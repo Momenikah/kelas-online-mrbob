@@ -1,0 +1,84 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'tutor' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/tutor" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Kuesioner</h1>
+    <button class="btn btn-light" onclick="toggleModal('quizModal')">
+      <i class="fas fa-plus"></i> Buat Kuesioner
+    </button>
+  </div>
+
+  <div class="container">
+    <% if (questionnaires.length === 0) { %>
+      <div class="empty-state"><i class="fas fa-clipboard-list"></i><p>Belum ada kuesioner.</p></div>
+    <% } else { %>
+      <div class="quiz-grid">
+        <% questionnaires.forEach(q => { %>
+        <div class="quiz-card">
+          <div class="quiz-card-header">
+            <div class="quiz-icon"><i class="fas fa-clipboard-question"></i></div>
+            <span class="quiz-program"><%= q.program_name %></span>
+          </div>
+          <h3 class="quiz-title"><%= q.title %></h3>
+          <% if (q.description) { %><p class="quiz-desc"><%= q.description %></p><% } %>
+          <div class="quiz-info">
+            <span><i class="fas fa-question-circle"></i> <%= q.question_count %> soal</span>
+            <span><i class="fas fa-users"></i> <%= q.response_count %> respon</span>
+            <% if (q.due_date) { %><span><i class="fas fa-calendar"></i> <%= formatDate(q.due_date) %></span><% } %>
+          </div>
+          <a href="/tutor/questionnaire/<%= q.id %>" class="btn btn-outline btn-full">
+            <i class="fas fa-eye"></i> Kelola Soal & Hasil
+          </a>
+        </div>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+
+  <!-- Create Questionnaire Modal -->
+  <div class="modal" id="quizModal" style="display:none">
+    <div class="modal-overlay" onclick="toggleModal('quizModal')"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Buat Kuesioner Baru</h3>
+        <button class="modal-close" onclick="toggleModal('quizModal')"><i class="fas fa-times"></i></button>
+      </div>
+      <form action="/tutor/questionnaire" method="POST" class="modal-form">
+        <div class="form-group">
+          <label class="form-label">Judul</label>
+          <input type="text" name="title" class="form-input" required placeholder="Contoh: Kuis TOEFL Sesi 1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Deskripsi</label>
+          <textarea name="description" class="form-textarea" rows="2" placeholder="Deskripsi kuesioner..."></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Program</label>
+            <select name="program_id" class="form-input" required>
+              <option value="">-- Pilih Program --</option>
+              <% programs.forEach(p => { %><option value="<%= p.id %>"><%= p.name %></option><% }) %>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Durasi (menit)</label>
+            <input type="number" name="duration_minutes" class="form-input" value="30" min="1">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Deadline</label>
+          <input type="datetime-local" name="due_date" class="form-input">
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" onclick="toggleModal('quizModal')">Batal</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Buat</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

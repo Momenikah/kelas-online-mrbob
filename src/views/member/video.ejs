@@ -1,0 +1,68 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'member' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/member" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1><i class="fas fa-gift"></i> Video Premium <span class="bonus-label">Bonus</span></h1>
+  </div>
+
+  <div class="container">
+    <% if (videos.length === 0) { %>
+      <div class="empty-state">
+        <i class="fas fa-video"></i>
+        <p>Belum ada video tersedia.</p>
+      </div>
+    <% } else { %>
+      <% let currentProgram = ''; %>
+      <% videos.forEach(v => { %>
+        <% if (v.program_name !== currentProgram) { %>
+          <h3 class="module-program-title"><i class="fas fa-graduation-cap"></i> <%= v.program_name %></h3>
+          <% currentProgram = v.program_name; %>
+        <% } %>
+        <div class="video-card">
+          <div class="video-thumb" onclick="playVideo('<%= v.id %>', '<%= v.video_url %>')">
+            <div class="video-play-btn"><i class="fas fa-play-circle"></i></div>
+            <div class="video-thumb-overlay">
+              <% if (v.is_premium) { %><span class="badge-premium">Premium</span><% } %>
+            </div>
+          </div>
+          <div class="video-info">
+            <h4><%= v.title %></h4>
+            <p><%= v.description %></p>
+            <div class="video-meta">
+              <% if (v.duration) { %><span><i class="fas fa-clock"></i> <%= v.duration %></span><% } %>
+            </div>
+            <button class="btn btn-primary" onclick="playVideo('<%= v.id %>', '<%= v.video_url %>')">
+              <i class="fas fa-play"></i> Tonton Video
+            </button>
+          </div>
+        </div>
+      <% }) %>
+    <% } %>
+  </div>
+
+  <!-- Video Modal -->
+  <div class="modal" id="videoModal" style="display:none">
+    <div class="modal-overlay" onclick="closeVideo()"></div>
+    <div class="modal-content video-modal">
+      <button class="modal-close" onclick="closeVideo()"><i class="fas fa-times"></i></button>
+      <div id="videoContainer"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function playVideo(id, url) {
+  const container = document.getElementById('videoContainer');
+  container.innerHTML = `<iframe src="${url}" frameborder="0" allowfullscreen width="100%" height="400"></iframe>`;
+  document.getElementById('videoModal').style.display = 'flex';
+}
+function closeVideo() {
+  document.getElementById('videoModal').style.display = 'none';
+  document.getElementById('videoContainer').innerHTML = '';
+}
+</script>
+
+<%- include('../partials/footer') %>

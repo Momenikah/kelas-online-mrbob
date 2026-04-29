@@ -1,0 +1,69 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'tutor' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/tutor" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Waktu Tersedia</h1>
+  </div>
+
+  <div class="container">
+    <div class="two-col">
+      <!-- Add new time -->
+      <div class="section-card">
+        <h3 class="section-title"><i class="fas fa-plus-circle"></i> Tambah Waktu Tersedia</h3>
+        <form action="/tutor/available-time" method="POST">
+          <div class="form-group">
+            <label class="form-label">Hari</label>
+            <select name="day_of_week" class="form-input" required>
+              <% days.forEach((d, i) => { %>
+              <option value="<%= i %>"><%= d %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Jam Mulai</label>
+              <input type="time" name="start_time" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Jam Selesai</label>
+              <input type="time" name="end_time" class="form-input" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Simpan</button>
+        </form>
+      </div>
+
+      <!-- Current schedule -->
+      <div class="section-card">
+        <h3 class="section-title"><i class="fas fa-clock"></i> Jadwal Waktu Tersedia</h3>
+        <% if (availableTimes.length === 0) { %>
+          <div class="empty-state"><i class="fas fa-clock"></i><p>Belum ada waktu tersedia.</p></div>
+        <% } else { %>
+          <div class="time-grid">
+            <% days.forEach((dayName, dayIdx) => { %>
+              <% const dayTimes = availableTimes.filter(t => t.day_of_week == dayIdx); %>
+              <% if (dayTimes.length > 0) { %>
+              <div class="time-day-group">
+                <h4 class="time-day-name"><%= dayName %></h4>
+                <% dayTimes.forEach(t => { %>
+                <div class="time-slot">
+                  <span><%= formatTime(t.start_time) %> - <%= formatTime(t.end_time) %></span>
+                  <form action="/tutor/available-time/<%= t.id %>/delete" method="POST" style="display:inline">
+                    <button class="btn-icon btn-danger-icon" title="Hapus"><i class="fas fa-times"></i></button>
+                  </form>
+                </div>
+                <% }) %>
+              </div>
+              <% } %>
+            <% }) %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

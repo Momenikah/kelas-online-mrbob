@@ -1,0 +1,100 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'tutor' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/tutor" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Kelola Presensi</h1>
+  </div>
+
+  <div class="container">
+    <!-- Select schedule -->
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-search"></i> Pilih Sesi</h3>
+      <form action="/tutor/presence" method="GET" class="filter-form">
+        <select name="schedule_id" class="form-input" onchange="this.form.submit()">
+          <option value="">-- Pilih Sesi --</option>
+          <% schedules.forEach(s => { %>
+          <option value="<%= s.id %>" <%= selectedId == s.id ? 'selected' : '' %>>
+            <%= formatDate(s.date) %> | <%= s.title %> (<%= s.program_name %>)
+          </option>
+          <% }) %>
+        </select>
+      </form>
+    </div>
+
+    <!-- Presence form -->
+    <% if (selectedSchedule) { %>
+    <div class="section-card">
+      <div class="presence-header">
+        <div>
+          <h3><%= selectedSchedule.title %></h3>
+          <p><%= formatDate(selectedSchedule.date) %> | <%= formatTime(selectedSchedule.start_time) %> - <%= formatTime(selectedSchedule.end_time) %></p>
+        </div>
+        <span class="badge-pill badge-<%= selectedSchedule.status %>">
+          <%= selectedSchedule.status === 'upcoming' ? 'Akan Datang' : 'Selesai' %>
+        </span>
+      </div>
+
+      <% if (members.length === 0) { %>
+        <div class="empty-state"><i class="fas fa-users"></i><p>Tidak ada peserta terdaftar.</p></div>
+      <% } else { %>
+        <form action="/tutor/presence/<%= selectedSchedule.id %>" method="POST">
+          <div class="presence-table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr><th>#</th><th>Nama Member</th><th>Status Kehadiran</th></tr>
+              </thead>
+              <tbody>
+                <% members.forEach((m, idx) => { %>
+                <tr>
+                  <td><%= idx + 1 %></td>
+                  <td>
+                    <div class="member-name-cell">
+                      <% if (m.photo) { %>
+                        <img src="<%= m.photo %>" class="table-avatar" alt="<%= m.name %>">
+                      <% } else { %>
+                        <div class="table-avatar-init"><%= getInitials(m.name) %></div>
+                      <% } %>
+                      <%= m.name %>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="presence-radio-group">
+                      <label class="presence-radio present">
+                        <input type="radio" name="presences[<%= m.id %>]" value="present" <%= m.status === 'present' ? 'checked' : '' %>>
+                        <span>Hadir</span>
+                      </label>
+                      <label class="presence-radio late">
+                        <input type="radio" name="presences[<%= m.id %>]" value="late" <%= m.status === 'late' ? 'checked' : '' %>>
+                        <span>Terlambat</span>
+                      </label>
+                      <label class="presence-radio excused">
+                        <input type="radio" name="presences[<%= m.id %>]" value="excused" <%= m.status === 'excused' ? 'checked' : '' %>>
+                        <span>Izin</span>
+                      </label>
+                      <label class="presence-radio absent">
+                        <input type="radio" name="presences[<%= m.id %>]" value="absent" <%= m.status === 'absent' ? 'checked' : '' %>>
+                        <span>Absen</span>
+                      </label>
+                    </div>
+                  </td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <div class="form-actions mt-20">
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-save"></i> Simpan Presensi
+            </button>
+          </div>
+        </form>
+      <% } %>
+    </div>
+    <% } %>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

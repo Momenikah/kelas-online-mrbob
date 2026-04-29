@@ -1,0 +1,114 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'admin' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+
+  <div class="profile-banner">
+    <h1 class="banner-title">Admin Panel</h1>
+    <div class="profile-avatar">
+      <% if (user.photo) { %>
+        <img src="<%= user.photo %>" alt="<%= user.name %>" class="avatar-img">
+      <% } else { %>
+        <div class="avatar-initials"><%= getInitials(user.name) %></div>
+      <% } %>
+    </div>
+    <h2 class="banner-name"><%= user.name %></h2>
+  </div>
+
+  <div class="container">
+    <div class="stats-row stats-row-5">
+      <div class="stat-card">
+        <div class="stat-icon"><i class="fas fa-users"></i></div>
+        <div class="stat-info">
+          <span class="stat-value"><%= stats.totalUsers %></span>
+          <span class="stat-label">Total Pengguna</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-present"><i class="fas fa-user-graduate"></i></div>
+        <div class="stat-info">
+          <span class="stat-value"><%= stats.totalMembers %></span>
+          <span class="stat-label">Member</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-rate"><i class="fas fa-chalkboard-teacher"></i></div>
+        <div class="stat-info">
+          <span class="stat-value"><%= stats.totalTutors %></span>
+          <span class="stat-label">Tutor</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-total"><i class="fas fa-id-card"></i></div>
+        <div class="stat-info">
+          <span class="stat-value"><%= stats.activeEnrollments %></span>
+          <span class="stat-label">Enrollment Aktif</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-absent"><i class="fas fa-calendar"></i></div>
+        <div class="stat-info">
+          <span class="stat-value"><%= stats.totalSchedules %></span>
+          <span class="stat-label">Jadwal</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="menu-grid">
+      <div class="menu-card" onclick="window.location='/admin/users'">
+        <div class="menu-icon-wrap"><div class="menu-icon"><i class="fas fa-users"></i></div></div>
+        <span class="menu-label">Kelola Pengguna</span>
+      </div>
+      <div class="menu-card" onclick="window.location='/admin/programs'">
+        <div class="menu-icon-wrap"><div class="menu-icon"><i class="fas fa-graduation-cap"></i></div></div>
+        <span class="menu-label">Kelola Program</span>
+      </div>
+      <div class="menu-card" onclick="window.location='/admin/enrollments'">
+        <div class="menu-icon-wrap"><div class="menu-icon"><i class="fas fa-id-card"></i></div></div>
+        <span class="menu-label">Enrollment</span>
+      </div>
+      <div class="menu-card menu-card-logout" onclick="if(confirm('Keluar?')) window.location='/logout'">
+        <div class="menu-icon-wrap"><div class="menu-icon menu-icon-logout"><i class="fas fa-right-from-bracket"></i></div></div>
+        <span class="menu-label menu-label-logout">Log Out</span>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-user-plus"></i> Pengguna Terbaru</h3>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr><th>Nama</th><th>Email</th><th>Role</th><th>VIP</th><th>Status</th><th>Bergabung</th></tr>
+          </thead>
+          <tbody>
+            <% recentUsers.forEach(u => { %>
+            <tr>
+              <td>
+                <div class="member-name-cell">
+                  <% if (u.photo) { %>
+                    <img src="<%= u.photo %>" class="table-avatar">
+                  <% } else { %>
+                    <div class="table-avatar-init"><%= getInitials(u.name) %></div>
+                  <% } %>
+                  <%= u.name %>
+                </div>
+              </td>
+              <td><%= u.email %></td>
+              <td><span class="badge-pill badge-<%= u.role %>"><%= u.role %></span></td>
+              <td><%= u.is_vip ? '⭐' : '-' %></td>
+              <td>
+                <% if (u.is_active) { %><span class="badge-pill badge-completed">Aktif</span>
+                <% } else { %><span class="badge-pill badge-cancelled">Non-aktif</span><% } %>
+              </td>
+              <td><%= formatDate(u.created_at) %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

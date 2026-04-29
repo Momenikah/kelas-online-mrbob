@@ -1,0 +1,14 @@
+<% if (locals.flashSuccess && flashSuccess.length > 0) { %>
+  <div class="alert alert-success">
+    <i class="fas fa-check-circle"></i>
+    <%= flashSuccess[0] %>
+    <button class="alert-close" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
+  </div>
+<% } %>
+<% if (locals.flashError && flashError.length > 0) { %>
+  <div class="alert alert-danger">
+    <i class="fas fa-exclamation-circle"></i>
+    <%= flashError[0] %>
+    <button class="alert-close" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
+  </div>
+<% } %>

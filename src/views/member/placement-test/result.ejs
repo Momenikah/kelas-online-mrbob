@@ -1,0 +1,115 @@
+<%- include('../../partials/head') %>
+<%- include('../../partials/navbar', { activeNav: 'member' }) %>
+
+<div class="page-wrapper">
+  <%- include('../../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/member/placement-test" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1><i class="fas fa-trophy"></i> Hasil Placement Test</h1>
+  </div>
+
+  <div class="container">
+    <!-- Hero result card -->
+    <div class="pt-result-hero level-<%= test.level_num %>">
+      <div class="pt-result-decoration"></div>
+      <p class="pt-result-greeting">Hai, kak <strong><%= test.full_name %></strong>! 👋</p>
+      <p class="pt-result-msg">Terima kasih sudah mencoba Placement Test for <%= test.test_type === 'kids' ? 'Kids' : 'Adult' %>. Berikut hasil tes kamu:</p>
+
+      <div class="pt-result-score-box">
+        <div class="pt-score-circle">
+          <span class="pt-score-num"><%= test.score %></span>
+          <span class="pt-score-max">/ <%= test.max_score %></span>
+        </div>
+        <div class="pt-score-info">
+          <span class="pt-score-pct"><%= pct %>%</span>
+          <span class="pt-score-label">Total Score</span>
+        </div>
+      </div>
+
+      <div class="pt-level-badge">
+        <span class="pt-level-num"><%= test.level_label %></span>
+        <span class="pt-level-desc"><%= test.level_desc %></span>
+      </div>
+
+      <p class="pt-result-recommendation">
+        <i class="fas fa-info-circle"></i>
+        Berdasarkan skor di atas, kamu direkomendasikan untuk mengikuti program di
+        <strong><%= test.level_label %> – <%= test.level_desc %></strong>.
+      </p>
+    </div>
+
+    <!-- Score breakdown -->
+    <div class="section-card mt-20">
+      <h3 class="section-title"><i class="fas fa-chart-pie"></i> Detail Skor</h3>
+      <div class="progress-label">
+        <span>Persentase Skor</span>
+        <strong><%= pct %>%</strong>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" style="width: <%= pct %>%"></div>
+      </div>
+      <div class="pt-level-scale">
+        <div class="pt-level-step <%= test.level_num >= 1 ? 'active' : '' %>"><span>L1</span><small>Beginner</small></div>
+        <div class="pt-level-step <%= test.level_num >= 2 ? 'active' : '' %>"><span>L2</span><small>Elementary</small></div>
+        <div class="pt-level-step <%= test.level_num >= 3 ? 'active' : '' %>"><span>L3</span><small>Pre-Int</small></div>
+        <div class="pt-level-step <%= test.level_num >= 4 ? 'active' : '' %>"><span>L4</span><small>Intermediate</small></div>
+        <div class="pt-level-step <%= test.level_num >= 5 ? 'active' : '' %>"><span>L5</span><small>Advanced</small></div>
+      </div>
+    </div>
+
+    <!-- Profile Info -->
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-id-card"></i> Data Peserta</h3>
+      <div class="pt-profile-grid">
+        <div><strong>Nama</strong><span><%= test.full_name %></span></div>
+        <div><strong>Email</strong><span><%= test.email %></span></div>
+        <div><strong>Kota</strong><span><%= test.city %></span></div>
+        <div><strong>WhatsApp</strong><span><%= test.phone %></span></div>
+        <div><strong>Tanggal</strong><span><%= formatDate(test.taken_at) %></span></div>
+      </div>
+    </div>
+
+    <!-- Review Answers -->
+    <% if (questions && questions.length > 0) { %>
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-list-check"></i> Review Jawaban</h3>
+      <% const userAnswers = typeof test.answers === 'string' ? JSON.parse(test.answers) : (test.answers || {}); %>
+      <% questions.forEach((q, idx) => { %>
+        <% const userAns = userAnswers[q.key] || '-'; %>
+        <% const isCorrect = userAns === q.correct; %>
+        <div class="pt-review-item <%= isCorrect ? 'correct' : 'wrong' %>">
+          <div class="pt-review-num">
+            <%= idx + 1 %>
+            <i class="fas <%= isCorrect ? 'fa-check' : 'fa-times' %>"></i>
+          </div>
+          <div class="pt-review-body">
+            <span class="pt-section-tag"><%= q.section %></span>
+            <p class="pt-review-q"><%= q.question.replace(/\n/g, ' ') %></p>
+            <div class="pt-review-answers">
+              <span class="pt-ans-line">
+                <strong>Jawabanmu:</strong> <%= userAns %>
+              </span>
+              <% if (!isCorrect) { %>
+                <span class="pt-ans-line correct-line">
+                  <strong>Jawaban benar:</strong> <%= q.correct %>
+                </span>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+    <% } %>
+
+    <div class="pt-result-actions">
+      <a href="/member/placement-test" class="btn btn-outline">
+        <i class="fas fa-clipboard-check"></i> Kembali ke Placement Test
+      </a>
+      <a href="/member" class="btn btn-primary">
+        <i class="fas fa-home"></i> Kembali ke Member Area
+      </a>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/footer') %>

@@ -1,0 +1,67 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'member' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+
+  <div class="sub-banner">
+    <a href="/member" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Modul Belajar</h1>
+  </div>
+
+  <div class="container">
+    <% if (modules.length === 0) { %>
+      <div class="empty-state">
+        <i class="fas fa-book-open"></i>
+        <p>Belum ada modul tersedia.</p>
+      </div>
+    <% } else { %>
+      <% let currentProgram = ''; %>
+      <% modules.forEach(m => { %>
+        <% if (m.program_name !== currentProgram) { %>
+          <h3 class="module-program-title"><i class="fas fa-graduation-cap"></i> <%= m.program_name %></h3>
+          <% currentProgram = m.program_name; %>
+        <% } %>
+        <div class="module-card <%= m.is_premium ? 'premium' : '' %>">
+          <div class="module-num"><%= m.order_number %></div>
+          <div class="module-body">
+            <div class="module-header">
+              <h4><%= m.title %></h4>
+              <% if (m.is_premium) { %><span class="badge-premium"><i class="fas fa-star"></i> Premium</span><% } %>
+            </div>
+            <p class="module-desc"><%= m.description %></p>
+            <div class="module-actions">
+              <% if (m.file_url) { %>
+                <a href="<%= m.file_url %>" class="btn btn-sm btn-outline" target="_blank">
+                  <i class="fas fa-file-download"></i> Download Materi
+                </a>
+              <% } %>
+              <% if (m.video_url) { %>
+                <a href="<%= m.video_url %>" class="btn btn-sm btn-primary" target="_blank">
+                  <i class="fas fa-play-circle"></i> Tonton Video
+                </a>
+              <% } %>
+              <% if (!m.file_url && !m.video_url) { %>
+                <button class="btn btn-sm btn-outline" onclick="showContent('<%= m.id %>')">
+                  <i class="fas fa-book-open"></i> Baca Materi
+                </button>
+              <% } %>
+            </div>
+            <div class="module-content" id="content-<%= m.id %>" style="display:none">
+              <div class="content-box"><%= m.content %></div>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    <% } %>
+  </div>
+</div>
+
+<script>
+function showContent(id) {
+  const el = document.getElementById('content-' + id);
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+
+<%- include('../partials/footer') %>

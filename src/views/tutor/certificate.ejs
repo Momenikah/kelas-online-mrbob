@@ -1,0 +1,83 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'tutor' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/tutor" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Kelola Sertifikat</h1>
+    <button class="btn btn-light" onclick="toggleModal('certModal')">
+      <i class="fas fa-plus"></i> Terbitkan Sertifikat
+    </button>
+  </div>
+
+  <div class="container">
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-id-card-alt"></i> Sertifikat Diterbitkan</h3>
+      <% if (certificates.length === 0) { %>
+        <div class="empty-state"><i class="fas fa-award"></i><p>Belum ada sertifikat diterbitkan.</p></div>
+      <% } else { %>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr><th>Nomor</th><th>Member</th><th>Program</th><th>Judul</th><th>Tanggal</th></tr>
+            </thead>
+            <tbody>
+              <% certificates.forEach(c => { %>
+              <tr>
+                <td><%= c.certificate_number %></td>
+                <td><%= c.member_name %></td>
+                <td><%= c.program_name %></td>
+                <td><%= c.title %></td>
+                <td><%= formatDate(c.issued_date) %></td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Issue Certificate Modal -->
+  <div class="modal" id="certModal" style="display:none">
+    <div class="modal-overlay" onclick="toggleModal('certModal')"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Terbitkan Sertifikat</h3>
+        <button class="modal-close" onclick="toggleModal('certModal')"><i class="fas fa-times"></i></button>
+      </div>
+      <form action="/tutor/certificate" method="POST" class="modal-form">
+        <div class="form-group">
+          <label class="form-label">Member & Program</label>
+          <select name="member_id" class="form-input" required onchange="updateProgramFromMember(this)">
+            <option value="">-- Pilih Member --</option>
+            <% members.forEach(m => { %>
+              <option value="<%= m.id %>" data-program="<%= m.program_id %>" data-program-name="<%= m.program_name %>">
+                <%= m.name %> (<%= m.program_name %>)
+              </option>
+            <% }) %>
+          </select>
+          <input type="hidden" name="program_id" id="programIdHidden">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Judul Sertifikat</label>
+          <input type="text" name="title" class="form-input" required placeholder="Contoh: Sertifikat Kelulusan TOEFL Preparation">
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" onclick="toggleModal('certModal')">Batal</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-award"></i> Terbitkan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function updateProgramFromMember(select) {
+  const opt = select.options[select.selectedIndex];
+  document.getElementById('programIdHidden').value = opt.dataset.program || '';
+}
+</script>
+
+<%- include('../partials/footer') %>

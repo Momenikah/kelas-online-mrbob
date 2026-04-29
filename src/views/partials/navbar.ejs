@@ -1,0 +1,24 @@
+<nav class="navbar">
+  <div class="navbar-inner">
+    <a href="/" class="navbar-brand">
+      <div class="logo-box">
+        <span class="logo-super">Super</span>
+        <span class="logo-seru">Seru!</span>
+      </div>
+    </a>
+    <div class="navbar-nav">
+      <% if (locals.currentUser) { %>
+        <% if (currentUser.role === 'admin') { %>
+          <a href="/admin" class="nav-link <%= typeof activeNav !== 'undefined' && activeNav === 'admin' ? 'active' : '' %>">Admin Panel</a>
+        <% } else if (currentUser.role === 'tutor') { %>
+          <a href="/tutor" class="nav-link <%= typeof activeNav !== 'undefined' && activeNav === 'tutor' ? 'active' : '' %>">Tutor Area</a>
+        <% } else { %>
+          <a href="/member" class="nav-link <%= typeof activeNav !== 'undefined' && activeNav === 'member' ? 'active' : '' %>">Member Area</a>
+        <% } %>
+        <a href="/logout" class="nav-link">Log Out</a>
+      <% } else { %>
+        <a href="/login" class="nav-link">Login</a>
+      <% } %>
+    </div>
+  </div>
+</nav>

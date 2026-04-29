@@ -1,0 +1,140 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'tutor' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+
+  <!-- Profile Banner -->
+  <div class="profile-banner">
+    <h1 class="banner-title">Tutor Area</h1>
+    <div class="profile-avatar">
+      <% if (user.photo) { %>
+        <img src="<%= user.photo %>" alt="<%= user.name %>" class="avatar-img">
+      <% } else { %>
+        <div class="avatar-initials"><%= getInitials(user.name) %></div>
+      <% } %>
+    </div>
+    <h2 class="banner-name"><%= user.name %></h2>
+    <a href="/tutor/profile" class="btn-edit-profile">
+      <i class="fas fa-edit"></i> EDIT PROFILE
+    </a>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="container">
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-icon"><i class="fas fa-users"></i></div>
+        <div class="stat-info">
+          <span class="stat-value"><%= memberCount %></span>
+          <span class="stat-label">Total Member</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon"><i class="fas fa-calendar-check"></i></div>
+        <div class="stat-info">
+          <span class="stat-value"><%= presStats.total_schedules %></span>
+          <span class="stat-label">Total Sesi</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon"><i class="fas fa-check-double"></i></div>
+        <div class="stat-info">
+          <span class="stat-value"><%= presStats.completed %></span>
+          <span class="stat-label">Sesi Selesai</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Menu Grid -->
+  <div class="container">
+    <div class="menu-grid">
+
+      <div class="menu-card" onclick="window.location='/tutor/schedule'">
+        <div class="menu-icon-wrap">
+          <div class="menu-icon"><i class="fas fa-calendar-alt"></i></div>
+        </div>
+        <span class="menu-label">Schedule</span>
+      </div>
+
+      <div class="menu-card" onclick="window.location='/tutor/available-time'">
+        <div class="menu-icon-wrap">
+          <div class="menu-icon"><i class="fas fa-clock"></i></div>
+        </div>
+        <span class="menu-label">Available Time</span>
+      </div>
+
+      <div class="menu-card" onclick="window.location='/tutor/presence'">
+        <div class="menu-icon-wrap">
+          <div class="menu-icon"><i class="fas fa-user-check"></i></div>
+        </div>
+        <span class="menu-label">Presence</span>
+      </div>
+
+      <div class="menu-card" onclick="window.location='/tutor/questionnaire'">
+        <div class="menu-icon-wrap">
+          <div class="menu-icon"><i class="fas fa-table-cells"></i></div>
+        </div>
+        <span class="menu-label">questionnaire</span>
+      </div>
+
+      <div class="menu-card" onclick="window.location='/tutor/report'">
+        <div class="menu-icon-wrap">
+          <div class="menu-icon"><i class="fas fa-file-alt"></i></div>
+        </div>
+        <span class="menu-label">Member's Report</span>
+      </div>
+
+      <div class="menu-card" onclick="window.location='/tutor/certificate'">
+        <div class="menu-icon-wrap">
+          <div class="menu-icon"><i class="fas fa-id-card-alt"></i></div>
+        </div>
+        <span class="menu-label">E-Certificate</span>
+      </div>
+
+      <div class="menu-card" onclick="window.location='#'" title="Hubungi admin">
+        <div class="menu-icon-wrap">
+          <div class="menu-icon"><i class="fas fa-circle-info"></i></div>
+        </div>
+        <span class="menu-label">Help & Support</span>
+      </div>
+
+      <div class="menu-card menu-card-logout" onclick="if(confirm('Keluar dari akun?')) window.location='/logout'">
+        <div class="menu-icon-wrap">
+          <div class="menu-icon menu-icon-logout"><i class="fas fa-right-from-bracket"></i></div>
+        </div>
+        <span class="menu-label menu-label-logout">Log Out</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Upcoming Schedules -->
+  <% if (upcomingSchedules && upcomingSchedules.length > 0) { %>
+  <div class="container">
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-calendar"></i> Jadwal Mengajar Berikutnya</h3>
+      <div class="schedule-list">
+        <% upcomingSchedules.forEach(s => { %>
+        <div class="schedule-item">
+          <div class="schedule-date-badge">
+            <span class="sdb-day"><%= new Date(s.date).toLocaleDateString('id-ID', {day:'2-digit'}) %></span>
+            <span class="sdb-month"><%= new Date(s.date).toLocaleDateString('id-ID', {month:'short'}) %></span>
+          </div>
+          <div class="schedule-info">
+            <strong><%= s.title %></strong>
+            <span><i class="fas fa-book"></i> <%= s.program_name %></span>
+            <span><i class="fas fa-clock"></i> <%= formatTime(s.start_time) %> - <%= formatTime(s.end_time) %></span>
+          </div>
+          <a href="/tutor/schedule" class="btn btn-sm btn-outline">Detail</a>
+        </div>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+</div>
+
+<%- include('../partials/footer') %>

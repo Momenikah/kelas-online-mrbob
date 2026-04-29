@@ -1,0 +1,109 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'tutor' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/tutor" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Jadwal Mengajar</h1>
+    <button class="btn btn-light" onclick="toggleModal('scheduleModal')">
+      <i class="fas fa-plus"></i> Tambah Jadwal
+    </button>
+  </div>
+
+  <div class="container">
+    <% if (schedules.length === 0) { %>
+      <div class="empty-state"><i class="fas fa-calendar-times"></i><p>Belum ada jadwal.</p></div>
+    <% } else { %>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr><th>Tanggal</th><th>Judul Sesi</th><th>Program</th><th>Waktu</th><th>Peserta</th><th>Status</th><th>Aksi</th></tr>
+          </thead>
+          <tbody>
+            <% schedules.forEach(s => { %>
+            <tr>
+              <td><%= formatDate(s.date) %></td>
+              <td><strong><%= s.title %></strong></td>
+              <td><%= s.program_name %></td>
+              <td><%= formatTime(s.start_time) %> - <%= formatTime(s.end_time) %></td>
+              <td><i class="fas fa-users"></i> <%= s.present_count %>/<%= s.registered_count %></td>
+              <td>
+                <span class="badge-pill badge-<%= s.status %>">
+                  <%= s.status === 'upcoming' ? 'Akan Datang' : s.status === 'completed' ? 'Selesai' : 'Dibatalkan' %>
+                </span>
+              </td>
+              <td class="td-actions">
+                <a href="/tutor/presence?schedule_id=<%= s.id %>" class="btn btn-sm btn-outline">
+                  <i class="fas fa-user-check"></i> Presensi
+                </a>
+                <form action="/tutor/schedule/<%= s.id %>/delete" method="POST" style="display:inline" onsubmit="return confirm('Hapus jadwal ini?')">
+                  <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+
+  <!-- Add Schedule Modal -->
+  <div class="modal" id="scheduleModal" style="display:none">
+    <div class="modal-overlay" onclick="toggleModal('scheduleModal')"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Tambah Jadwal Baru</h3>
+        <button class="modal-close" onclick="toggleModal('scheduleModal')"><i class="fas fa-times"></i></button>
+      </div>
+      <form action="/tutor/schedule" method="POST" class="modal-form">
+        <div class="form-group">
+          <label class="form-label">Program</label>
+          <select name="program_id" class="form-input" required>
+            <option value="">-- Pilih Program --</option>
+            <% programs.forEach(p => { %><option value="<%= p.id %>"><%= p.name %></option><% }) %>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Judul Sesi</label>
+          <input type="text" name="title" class="form-input" placeholder="Contoh: Sesi Listening TOEFL" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Deskripsi</label>
+          <textarea name="description" class="form-textarea" rows="2" placeholder="Deskripsi sesi..."></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Tanggal</label>
+            <input type="date" name="date" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Mulai</label>
+            <input type="time" name="start_time" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Selesai</label>
+            <input type="time" name="end_time" class="form-input" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Lokasi</label>
+            <input type="text" name="location" class="form-input" placeholder="Contoh: Online via Zoom">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Link Meeting</label>
+            <input type="url" name="meeting_link" class="form-input" placeholder="https://zoom.us/...">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" onclick="toggleModal('scheduleModal')">Batal</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

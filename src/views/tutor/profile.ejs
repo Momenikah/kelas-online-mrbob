@@ -1,0 +1,62 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'tutor' }) %>
+
+<div class="page-wrapper">
+  <div class="sub-banner">
+    <a href="/tutor" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Edit Profil Tutor</h1>
+  </div>
+
+  <div class="container">
+    <%- include('../partials/flash') %>
+
+    <div class="profile-form-card">
+      <div class="profile-photo-section">
+        <div class="profile-photo-preview">
+          <% if (profile.photo) { %>
+            <img src="<%= profile.photo %>" alt="Foto" class="preview-img">
+          <% } else { %>
+            <div class="avatar-initials avatar-xl"><%= getInitials(profile.name) %></div>
+          <% } %>
+        </div>
+      </div>
+
+      <form action="/tutor/profile" method="POST" enctype="multipart/form-data">
+        <div class="form-group">
+          <label class="form-label">Foto Profil</label>
+          <input type="file" name="photo" accept="image/*" class="form-input">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Nama Lengkap</label>
+            <input type="text" name="name" class="form-input" value="<%= profile.name %>" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-input" value="<%= profile.email %>" disabled>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Nomor HP</label>
+          <input type="tel" name="phone" class="form-input" value="<%= profile.phone || '' %>" placeholder="08xxxxxxxxxx">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Bio Pengajar</label>
+          <textarea name="bio" class="form-textarea" rows="4" placeholder="Pengalaman mengajar, keahlian, dll..."><%= profile.bio || '' %></textarea>
+        </div>
+
+        <div class="form-actions">
+          <a href="/tutor" class="btn btn-outline">Batal</a>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save"></i> Simpan Perubahan
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

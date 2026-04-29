@@ -1,0 +1,170 @@
+<%- include('../../partials/head') %>
+<%- include('../../partials/navbar', { activeNav: 'member' }) %>
+
+<div class="page-wrapper">
+  <%- include('../../partials/flash') %>
+
+  <div class="sub-banner">
+    <a href="/member/placement-test" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1><i class="fas fa-child"></i> Placement Test for Kids</h1>
+    <span class="pt-age-badge">Age 7-12</span>
+  </div>
+
+  <div class="container">
+    <div class="pt-intro-card pt-kids-intro">
+      <div class="pt-intro-icon"><i class="fas fa-star"></i></div>
+      <div>
+        <h3>Hai, kakak! Selamat datang di Placement Test 🎉</h3>
+        <p>Tes ini terdiri dari <strong>20 soal</strong> dalam 3 bagian: Gambar, Percakapan, dan Listening. Pilih jawaban terbaik. Kerjakan dengan tenang ya!</p>
+      </div>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="pt-progress-wrap">
+      <div class="pt-progress-info">
+        <span>Soal <strong id="curStep">1</strong> dari <%= questions.length %> + 1 (data diri)</span>
+        <span><strong id="curPct">5</strong>%</span>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="progressBar" style="width: 5%"></div>
+      </div>
+    </div>
+
+    <form action="/member/placement-test/kids" method="POST" id="ptForm">
+      <% questions.forEach((q, idx) => { %>
+        <div class="pt-step <%= idx === 0 ? 'active' : '' %>" data-step="<%= idx + 1 %>">
+          <div class="pt-question-card">
+            <div class="pt-question-header">
+              <span class="pt-section-tag"><%= q.section %></span>
+              <span class="pt-question-num">Soal <%= idx + 1 %> / <%= questions.length %></span>
+            </div>
+
+            <% if (q.image) { %>
+              <div class="pt-image-wrap">
+                <img src="<%= q.image %>" alt="Question <%= idx + 1 %>" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="pt-image-fallback" style="display:none">
+                  <i class="fas <%= q.imageFallback || 'fa-image' %>"></i>
+                  <span>Gambar tidak tersedia</span>
+                </div>
+              </div>
+            <% } %>
+
+            <% if (q.audio) { %>
+              <div class="pt-audio-wrap">
+                <% if (q.instruction) { %><p class="pt-audio-instruction"><i class="fas fa-info-circle"></i> <%= q.instruction %></p><% } %>
+                <iframe width="100%" height="120" scrolling="no" frameborder="no" allow="autoplay" src="<%= q.audio %>"></iframe>
+              </div>
+            <% } %>
+
+            <p class="pt-question-text"><%= q.question %></p>
+
+            <div class="pt-options">
+              <% q.options.forEach((opt, oi) => { %>
+                <label class="pt-option-label">
+                  <input type="radio" name="<%= q.key %>" value="<%= opt %>" required>
+                  <span class="pt-option-letter"><%= q.type === 'yesno' ? opt.charAt(0) : String.fromCharCode(65 + oi) %></span>
+                  <span class="pt-option-text"><%= opt %></span>
+                </label>
+              <% }) %>
+            </div>
+          </div>
+
+          <div class="pt-step-nav">
+            <% if (idx > 0) { %>
+              <button type="button" class="btn btn-outline" onclick="goPrev()"><i class="fas fa-arrow-left"></i> Sebelumnya</button>
+            <% } else { %>
+              <span></span>
+            <% } %>
+            <button type="button" class="btn btn-primary" onclick="goNext()">
+              Selanjutnya <i class="fas fa-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+      <% }) %>
+
+      <!-- Final Step: Profile Form -->
+      <div class="pt-step" data-step="<%= questions.length + 1 %>">
+        <div class="pt-question-card">
+          <div class="pt-question-header">
+            <span class="pt-section-tag"><i class="fas fa-id-card"></i> Data Diri</span>
+            <span class="pt-question-num">Langkah Akhir</span>
+          </div>
+          <p class="pt-question-text">Hampir selesai! Lengkapi data dirimu di bawah ini untuk menerima hasil placement test.</p>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label"><i class="fas fa-user"></i> Nama Lengkap</label>
+              <input type="text" name="full_name" class="form-input" value="<%= profile.name %>" placeholder="Contoh: Nabilla" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label"><i class="fas fa-envelope"></i> Email</label>
+              <input type="email" name="email" class="form-input" value="<%= profile.email %>" placeholder="example@mail.com" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label"><i class="fas fa-city"></i> Kota</label>
+              <input type="text" name="city" class="form-input" placeholder="Contoh: Jakarta" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label"><i class="fab fa-whatsapp"></i> No. WhatsApp</label>
+              <input type="tel" name="phone" class="form-input" placeholder="Contoh: 081234567890" required>
+            </div>
+          </div>
+        </div>
+        <div class="pt-step-nav">
+          <button type="button" class="btn btn-outline" onclick="goPrev()"><i class="fas fa-arrow-left"></i> Sebelumnya</button>
+          <button type="submit" class="btn btn-primary btn-lg">
+            <i class="fas fa-check-circle"></i> Submit & Lihat Hasil
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const totalSteps = <%= questions.length %> + 1;
+let curStep = 1;
+
+function showStep(n) {
+  document.querySelectorAll('.pt-step').forEach(s => s.classList.remove('active'));
+  const target = document.querySelector(`.pt-step[data-step="${n}"]`);
+  if (target) {
+    target.classList.add('active');
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  curStep = n;
+  const pct = Math.round(n / totalSteps * 100);
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('curStep').textContent = n;
+  document.getElementById('curPct').textContent = pct;
+}
+
+function goNext() {
+  // Validate current step's question
+  const current = document.querySelector('.pt-step.active');
+  const inputs = current.querySelectorAll('input[type="radio"]');
+  if (inputs.length > 0) {
+    const name = inputs[0].name;
+    const checked = current.querySelector(`input[name="${name}"]:checked`);
+    if (!checked) {
+      alert('Silakan pilih jawaban terlebih dahulu.');
+      return;
+    }
+  }
+  if (curStep < totalSteps) showStep(curStep + 1);
+}
+function goPrev() {
+  if (curStep > 1) showStep(curStep - 1);
+}
+
+// Auto-advance on radio click (optional UX boost)
+document.querySelectorAll('.pt-option-label input').forEach(input => {
+  input.addEventListener('change', () => {
+    setTimeout(goNext, 350);
+  });
+});
+</script>
+
+<%- include('../../partials/footer') %>

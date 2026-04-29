@@ -1,0 +1,66 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'member' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/member" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1><i class="fas fa-trophy"></i> Simulasi TOEFL <span class="vip-label">VIP Only</span></h1>
+  </div>
+
+  <div class="container">
+    <div class="toefl-info-card">
+      <div class="toefl-info-icon"><i class="fas fa-star"></i></div>
+      <div>
+        <h3>Selamat datang di Simulasi TOEFL!</h3>
+        <p>Latih kemampuan TOEFL Anda dengan soal-soal yang mendekati ujian asli. Tersedia untuk member VIP.</p>
+      </div>
+    </div>
+
+    <!-- Simulations -->
+    <div class="sim-grid">
+      <% simulations.forEach(s => { %>
+      <div class="sim-card">
+        <div class="sim-icon"><i class="fas fa-file-alt"></i></div>
+        <h4><%= s.title %></h4>
+        <p><%= s.description %></p>
+        <div class="sim-meta">
+          <span><i class="fas fa-clock"></i> <%= s.duration_minutes %> menit</span>
+          <span><i class="fas fa-tasks"></i> 3 Sections</span>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="alert('Fitur simulasi akan segera tersedia!')">
+          <i class="fas fa-play"></i> Mulai Simulasi
+        </button>
+      </div>
+      <% }) %>
+    </div>
+
+    <!-- Results history -->
+    <% if (results.length > 0) { %>
+    <div class="section-card mt-20">
+      <h3 class="section-title"><i class="fas fa-history"></i> Riwayat Hasil</h3>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr><th>Simulasi</th><th>Listening</th><th>Structure</th><th>Reading</th><th>Total</th><th>Tanggal</th></tr>
+          </thead>
+          <tbody>
+            <% results.forEach(r => { %>
+            <tr>
+              <td><%= r.title %></td>
+              <td><%= r.listening_score %></td>
+              <td><%= r.structure_score %></td>
+              <td><%= r.reading_score %></td>
+              <td><strong><%= r.total_score %></strong></td>
+              <td><%= formatDate(r.taken_at) %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <% } %>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>
