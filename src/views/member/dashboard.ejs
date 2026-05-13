@@ -1,0 +1,159 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'member' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+
+  <!-- Profile Banner -->
+  <div class="profile-banner">
+    <h1 class="banner-title">Member Area</h1>
+    <div class="profile-avatar">
+      <% if (user.photo) { %>
+        <img src="<%= user.photo %>" alt="<%= user.name %>" class="avatar-img">
+      <% } else { %>
+        <div class="avatar-initials"><%= getInitials(user.name) %></div>
+      <% } %>
+    </div>
+    <h2 class="banner-name"><%= user.name %></h2>
+    <% if (user.is_vip) { %><div><span class="vip-badge-banner"><i class="fas fa-crown"></i> VIP Member</span></div><% } %>
+    <a href="/member/profile" class="btn-edit-profile">
+      <i class="fas fa-pen-to-square"></i> EDIT PROFILE
+    </a>
+  </div>
+
+  <!-- Notifications -->
+  <% if (notifications && notifications.length > 0) { %>
+  <div class="container">
+    <div class="notif-bar">
+      <i class="fas fa-bell notif-icon"></i>
+      <span class="notif-text"><%= notifications[0].title %>: <%= notifications[0].message %></span>
+      <button class="notif-close" onclick="markNotifsRead(this.parentElement)"><i class="fas fa-times"></i></button>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- Upcoming Schedule Preview -->
+  <% if (upcomingSchedules && upcomingSchedules.length > 0) { %>
+  <div class="container">
+    <div class="upcoming-banner">
+      <i class="fas fa-calendar-check"></i>
+      <span>Jadwal berikutnya: <strong><%= upcomingSchedules[0].title %></strong> - <%= formatDate(upcomingSchedules[0].date) %> pukul <%= formatTime(upcomingSchedules[0].start_time) %></span>
+      <% if (upcomingSchedules[0].meeting_link) { %>
+        <a href="<%= upcomingSchedules[0].meeting_link %>" target="_blank" class="btn-join">
+          <i class="fas fa-video"></i> Join
+        </a>
+      <% } %>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- Menu Grid -->
+  <div class="container">
+    <div class="menu-grid">
+
+      <div class="menu-card" onclick="window.location='/member/schedule'">
+        <div class="menu-icon-wrap">
+          <div class="menu-icon"><i class="fas fa-calendar-alt"></i></div>
+        </div>
+        <span class="menu-label">Schedule</span>
+      </div>
+
+      <div class="menu-card" onclick="window.location='/member/module'">
+        <div class="menu-icon-wrap">
+          <div class="menu-icon"><i class="fas fa-layer-group"></i></div>
+        </div>
+        <span class="menu-label">Module</span>
+      </div>
+
+      <div class="menu-card" onclick="window.location='/member/presence'">
+        <div class="menu-icon-wrap">
+          <div class="menu-icon"><i class="fas fa-user-check"></i></div>
+        </div>
+        <span class="menu-label">Presence</span>
+      </div>
+
+      <div class="menu-card" onclick="window.location='/member/questionnaire'">
+        <div class="menu-icon-wrap">
+          <div class="menu-icon"><i class="fas fa-table-cells"></i></div>
+        </div>
+        <span class="menu-label">questionnaire</span>
+      </div>
+
+      <div class="menu-card" onclick="window.location='/member/report'">
+        <div class="menu-icon-wrap">
+          <div class="menu-icon"><i class="fas fa-file-alt"></i></div>
+        </div>
+        <span class="menu-label">Member's Report</span>
+      </div>
+
+      <div class="menu-card" onclick="window.location='/member/certificate'">
+        <div class="menu-icon-wrap">
+          <div class="menu-icon"><i class="fas fa-id-card-alt"></i></div>
+        </div>
+        <span class="menu-label">E-Certificate</span>
+      </div>
+
+      <div class="menu-card <%= !user.is_vip ? 'menu-card-locked' : '' %>" onclick="window.location='/member/toefl'">
+        <div class="menu-icon-wrap">
+          <span class="card-badge badge-vip">VIP Only</span>
+          <div class="menu-icon menu-icon-vip"><i class="fas fa-trophy"></i></div>
+        </div>
+        <span class="menu-label">TOEFL Simulation</span>
+      </div>
+
+      <div class="menu-card" onclick="window.location='/member/video'">
+        <div class="menu-icon-wrap">
+          <span class="card-badge badge-bonus">Bonus</span>
+          <div class="menu-icon menu-icon-bonus"><i class="fas fa-gift"></i></div>
+        </div>
+        <span class="menu-label">Video Premium</span>
+      </div>
+
+      <div class="menu-card" onclick="window.location='/member/renewal'">
+        <div class="menu-icon-wrap">
+          <div class="menu-icon"><i class="fas fa-arrows-rotate"></i></div>
+        </div>
+        <span class="menu-label">Renewal Program</span>
+      </div>
+
+      <div class="menu-card menu-card-logout" onclick="if(confirm('Keluar dari akun?')) window.location='/logout'">
+        <div class="menu-icon-wrap">
+          <div class="menu-icon menu-icon-logout"><i class="fas fa-right-from-bracket"></i></div>
+        </div>
+        <span class="menu-label menu-label-logout">Log Out</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Active Enrollments -->
+  <% if (enrollments && enrollments.length > 0) { %>
+  <div class="container">
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-graduation-cap"></i> Program Aktif</h3>
+      <div class="enrollment-list">
+        <% enrollments.forEach(e => { %>
+        <div class="enrollment-item">
+          <div class="enrollment-icon"><i class="fas fa-book"></i></div>
+          <div class="enrollment-info">
+            <strong><%= e.program_name %></strong>
+            <span>Berlaku hingga: <%= formatDate(e.end_date) %></span>
+          </div>
+          <span class="badge-status badge-active">Aktif</span>
+        </div>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+</div>
+
+<script>
+function markNotifsRead(el) {
+  fetch('/member/notifications/read', { method: 'POST' });
+  el.remove();
+}
+</script>
+
+<%- include('../partials/footer') %>

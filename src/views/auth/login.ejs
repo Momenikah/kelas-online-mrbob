@@ -1,0 +1,80 @@
+<%- include('../partials/head') %>
+
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="logo-box logo-lg">
+        <span class="logo-super">Super</span>
+        <span class="logo-seru">Seru!</span>
+      </div>
+      <p class="auth-subtitle">Learning Management Platform</p>
+    </div>
+
+    <% if (error && error.length > 0) { %>
+      <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <%= error[0] %></div>
+    <% } %>
+    <% if (success && success.length > 0) { %>
+      <div class="alert alert-success"><i class="fas fa-check-circle"></i> <%= success[0] %></div>
+    <% } %>
+
+    <h2 class="auth-title">Masuk ke Akun</h2>
+
+    <form action="/login" method="POST" class="auth-form">
+      <div class="form-group">
+        <label class="form-label"><i class="fas fa-envelope"></i> Email</label>
+        <input type="email" name="email" class="form-input" placeholder="Masukkan email Anda" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label"><i class="fas fa-lock"></i> Password</label>
+        <div class="input-password-wrapper">
+          <input type="password" name="password" id="passwordInput" class="form-input" placeholder="Masukkan password" required>
+          <button type="button" class="toggle-password" onclick="togglePassword()">
+            <i class="fas fa-eye" id="eyeIcon"></i>
+          </button>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">
+        <i class="fas fa-sign-in-alt"></i> Masuk
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      <p>Belum punya akun? <a href="/register" class="auth-link">Daftar sekarang</a></p>
+    </div>
+
+    <div class="demo-accounts">
+      <p class="demo-title">Akun Demo:</p>
+      <div class="demo-grid">
+        <div class="demo-item" onclick="fillLogin('admin@kelasonline.com','admin123')">
+          <i class="fas fa-user-shield"></i> Admin
+        </div>
+        <div class="demo-item" onclick="fillLogin('tutor@kelasonline.com','tutor123')">
+          <i class="fas fa-chalkboard-teacher"></i> Tutor
+        </div>
+        <div class="demo-item" onclick="fillLogin('member@kelasonline.com','member123')">
+          <i class="fas fa-user-graduate"></i> Member
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function fillLogin(email, pass) {
+  document.querySelector('input[name="email"]').value = email;
+  document.querySelector('input[name="password"]').value = pass;
+}
+function togglePassword() {
+  const input = document.getElementById('passwordInput');
+  const icon = document.getElementById('eyeIcon');
+  if (input.type === 'password') {
+    input.type = 'text';
+    icon.className = 'fas fa-eye-slash';
+  } else {
+    input.type = 'password';
+    icon.className = 'fas fa-eye';
+  }
+}
+</script>
+
+<%- include('../partials/footer') %>

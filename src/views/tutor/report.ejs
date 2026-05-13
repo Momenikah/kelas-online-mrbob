@@ -1,0 +1,66 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'tutor' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/tutor" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Laporan Member</h1>
+  </div>
+
+  <div class="container">
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-chart-bar"></i> Performa Member</h3>
+      <% if (reports.length === 0) { %>
+        <div class="empty-state"><i class="fas fa-users"></i><p>Belum ada data member.</p></div>
+      <% } else { %>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Program</th>
+                <th>Total Sesi</th>
+                <th>Hadir</th>
+                <th>Kehadiran</th>
+                <th>Nilai Kuis</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% reports.forEach(r => { %>
+              <tr>
+                <td>
+                  <div class="member-name-cell">
+                    <% if (r.photo) { %>
+                      <img src="<%= r.photo %>" class="table-avatar" alt="<%= r.name %>">
+                    <% } else { %>
+                      <div class="table-avatar-init"><%= getInitials(r.name) %></div>
+                    <% } %>
+                    <%= r.name %>
+                  </div>
+                </td>
+                <td><%= r.program_name %></td>
+                <td><%= r.total_sessions %></td>
+                <td><%= r.present_count %></td>
+                <td>
+                  <% const rate = r.total_sessions > 0 ? Math.round(r.present_count / r.total_sessions * 100) : 0; %>
+                  <span class="score-badge score-<%= rate >= 75 ? 'good' : 'low' %>"><%= rate %>%</span>
+                </td>
+                <td>
+                  <% if (r.avg_score !== null) { %>
+                    <span class="score-badge score-<%= r.avg_score >= 70 ? 'good' : 'low' %>">
+                      <%= Math.round(r.avg_score) %>%
+                    </span>
+                  <% } else { %><span class="text-muted">-</span><% } %>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

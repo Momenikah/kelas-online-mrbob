@@ -1,0 +1,130 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'admin' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/admin" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Kelola Pengguna</h1>
+    <button class="btn btn-light" onclick="toggleModal('userModal')">
+      <i class="fas fa-plus"></i> Tambah Pengguna
+    </button>
+  </div>
+
+  <div class="container">
+    <div class="section-card">
+      <form method="GET" action="/admin/users" class="filter-form">
+        <input type="text" name="search" class="form-input" placeholder="Cari nama atau email..." value="<%= filters.search || '' %>">
+        <select name="role" class="form-input">
+          <option value="">Semua Role</option>
+          <option value="admin" <%= filters.role === 'admin' ? 'selected' : '' %>>Admin</option>
+          <option value="tutor" <%= filters.role === 'tutor' ? 'selected' : '' %>>Tutor</option>
+          <option value="member" <%= filters.role === 'member' ? 'selected' : '' %>>Member</option>
+        </select>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Cari</button>
+        <a href="/admin/users" class="btn btn-outline">Reset</a>
+      </form>
+    </div>
+
+    <div class="section-card">
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr><th>Nama</th><th>Email</th><th>Phone</th><th>Role</th><th>VIP</th><th>Status</th><th>Aksi</th></tr>
+          </thead>
+          <tbody>
+            <% users.forEach(u => { %>
+            <tr>
+              <td>
+                <div class="member-name-cell">
+                  <% if (u.photo) { %>
+                    <img src="<%= u.photo %>" class="table-avatar">
+                  <% } else { %>
+                    <div class="table-avatar-init"><%= getInitials(u.name) %></div>
+                  <% } %>
+                  <%= u.name %>
+                </div>
+              </td>
+              <td><%= u.email %></td>
+              <td><%= u.phone || '-' %></td>
+              <td><span class="badge-pill badge-<%= u.role %>"><%= u.role %></span></td>
+              <td>
+                <form action="/admin/users/<%= u.id %>/toggle-vip" method="POST" style="display:inline">
+                  <button class="btn-icon"><%= u.is_vip ? '⭐' : '☆' %></button>
+                </form>
+              </td>
+              <td>
+                <% if (u.is_active) { %>
+                  <span class="badge-pill badge-completed">Aktif</span>
+                <% } else { %>
+                  <span class="badge-pill badge-cancelled">Non-aktif</span>
+                <% } %>
+              </td>
+              <td>
+                <form action="/admin/users/<%= u.id %>/toggle-status" method="POST" style="display:inline">
+                  <button class="btn btn-sm btn-outline" title="Toggle status">
+                    <i class="fas fa-power-off"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="userModal" style="display:none">
+    <div class="modal-overlay" onclick="toggleModal('userModal')"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Tambah Pengguna</h3>
+        <button class="modal-close" onclick="toggleModal('userModal')"><i class="fas fa-times"></i></button>
+      </div>
+      <form action="/admin/users" method="POST" class="modal-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Nama</label>
+            <input type="text" name="name" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" name="email" class="form-input" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" name="password" class="form-input" required minlength="6">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone</label>
+            <input type="tel" name="phone" class="form-input">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Role</label>
+            <select name="role" class="form-input" required>
+              <option value="member">Member</option>
+              <option value="tutor">Tutor</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="display:flex;align-items:center;gap:8px;margin-top:30px">
+              <input type="checkbox" name="is_vip"> Member VIP
+            </label>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" onclick="toggleModal('userModal')">Batal</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

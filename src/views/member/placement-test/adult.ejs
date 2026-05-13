@@ -1,0 +1,30 @@
+<%- include('../../partials/head') %>
+<%- include('../../partials/navbar', { activeNav: 'member' }) %>
+
+<div class="page-wrapper">
+  <%- include('../../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/member/placement-test" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1><i class="fas fa-user-tie"></i> Placement Test for Adult</h1>
+    <span class="pt-age-badge">Age 13+</span>
+  </div>
+
+  <div class="container">
+    <div class="pt-coming-soon">
+      <div class="pt-cs-icon"><i class="fas fa-tools"></i></div>
+      <h2>Segera Hadir!</h2>
+      <p>Placement Test untuk Adult sedang dalam tahap finalisasi. Soal akan mencakup grammar, reading comprehension, dan listening tingkat lanjut sesuai standar CEFR.</p>
+      <p>Sementara waktu, silakan gunakan placement test versi Kids atau hubungi admin untuk penjadwalan tes manual.</p>
+      <div class="pt-cs-actions">
+        <a href="/member/placement-test/kids" class="btn btn-primary">
+          <i class="fas fa-child"></i> Coba Test Kids
+        </a>
+        <a href="/member/placement-test" class="btn btn-outline">
+          <i class="fas fa-arrow-left"></i> Kembali
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../../partials/footer') %>

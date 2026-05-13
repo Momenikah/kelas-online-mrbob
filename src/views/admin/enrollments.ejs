@@ -1,0 +1,79 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'admin' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/admin" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Kelola Enrollment</h1>
+    <button class="btn btn-light" onclick="toggleModal('enrollModal')">
+      <i class="fas fa-plus"></i> Tambah Enrollment
+    </button>
+  </div>
+
+  <div class="container">
+    <div class="section-card">
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr><th>Member</th><th>Email</th><th>Program</th><th>Mulai</th><th>Berakhir</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            <% enrollments.forEach(e => { %>
+            <tr>
+              <td><%= e.member_name %></td>
+              <td><%= e.email %></td>
+              <td><%= e.program_name %></td>
+              <td><%= formatDate(e.start_date) %></td>
+              <td><%= formatDate(e.end_date) %></td>
+              <td><span class="badge-pill badge-<%= e.status %>"><%= e.status %></span></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="enrollModal" style="display:none">
+    <div class="modal-overlay" onclick="toggleModal('enrollModal')"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Tambah Enrollment</h3>
+        <button class="modal-close" onclick="toggleModal('enrollModal')"><i class="fas fa-times"></i></button>
+      </div>
+      <form action="/admin/enrollments" method="POST" class="modal-form">
+        <div class="form-group">
+          <label class="form-label">Member</label>
+          <select name="member_id" class="form-input" required>
+            <option value="">-- Pilih Member --</option>
+            <% members.forEach(m => { %><option value="<%= m.id %>"><%= m.name %> (<%= m.email %>)</option><% }) %>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Program</label>
+          <select name="program_id" class="form-input" required>
+            <option value="">-- Pilih Program --</option>
+            <% programs.forEach(p => { %><option value="<%= p.id %>"><%= p.name %></option><% }) %>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Mulai</label>
+            <input type="date" name="start_date" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Berakhir</label>
+            <input type="date" name="end_date" class="form-input" required>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" onclick="toggleModal('enrollModal')">Batal</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

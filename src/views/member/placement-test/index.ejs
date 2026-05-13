@@ -1,0 +1,90 @@
+<%- include('../../partials/head') %>
+<%- include('../../partials/navbar', { activeNav: 'member' }) %>
+
+<div class="page-wrapper">
+  <%- include('../../partials/flash') %>
+
+  <div class="sub-banner">
+    <a href="/member" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1><i class="fas fa-clipboard-check"></i> Placement Test</h1>
+  </div>
+
+  <div class="container">
+    <div class="pt-intro-card">
+      <div class="pt-intro-icon"><i class="fas fa-graduation-cap"></i></div>
+      <div>
+        <h3>Apa itu Placement Test?</h3>
+        <p>Placement Test membantu menentukan level kemampuan bahasa Inggrismu agar bisa ditempatkan di kelas yang sesuai. Pilih kategori sesuai usia kamu di bawah ini.</p>
+      </div>
+    </div>
+
+    <h3 class="section-title mt-20"><i class="fas fa-list-check"></i> Pilih Kategori Placement Test</h3>
+
+    <div class="pt-choice-grid">
+      <div class="pt-choice-card pt-choice-kids">
+        <div class="pt-choice-illustration">
+          <i class="fas fa-child"></i>
+          <span class="pt-age-badge">Age 7-12</span>
+        </div>
+        <h3>Kids</h3>
+        <p>Placement test untuk anak-anak dengan soal yang menyenangkan: gambar, percakapan ringan, dan listening.</p>
+        <ul class="pt-choice-features">
+          <li><i class="fas fa-check-circle"></i> 20 soal pilihan ganda</li>
+          <li><i class="fas fa-check-circle"></i> 3 sesi: Gambar, Percakapan, Listening</li>
+          <li><i class="fas fa-check-circle"></i> Hasil instan + Level (1-5)</li>
+        </ul>
+        <a href="/member/placement-test/kids" class="btn btn-primary btn-full btn-lg">
+          <i class="fas fa-play"></i> Mulai Test Kids
+        </a>
+      </div>
+
+      <div class="pt-choice-card pt-choice-adult">
+        <div class="pt-choice-illustration">
+          <i class="fas fa-user-tie"></i>
+          <span class="pt-age-badge">Age 13+</span>
+        </div>
+        <h3>Adult</h3>
+        <p>Placement test untuk remaja & dewasa dengan soal grammar, reading, dan listening tingkat lanjut.</p>
+        <ul class="pt-choice-features">
+          <li><i class="fas fa-check-circle"></i> Grammar, Reading & Listening</li>
+          <li><i class="fas fa-check-circle"></i> Penilaian level CEFR</li>
+          <li><i class="fas fa-check-circle"></i> Rekomendasi program</li>
+        </ul>
+        <a href="/member/placement-test/adult" class="btn btn-outline btn-full btn-lg">
+          <i class="fas fa-arrow-right"></i> Mulai Test Adult
+        </a>
+      </div>
+    </div>
+
+    <% if (history && history.length > 0) { %>
+      <div class="section-card mt-20">
+        <h3 class="section-title"><i class="fas fa-history"></i> Riwayat Placement Test</h3>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr><th>Tanggal</th><th>Tipe</th><th>Skor</th><th>Level</th><th>Kategori</th><th>Aksi</th></tr>
+            </thead>
+            <tbody>
+              <% history.forEach(h => { %>
+              <tr>
+                <td><%= formatDate(h.taken_at) %></td>
+                <td><span class="badge-pill badge-<%= h.test_type === 'kids' ? 'tutor' : 'member' %>"><%= h.test_type.toUpperCase() %></span></td>
+                <td><strong><%= h.score %>/<%= h.max_score %></strong></td>
+                <td><strong><%= h.level_label %></strong></td>
+                <td><%= h.level_desc %></td>
+                <td>
+                  <a href="/member/placement-test/result/<%= h.id %>" class="btn btn-sm btn-outline">
+                    <i class="fas fa-eye"></i> Lihat
+                  </a>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<%- include('../../partials/footer') %>

@@ -1,0 +1,62 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'member' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/member" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>E-Sertifikat</h1>
+  </div>
+
+  <div class="container">
+    <% if (certificates.length === 0) { %>
+      <div class="empty-state">
+        <i class="fas fa-award"></i>
+        <p>Belum ada sertifikat yang diterbitkan.</p>
+        <small>Selesaikan program untuk mendapatkan sertifikat.</small>
+      </div>
+    <% } else { %>
+      <div class="cert-grid">
+        <% certificates.forEach(c => { %>
+        <div class="cert-card">
+          <div class="cert-bg">
+            <div class="cert-ribbon"><i class="fas fa-award"></i></div>
+            <div class="cert-logo">Super<br>Seru!</div>
+            <div class="cert-body">
+              <p class="cert-with">Sertifikat Kelulusan</p>
+              <h3 class="cert-name"><%= user.name %></h3>
+              <p class="cert-desc">Telah berhasil menyelesaikan program</p>
+              <h4 class="cert-program"><%= c.program_name %></h4>
+              <div class="cert-footer-row">
+                <div>
+                  <p class="cert-num">No: <%= c.certificate_number %></p>
+                  <p class="cert-date">Diterbitkan: <%= formatDate(c.issued_date) %></p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="cert-actions">
+            <button class="btn btn-outline" onclick="printCert('<%= c.id %>')">
+              <i class="fas fa-print"></i> Cetak
+            </button>
+            <button class="btn btn-primary" onclick="downloadCert('<%= c.id %>')">
+              <i class="fas fa-download"></i> Unduh
+            </button>
+          </div>
+        </div>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<script>
+function printCert(id) {
+  window.print();
+}
+function downloadCert(id) {
+  alert('Fitur unduh akan segera tersedia.');
+}
+</script>
+
+<%- include('../partials/footer') %>

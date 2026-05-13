@@ -1,0 +1,132 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'tutor' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/tutor/questionnaire" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1><%= questionnaire.title %></h1>
+    <button class="btn btn-light" onclick="toggleModal('addQModal')">
+      <i class="fas fa-plus"></i> Tambah Soal
+    </button>
+  </div>
+
+  <div class="container">
+    <div class="two-col">
+      <!-- Questions list -->
+      <div>
+        <div class="section-card">
+          <h3 class="section-title"><i class="fas fa-list"></i> Daftar Soal (<%= questions.length %>)</h3>
+          <% if (questions.length === 0) { %>
+            <div class="empty-state"><i class="fas fa-question"></i><p>Belum ada soal.</p></div>
+          <% } else { %>
+            <% questions.forEach((q, idx) => { %>
+            <div class="question-review-card">
+              <div class="question-num">Soal <%= idx + 1 %> · <%= q.points %> poin</div>
+              <p class="question-text"><%= q.question_text %></p>
+              <span class="quiz-type-badge"><%= q.question_type.replace('_', ' ') %></span>
+              <% if (q.options && q.question_type === 'multiple_choice') { %>
+                <div class="options-preview">
+                  <% const opts = Array.isArray(q.options) ? q.options : JSON.parse(q.options); %>
+                  <% opts.forEach((o, i) => { %>
+                    <span class="option-preview <%= o === q.correct_answer ? 'correct' : '' %>">
+                      <%= String.fromCharCode(65+i) %>. <%= o %>
+                    </span>
+                  <% }) %>
+                </div>
+              <% } %>
+            </div>
+            <% }) %>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- Responses -->
+      <div>
+        <div class="section-card">
+          <h3 class="section-title"><i class="fas fa-users"></i> Respon Member (<%= responses.length %>)</h3>
+          <% if (responses.length === 0) { %>
+            <div class="empty-state"><i class="fas fa-inbox"></i><p>Belum ada respon.</p></div>
+          <% } else { %>
+            <% responses.forEach(r => { %>
+            <div class="response-item">
+              <strong><%= r.member_name %></strong>
+              <div class="response-score">
+                <span class="score-badge score-<%= r.max_score > 0 && r.score/r.max_score >= 0.7 ? 'good' : 'low' %>">
+                  <%= r.score %>/<%= r.max_score %>
+                </span>
+              </div>
+              <small><%= formatDate(r.submitted_at) %></small>
+            </div>
+            <% }) %>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Question Modal -->
+  <div class="modal" id="addQModal" style="display:none">
+    <div class="modal-overlay" onclick="toggleModal('addQModal')"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Tambah Soal</h3>
+        <button class="modal-close" onclick="toggleModal('addQModal')"><i class="fas fa-times"></i></button>
+      </div>
+      <form action="/tutor/questionnaire/question/add" method="POST" class="modal-form" id="addQForm">
+        <input type="hidden" name="questionnaire_id" value="<%= questionnaire.id %>">
+        <div class="form-group">
+          <label class="form-label">Pertanyaan</label>
+          <textarea name="question_text" class="form-textarea" rows="3" required placeholder="Tulis pertanyaan..."></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Tipe</label>
+            <select name="question_type" class="form-input" onchange="updateQForm(this.value)">
+              <option value="multiple_choice">Pilihan Ganda</option>
+              <option value="essay">Esai</option>
+              <option value="rating">Rating</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Poin</label>
+            <input type="number" name="points" class="form-input" value="1" min="0">
+          </div>
+        </div>
+        <div id="optionsSection">
+          <div class="form-group">
+            <label class="form-label">Pilihan (pisahkan dengan koma)</label>
+            <input type="text" id="optionsList" class="form-input" placeholder="Pilihan A, Pilihan B, Pilihan C, Pilihan D">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Jawaban Benar</label>
+            <input type="text" name="correct_answer" class="form-input" placeholder="Tulis jawaban yang benar (sama persis)">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" onclick="toggleModal('addQModal')">Batal</button>
+          <button type="submit" class="btn btn-primary" onclick="prepareOptions()"><i class="fas fa-save"></i> Tambah</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function updateQForm(type) {
+  document.getElementById('optionsSection').style.display = type === 'multiple_choice' ? 'block' : 'none';
+}
+function prepareOptions() {
+  const list = document.getElementById('optionsList').value;
+  if (list) {
+    const opts = list.split(',').map(o => o.trim());
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.name = 'options';
+    hidden.value = JSON.stringify(opts);
+    document.getElementById('addQForm').appendChild(hidden);
+  }
+}
+</script>
+
+<%- include('../partials/footer') %>

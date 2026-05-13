@@ -1,0 +1,66 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'member' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/member" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Perpanjang Program</h1>
+  </div>
+
+  <div class="container">
+    <!-- Current enrollments -->
+    <% if (enrollments.length > 0) { %>
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-id-card"></i> Program Aktif Saat Ini</h3>
+      <% enrollments.forEach(e => { %>
+      <div class="renewal-item">
+        <div class="renewal-info">
+          <h4><%= e.program_name %></h4>
+          <span>Aktif: <%= formatDate(e.start_date) %> - <%= formatDate(e.end_date) %></span>
+          <% const daysLeft = Math.ceil((new Date(e.end_date) - new Date()) / (1000 * 60 * 60 * 24)); %>
+          <% if (daysLeft <= 14) { %>
+            <span class="renewal-warning"><i class="fas fa-exclamation-triangle"></i> Berakhir dalam <%= daysLeft %> hari</span>
+          <% } %>
+        </div>
+        <span class="badge-status badge-<%= e.status %>"><%= e.status %></span>
+      </div>
+      <% }) %>
+    </div>
+    <% } %>
+
+    <!-- Available programs -->
+    <h3 class="section-title mt-20"><i class="fas fa-star"></i> Paket Program</h3>
+    <div class="program-grid">
+      <% programs.forEach(p => { %>
+      <div class="program-card">
+        <div class="program-card-header">
+          <i class="fas fa-graduation-cap"></i>
+        </div>
+        <h4 class="program-name"><%= p.name %></h4>
+        <p class="program-desc"><%= p.description %></p>
+        <div class="program-detail">
+          <span><i class="fas fa-clock"></i> <%= p.duration_months %> Bulan</span>
+          <span class="program-price"><%= formatCurrency(p.price) %></span>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="confirmRenewal('<%= p.id %>', '<%= p.name %>', '<%= formatCurrency(p.price) %>')">
+          <i class="fas fa-shopping-cart"></i> Daftar / Perpanjang
+        </button>
+      </div>
+      <% }) %>
+    </div>
+
+    <div class="renewal-note">
+      <i class="fas fa-info-circle"></i>
+      <p>Untuk pembayaran dan pendaftaran program, silakan hubungi admin atau kunjungi kantor kami. Tim kami siap membantu Anda.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+function confirmRenewal(id, name, price) {
+  alert(`Program: ${name}\nHarga: ${price}\n\nSilakan hubungi admin untuk melanjutkan pendaftaran.`);
+}
+</script>
+
+<%- include('../partials/footer') %>

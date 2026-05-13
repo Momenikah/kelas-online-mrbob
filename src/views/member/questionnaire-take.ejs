@@ -1,0 +1,120 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'member' }) %>
+
+<div class="page-wrapper">
+  <div class="sub-banner">
+    <a href="/member/questionnaire" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1><%= questionnaire.title %></h1>
+  </div>
+
+  <div class="container">
+    <div class="quiz-take-wrapper">
+      <div class="quiz-take-header">
+        <div class="quiz-take-meta">
+          <span><i class="fas fa-book"></i> <%= questionnaire.program_name %></span>
+          <span><i class="fas fa-clock"></i> Durasi: <%= questionnaire.duration_minutes %> menit</span>
+          <% if (questionnaire.due_date) { %>
+            <span><i class="fas fa-calendar"></i> Deadline: <%= formatDate(questionnaire.due_date) %></span>
+          <% } %>
+        </div>
+        <% if (questionnaire.description) { %><p class="quiz-take-desc"><%= questionnaire.description %></p><% } %>
+      </div>
+
+      <% if (response) { %>
+        <!-- Already submitted - show results -->
+        <div class="result-card">
+          <div class="result-icon"><i class="fas fa-award"></i></div>
+          <h2>Hasil Kuis</h2>
+          <div class="result-score">
+            <span class="score-big"><%= response.score %></span>
+            <span class="score-max">/ <%= response.max_score %></span>
+          </div>
+          <div class="score-pct"><%= response.max_score > 0 ? Math.round(response.score/response.max_score*100) : 0 %>%</div>
+          <p>Dikumpulkan: <%= formatDate(response.submitted_at) %></p>
+        </div>
+
+        <!-- Show questions with answers -->
+        <% questions.forEach((q, idx) => { %>
+        <div class="question-review-card">
+          <div class="question-num">Soal <%= idx + 1 %></div>
+          <p class="question-text"><%= q.question_text %></p>
+          <div class="answer-review">
+            <strong>Jawabanmu:</strong>
+            <span class="answer-text"><%= response.answers ? (JSON.parse(typeof response.answers === 'string' ? response.answers : JSON.stringify(response.answers))[q.id] || '-') : '-' %></span>
+          </div>
+          <% if (q.correct_answer) { %>
+          <div class="correct-answer"><strong>Jawaban benar:</strong> <%= q.correct_answer %></div>
+          <% } %>
+        </div>
+        <% }) %>
+
+      <% } else { %>
+        <!-- Form to take quiz -->
+        <form action="/member/questionnaire/<%= questionnaire.id %>/submit" method="POST" id="quizForm">
+          <% if (questionnaire.duration_minutes) { %>
+          <div class="timer-bar">
+            <i class="fas fa-stopwatch"></i>
+            Sisa waktu: <span id="timer" class="timer-count"><%= questionnaire.duration_minutes %>:00</span>
+          </div>
+          <% } %>
+
+          <% questions.forEach((q, idx) => { %>
+          <div class="question-card">
+            <div class="question-num">Soal <%= idx + 1 %> <span class="question-pts">(<%= q.points %> poin)</span></div>
+            <p class="question-text"><%= q.question_text %></p>
+
+            <% if (q.question_type === 'multiple_choice' && q.options) { %>
+              <% const opts = Array.isArray(q.options) ? q.options : JSON.parse(q.options); %>
+              <div class="options-grid">
+                <% opts.forEach((opt, oi) => { %>
+                <label class="option-label">
+                  <input type="radio" name="q_<%= q.id %>" value="<%= opt %>" required>
+                  <span class="option-letter"><%= String.fromCharCode(65+oi) %></span>
+                  <span class="option-text"><%= opt %></span>
+                </label>
+                <% }) %>
+              </div>
+            <% } else if (q.question_type === 'essay') { %>
+              <textarea name="q_<%= q.id %>" class="form-textarea" rows="4" placeholder="Tulis jawaban Anda..."></textarea>
+            <% } else if (q.question_type === 'rating') { %>
+              <div class="rating-options">
+                <% for(let i = 1; i <= 5; i++) { %>
+                <label class="rating-label">
+                  <input type="radio" name="q_<%= q.id %>" value="<%= i %>">
+                  <span class="rating-star"><%= i %> ★</span>
+                </label>
+                <% } %>
+              </div>
+            <% } %>
+          </div>
+          <% }) %>
+
+          <div class="quiz-submit-bar">
+            <button type="submit" class="btn btn-primary btn-lg" onclick="return confirm('Kumpulkan jawaban? Tidak dapat diubah setelah dikumpulkan.')">
+              <i class="fas fa-paper-plane"></i> Kumpulkan Jawaban
+            </button>
+          </div>
+        </form>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<% if (!response && questionnaire.duration_minutes) { %>
+<script>
+let totalSeconds = <%= questionnaire.duration_minutes %> * 60;
+const timerEl = document.getElementById('timer');
+const interval = setInterval(() => {
+  totalSeconds--;
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  timerEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+  if (totalSeconds <= 0) {
+    clearInterval(interval);
+    document.getElementById('quizForm').submit();
+  }
+}, 1000);
+</script>
+<% } %>
+
+<%- include('../partials/footer') %>
