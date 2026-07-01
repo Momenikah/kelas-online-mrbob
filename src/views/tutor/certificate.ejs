@@ -12,24 +12,50 @@
   </div>
 
   <div class="container">
+    <div class="at-stats">
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:#D97706"><i class="fas fa-award"></i></span>
+        <div><strong><%= stats.total %></strong><small>Sertifikat diterbitkan</small></div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <form method="GET" action="/tutor/certificate" class="filter-form">
+        <input type="text" name="search" class="form-input" placeholder="Cari nama member / nomor sertifikat..." value="<%= filters.search || '' %>">
+        <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Cari</button>
+        <a href="/tutor/certificate" class="btn btn-outline">Reset</a>
+      </form>
+    </div>
+
     <div class="section-card">
       <h3 class="section-title"><i class="fas fa-id-card-alt"></i> Sertifikat Diterbitkan</h3>
       <% if (certificates.length === 0) { %>
-        <div class="empty-state"><i class="fas fa-award"></i><p>Belum ada sertifikat diterbitkan.</p></div>
+        <div class="empty-state"><i class="fas fa-award"></i><p>Belum ada sertifikat yang cocok.</p></div>
       <% } else { %>
         <div class="table-wrapper">
           <table class="data-table">
             <thead>
-              <tr><th>Nomor</th><th>Member</th><th>Program</th><th>Judul</th><th>Tanggal</th></tr>
+              <tr><th>Nomor</th><th>Member</th><th>Program</th><th>Kategori</th><th>Grade</th><th>Tanggal</th><th>Aksi</th></tr>
             </thead>
             <tbody>
               <% certificates.forEach(c => { %>
+              <% const d = c.details || {}; %>
               <tr>
                 <td><%= c.certificate_number %></td>
                 <td><%= c.member_name %></td>
                 <td><%= c.program_name %></td>
-                <td><%= c.title %></td>
+                <td><%= d.category || c.title %></td>
+                <td><%= d.grade || '-' %></td>
                 <td><%= formatDate(c.issued_date) %></td>
+                <td>
+                  <a class="btn btn-sm btn-outline" href="/tutor/certificate/<%= c.id %>/print" target="_blank" rel="noopener">
+                    <i class="fas fa-eye"></i> Preview
+                  </a>
+                  <form action="/tutor/certificate/<%= c.id %>/delete" method="POST" style="display:inline"
+                        data-confirm="Cabut sertifikat <%= c.certificate_number %>?">
+                    <button class="btn-icon btn-danger-icon" title="Cabut sertifikat"><i class="fas fa-trash"></i></button>
+                  </form>
+                </td>
               </tr>
               <% }) %>
             </tbody>
@@ -42,27 +68,176 @@
   <!-- Issue Certificate Modal -->
   <div class="modal" id="certModal" style="display:none">
     <div class="modal-overlay" onclick="toggleModal('certModal')"></div>
-    <div class="modal-content">
+    <div class="modal-content cert-modal">
       <div class="modal-header">
         <h3>Terbitkan Sertifikat</h3>
         <button class="modal-close" onclick="toggleModal('certModal')"><i class="fas fa-times"></i></button>
       </div>
-      <form action="/tutor/certificate" method="POST" class="modal-form">
+      <form action="/tutor/certificate" method="POST" class="modal-form cert-form" id="certForm">
+        <div class="cert-flow-steps">
+          <span class="is-active"><b>1</b> Data Sertifikat</span>
+          <span><b>2</b> Nilai / Report</span>
+          <span><b>3</b> Preview & Terbitkan</span>
+        </div>
+
+        <div class="cert-flow-layout">
+          <div class="cert-flow-main">
         <div class="form-group">
-          <label class="form-label">Member & Program</label>
-          <select name="member_id" class="form-input" required onchange="updateProgramFromMember(this)">
+          <label class="form-label">Kategori Program <span class="req">*</span></label>
+          <div class="cert-category-grid">
+            <label><input type="radio" name="category" value="Speaking & Career Class" required checked> <i class="fas fa-comments"></i> <span><strong>Speaking</strong><small>Personal report</small></span></label>
+            <label><input type="radio" name="category" value="Grammar Class" required> <i class="fas fa-book-open"></i> <span><strong>Grammar</strong><small>Grade saja</small></span></label>
+            <label><input type="radio" name="category" value="TOEFL Class" required> <i class="fas fa-headphones"></i> <span><strong>TOEFL</strong><small>Test score</small></span></label>
+            <label><input type="radio" name="category" value="IELTS Class" required> <i class="fas fa-pen-nib"></i> <span><strong>IELTS</strong><small>Band score</small></span></label>
+            <label><input type="radio" name="category" value="Holiday Class" required> <i class="fas fa-suitcase"></i> <span><strong>Holiday</strong><small>Personal report</small></span></label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Member & Program <span class="req">*</span></label>
+          <select name="member_id" id="certMemberSelect" class="form-input" required onchange="updateProgramFromMember(this)">
             <option value="">-- Pilih Member --</option>
             <% members.forEach(m => { %>
-              <option value="<%= m.id %>" data-program="<%= m.program_id %>" data-program-name="<%= m.program_name %>">
+              <option value="<%= m.id %>" data-email="<%= m.email %>" data-program="<%= m.program_id %>" data-program-name="<%= m.program_name %>">
                 <%= m.name %> (<%= m.program_name %>)
               </option>
             <% }) %>
           </select>
           <input type="hidden" name="program_id" id="programIdHidden">
+          <input type="hidden" name="program_label" id="programLabelHidden">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Email Member</label>
+            <input type="email" name="member_email" id="memberEmail" class="form-input" readonly>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nama Tutor</label>
+            <input type="text" name="tutor_name" class="form-input" value="<%= user.name %>" readonly>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Periode <span class="req">*</span></label>
+            <select name="period_label" id="certPeriod" class="form-input" required>
+              <option value="">-- Pilih Periode --</option>
+              <% periods.forEach(p => { %><option value="<%= p.label %>"><%= p.label %></option><% }) %>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Grade <span class="req">*</span></label>
+            <input type="text" name="grade" id="certGrade" class="form-input" required placeholder="Contoh: B+">
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Judul Sertifikat</label>
-          <input type="text" name="title" class="form-input" required placeholder="Contoh: Sertifikat Kelulusan TOEFL Preparation">
+          <input type="text" name="title" id="certTitle" class="form-input" required value="Sertifikat Kelulusan" placeholder="Contoh: Sertifikat Kelulusan">
+        </div>
+
+        <div class="cert-extra-section" data-section="personal">
+          <h4>Personal Report</h4>
+          <p class="field-hint">Hanya untuk kategori Speaking dan Holiday.</p>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Speaking (1-5)</label><input type="number" min="1" max="5" name="speaking_score" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Pronunciation (1-5)</label><input type="number" min="1" max="5" name="pronunciation_score" class="form-input"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Vocabulary (1-5)</label><input type="number" min="1" max="5" name="vocabulary_score" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Grammar (1-5)</label><input type="number" min="1" max="5" name="grammar_score" class="form-input"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Understanding (1-5)</label><input type="number" min="1" max="5" name="understanding_score" class="form-input"></div>
+            <div class="form-group"><label class="form-label">CEFR</label><input type="text" name="cefr_score" class="form-input" placeholder="Contoh: B2 Proficiency"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Before</label><textarea name="before" class="form-textarea" rows="3"></textarea></div>
+            <div class="form-group"><label class="form-label">After</label><textarea name="after" class="form-textarea" rows="3"></textarea></div>
+          </div>
+        </div>
+
+        <div class="cert-extra-section" data-section="toefl" style="display:none">
+          <h4>TOEFL Test</h4>
+          <div class="form-group"><label class="form-label">Listening Comprehension</label><input type="text" name="listening_score" class="form-input"></div>
+          <div class="form-group"><label class="form-label">Structure & Written Comprehension</label><input type="text" name="structure_score" class="form-input"></div>
+          <div class="form-group"><label class="form-label">Reading Comprehension</label><input type="text" name="reading_score" class="form-input"></div>
+          <div class="form-group"><label class="form-label">Total Score</label><input type="text" name="total_score" class="form-input"></div>
+        </div>
+
+        <div class="cert-extra-section" data-section="ielts" style="display:none">
+          <h4>IELTS Test</h4>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Listening</label><input type="text" name="listening_score" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Reading</label><input type="text" name="reading_score" class="form-input"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Writing</label><input type="text" name="writing_score" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Speaking</label><input type="text" name="speaking_score" class="form-input"></div>
+          </div>
+          <div class="form-group"><label class="form-label">Total Score</label><input type="text" name="total_score" class="form-input"></div>
+        </div>
+          </div>
+
+          <aside class="cert-preview-panel">
+            <div class="cert-preview-card">
+              <div class="cert-preview-head">
+                <span class="cert-preview-kicker"><i class="fas fa-award"></i> Live Preview</span>
+                <div class="cert-preview-tools">
+                  <button type="button" class="btn-icon" title="Perbesar preview" onclick="openCertificatePreviewZoom()"><i class="fas fa-expand"></i></button>
+                  <span id="previewPageCount">1 halaman</span>
+                </div>
+              </div>
+              <div class="cert-preview-tabs">
+                <button type="button" class="is-active" data-preview-tab="certificate" onclick="setCertificatePreviewPage('certificate')">
+                  <i class="fas fa-award"></i> Sertifikat
+                </button>
+                <button type="button" id="previewReportTab" data-preview-tab="report" onclick="setCertificatePreviewPage('report')">
+                  <i class="fas fa-file-alt"></i> Personal Report
+                </button>
+              </div>
+              <div class="cert-preview-pages">
+                <div class="cert-mini-sheet cert-mini-general" id="previewCertSheet">
+                  <img id="previewTemplateImg" src="/img/certificates/sertifikat-umum.png" alt="">
+                  <span class="pv-code" id="previewCode">DD/MM/YYYY/CERT</span>
+                  <strong class="pv-name" id="previewMember">Pilih member</strong>
+                  <strong class="pv-grade" id="previewGrade">Grade -</strong>
+                  <strong class="pv-program" id="previewProgram">-</strong>
+                  <strong class="pv-period" id="previewPeriod">-</strong>
+                  <div class="pv-score-list" id="previewScoreList">
+                    <span><b>Listening</b><i>:</i><em id="pvListening">-</em></span>
+                    <span id="pvStructureRow"><b>Structure & Written</b><i>:</i><em id="pvStructure">-</em></span>
+                    <span><b>Reading</b><i>:</i><em id="pvReading">-</em></span>
+                    <span id="pvWritingRow"><b>Writing</b><i>:</i><em id="pvWriting">-</em></span>
+                    <span id="pvSpeakingRow"><b>Speaking</b><i>:</i><em id="pvSpeaking">-</em></span>
+                    <span class="total"><b>Total Score</b><i>:</i><em id="pvTotal">-</em></span>
+                  </div>
+                </div>
+                <div class="cert-mini-sheet cert-mini-report" id="previewReportSheet">
+                  <img src="/img/certificates/Personal-Report.png" alt="">
+                  <strong class="pv-report-title">Member Report</strong>
+                  <span class="pv-report-code" id="previewReportCode">DD/MM/YYYY/CERT</span>
+                  <span class="pv-report-member" id="previewReportMember">Member's Name : -</span>
+                  <span class="pv-report-tutor">Tutor's Name : <%= user.name %></span>
+                  <span class="pv-report-band">Personal Report</span>
+                  <div class="pv-report-scores">
+                    <b id="pvReportSpeaking">-</b>
+                    <b id="pvReportVocab">-</b>
+                    <b id="pvReportGrammar">-</b>
+                    <b id="pvReportPronunciation">-</b>
+                    <b id="pvReportUnderstanding">-</b>
+                    <b id="pvReportCefr">-</b>
+                  </div>
+                  <span class="pv-report-improvement">Improvement</span>
+                </div>
+              </div>
+              <div class="cert-preview-summary">
+                <span>Kategori</span><b id="previewCategory">Speaking & Career Class</b>
+                <span>Output</span><b id="previewNote">Personal Report aktif untuk kategori ini.</b>
+              </div>
+              <div class="cert-preview-checks">
+                <span id="previewBaseCheck"><i class="fas fa-circle"></i> Data dasar</span>
+                <span id="previewScoreCheck"><i class="fas fa-circle"></i> Nilai / report</span>
+              </div>
+            </div>
+          </aside>
         </div>
         <div class="form-actions">
           <button type="button" class="btn btn-outline" onclick="toggleModal('certModal')">Batal</button>
@@ -73,11 +248,162 @@
   </div>
 </div>
 
+<div class="cert-preview-zoom" id="certPreviewZoom" style="display:none">
+  <div class="cert-preview-zoom-overlay" onclick="closeCertificatePreviewZoom()"></div>
+  <div class="cert-preview-zoom-content">
+    <div class="cert-preview-zoom-head">
+      <strong><i class="fas fa-award"></i> Preview Sertifikat</strong>
+      <button class="modal-close" type="button" onclick="closeCertificatePreviewZoom()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="cert-preview-zoom-body" id="certPreviewZoomBody"></div>
+  </div>
+</div>
+
 <script>
 function updateProgramFromMember(select) {
   const opt = select.options[select.selectedIndex];
   document.getElementById('programIdHidden').value = opt.dataset.program || '';
+  document.getElementById('programLabelHidden').value = opt.dataset.programName || '';
+  document.getElementById('memberEmail').value = opt.dataset.email || '';
+  updateCertificatePreview();
 }
+function updateCertificateSections() {
+  const category = document.querySelector('input[name="category"]:checked')?.value || '';
+  const isSpeaking = category.includes('Speaking') || category.includes('Holiday');
+  const isToefl = category.includes('TOEFL');
+  const isIelts = category.includes('IELTS');
+  [
+    ['personal', isSpeaking],
+    ['toefl', isToefl],
+    ['ielts', isIelts],
+  ].forEach(([sectionName, isActive]) => {
+    const section = document.querySelector(`[data-section="${sectionName}"]`);
+    section.style.display = isActive ? 'block' : 'none';
+    section.querySelectorAll('input, textarea, select').forEach((field) => {
+      field.disabled = !isActive;
+    });
+  });
+  updateCertificatePreview();
+}
+function updateCertificatePreview() {
+  const category = document.querySelector('input[name="category"]:checked')?.value || '-';
+  const isPersonal = category.includes('Speaking') || category.includes('Holiday');
+  const isToefl = category.includes('TOEFL');
+  const isIelts = category.includes('IELTS');
+  const memberSelect = document.getElementById('certMemberSelect');
+  const memberOpt = memberSelect.options[memberSelect.selectedIndex];
+  const memberText = memberOpt && memberOpt.value ? memberOpt.textContent.replace(/\s*\([^)]*\)\s*$/, '').trim() : 'Pilih member';
+  const program = document.getElementById('programLabelHidden').value || '-';
+  const period = document.getElementById('certPeriod').value || '-';
+  const grade = document.getElementById('certGrade').value || '-';
+  const gradeText = /^grade\s/i.test(grade) ? grade : `Grade ${grade}`;
+  const note = isPersonal
+    ? 'Sertifikat + Personal Report.'
+    : isToefl || isIelts
+      ? 'Field test score aktif untuk kategori ini.'
+      : 'Kategori ini menerbitkan sertifikat berbasis grade.';
+  const getValue = (selector, fallback = '-') => {
+    const field = Array.from(document.querySelectorAll(selector)).find((item) => !item.disabled);
+    return field && field.value.trim() ? field.value.trim() : fallback;
+  };
+  const sheet = document.getElementById('previewCertSheet');
+  const templateImg = document.getElementById('previewTemplateImg');
+  const scoreList = document.getElementById('previewScoreList');
+  const reportSheet = document.getElementById('previewReportSheet');
+
+  sheet.classList.toggle('cert-mini-test', isToefl || isIelts);
+  sheet.classList.toggle('cert-mini-general', !(isToefl || isIelts));
+  templateImg.src = isToefl || isIelts
+    ? '/img/certificates/template-TOEFL-IELTS-1.png'
+    : '/img/certificates/sertifikat-umum.png';
+  scoreList.style.display = isToefl || isIelts ? 'grid' : 'none';
+  reportSheet.style.display = isPersonal ? 'block' : 'none';
+  document.getElementById('previewReportTab').style.display = isPersonal ? 'inline-flex' : 'none';
+  document.querySelector('.cert-preview-tabs').classList.toggle('is-single', !isPersonal);
+  if (!isPersonal && document.querySelector('[data-preview-tab="report"]').classList.contains('is-active')) {
+    setCertificatePreviewPage('certificate');
+  }
+
+  document.getElementById('previewMember').textContent = memberText;
+  document.getElementById('previewCategory').textContent = category;
+  document.getElementById('previewProgram').textContent = isToefl ? 'TOEFL Test' : isIelts ? 'IELTS Test' : program.toUpperCase();
+  document.getElementById('previewPeriod').textContent = (isToefl || isIelts) ? `Date of periode : ${period}` : period;
+  document.getElementById('previewGrade').textContent = gradeText;
+  document.getElementById('previewGrade').style.display = (isToefl || isIelts) ? 'none' : 'block';
+  document.getElementById('previewNote').textContent = note;
+  document.getElementById('previewPageCount').textContent = isPersonal ? '2 halaman' : '1 halaman';
+  document.getElementById('previewCode').textContent = 'DD/MM/YYYY/CERT';
+
+  document.getElementById('pvListening').textContent = getValue('input[name="listening_score"]');
+  document.getElementById('pvStructure').textContent = getValue('input[name="structure_score"]');
+  document.getElementById('pvReading').textContent = getValue('input[name="reading_score"]');
+  document.getElementById('pvWriting').textContent = getValue('input[name="writing_score"]', '');
+  document.getElementById('pvSpeaking').textContent = getValue('input[name="speaking_score"]', '');
+  document.getElementById('pvTotal').textContent = getValue('input[name="total_score"]');
+  document.getElementById('pvStructureRow').style.display = isToefl ? 'grid' : 'none';
+  document.getElementById('pvWritingRow').style.display = isIelts ? 'grid' : 'none';
+  document.getElementById('pvSpeakingRow').style.display = isIelts ? 'grid' : 'none';
+
+  document.getElementById('previewReportCode').textContent = 'DD/MM/YYYY/CERT';
+  document.getElementById('previewReportMember').textContent = `Member's Name : ${memberText}`;
+  document.getElementById('pvReportSpeaking').textContent = getValue('input[name="speaking_score"]');
+  document.getElementById('pvReportVocab').textContent = getValue('input[name="vocabulary_score"]');
+  document.getElementById('pvReportGrammar').textContent = getValue('input[name="grammar_score"]');
+  document.getElementById('pvReportPronunciation').textContent = getValue('input[name="pronunciation_score"]');
+  document.getElementById('pvReportUnderstanding').textContent = getValue('input[name="understanding_score"]');
+  document.getElementById('pvReportCefr').textContent = getValue('input[name="cefr_score"]');
+
+  const hasBase = memberOpt && memberOpt.value && program !== '-' && period !== '-' && grade !== '-';
+  const hasScore = isPersonal
+    ? ['input[name="speaking_score"]', 'input[name="vocabulary_score"]', 'input[name="grammar_score"]', 'input[name="pronunciation_score"]', 'input[name="understanding_score"]']
+      .every((selector) => getValue(selector, '') !== '')
+    : isToefl
+      ? ['input[name="listening_score"]', 'input[name="structure_score"]', 'input[name="reading_score"]', 'input[name="total_score"]']
+        .every((selector) => getValue(selector, '') !== '')
+      : isIelts
+        ? ['input[name="listening_score"]', 'input[name="reading_score"]', 'input[name="writing_score"]', 'input[name="speaking_score"]', 'input[name="total_score"]']
+          .every((selector) => getValue(selector, '') !== '')
+        : grade !== '-';
+  setPreviewCheck('previewBaseCheck', hasBase);
+  setPreviewCheck('previewScoreCheck', hasScore);
+  refreshCertificatePreviewTabs();
+}
+function setPreviewCheck(id, isReady) {
+  const el = document.getElementById(id);
+  el.classList.toggle('is-ready', isReady);
+  el.classList.toggle('is-missing', !isReady);
+  el.querySelector('i').className = isReady ? 'fas fa-check-circle' : 'fas fa-circle';
+}
+function openCertificatePreviewZoom() {
+  updateCertificatePreview();
+  const zoom = document.getElementById('certPreviewZoom');
+  const body = document.getElementById('certPreviewZoomBody');
+  body.innerHTML = '';
+  document.querySelectorAll('.cert-preview-pages .cert-mini-sheet').forEach((sheet) => {
+    if (sheet.style.display !== 'none') body.appendChild(sheet.cloneNode(true));
+  });
+  zoom.style.display = 'flex';
+}
+function closeCertificatePreviewZoom() {
+  document.getElementById('certPreviewZoom').style.display = 'none';
+}
+function setCertificatePreviewPage(page) {
+  document.querySelectorAll('[data-preview-tab]').forEach((button) => {
+    button.classList.toggle('is-active', button.dataset.previewTab === page);
+  });
+  refreshCertificatePreviewTabs();
+}
+function refreshCertificatePreviewTabs() {
+  const active = document.querySelector('[data-preview-tab].is-active')?.dataset.previewTab || 'certificate';
+  document.getElementById('previewCertSheet').classList.toggle('is-preview-hidden', active !== 'certificate');
+  document.getElementById('previewReportSheet').classList.toggle('is-preview-hidden', active !== 'report');
+}
+document.querySelectorAll('input[name="category"]').forEach((input) => input.addEventListener('change', updateCertificateSections));
+document.querySelectorAll('#certForm input, #certForm select, #certForm textarea').forEach((field) => {
+  field.addEventListener('input', updateCertificatePreview);
+  field.addEventListener('change', updateCertificatePreview);
+});
+updateCertificateSections();
 </script>
 
 <%- include('../partials/footer') %>

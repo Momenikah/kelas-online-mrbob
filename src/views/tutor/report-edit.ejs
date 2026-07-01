@@ -1,0 +1,111 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'tutor' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+
+  <div class="sub-banner">
+    <a href="/tutor/report" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1><%= report ? 'Update Member Report' : 'Create Member Report' %></h1>
+    <p class="sub-banner-desc">Tutor mengisi perkembangan member dari Day 1 sampai Day 15.</p>
+  </div>
+
+  <div class="container">
+    <form action="/tutor/report" method="POST" class="report-form">
+      <% const filledCount = reportDays.filter(day => day.text).length; %>
+      <div class="section-card report-editor-card">
+        <div class="presence-header">
+          <div>
+            <h3>Data Report</h3>
+            <p>Pilih member dan periode, lalu isi catatan harian yang diperlukan.</p>
+          </div>
+          <span class="presence-session-count" id="reportFilledCount"><i class="fas fa-file-lines"></i> <%= filledCount %>/15 terisi</span>
+        </div>
+        <div class="report-meta-grid">
+          <div class="form-group">
+            <label class="form-label">Member <span class="req">*</span></label>
+            <select name="member_id" class="form-input" required <%= report ? 'disabled' : '' %>>
+              <option value="">-- Pilih Member --</option>
+              <% members.forEach(m => { %><option value="<%= m.id %>" <%= String(filters.memberId) === String(m.id) ? 'selected' : '' %>><%= m.name %> - <%= m.email %></option><% }) %>
+            </select>
+            <% if (report) { %><input type="hidden" name="member_id" value="<%= report.member_id %>"><% } %>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Program <span class="req">*</span></label>
+            <select name="program_id" class="form-input" required <%= report ? 'disabled' : '' %>>
+              <option value="">-- Pilih Program --</option>
+              <% programs.forEach(p => { %><option value="<%= p.id %>" <%= String(filters.programId) === String(p.id) ? 'selected' : '' %>><%= p.name %></option><% }) %>
+            </select>
+            <% if (report) { %><input type="hidden" name="program_id" value="<%= report.program_id %>"><% } %>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Periode <span class="req">*</span></label>
+            <select name="period_start" class="form-input" required <%= report ? 'disabled' : '' %>>
+              <option value="">-- Pilih Periode --</option>
+              <% periods.forEach(p => { %><option value="<%= p.value %>" <%= String(filters.periodStart) === String(p.value) ? 'selected' : '' %>><%= p.label %></option><% }) %>
+            </select>
+            <% if (report) { %><input type="hidden" name="period_start" value="<%= filters.periodStart %>"><% } %>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Paket</label>
+            <select name="package_name" class="form-input">
+              <option value="">-- Pilih Paket --</option>
+              <% ['Luxury', 'VIP', 'Private', 'Semi Private'].forEach(pkg => { %>
+                <option value="<%= pkg %>" <%= filters.packageName === pkg ? 'selected' : '' %>><%= pkg %></option>
+              <% }) %>
+              <% if (filters.packageName && !['Luxury', 'VIP', 'Private', 'Semi Private'].includes(filters.packageName)) { %>
+                <option value="<%= filters.packageName %>" selected><%= filters.packageName %></option>
+              <% } %>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card report-editor-card">
+        <div class="presence-header">
+          <div>
+            <h3>Daily Progress</h3>
+            <p>Buka day yang ingin diisi. Day kosong tidak akan tampil di halaman member/admin.</p>
+          </div>
+          <span class="presence-session-count"><i class="fas fa-calendar-days"></i> Day 1-15</span>
+        </div>
+        <div class="report-write-list">
+          <% reportDays.forEach((day, idx) => { %>
+            <details class="report-write-day" <%= day.text || idx === 0 ? 'open' : '' %>>
+              <summary>
+                <span><i class="fas fa-file-pen"></i> Day <%= day.number %></span>
+                <b class="<%= day.text ? 'is-filled' : '' %>"><%= day.text ? 'Terisi' : 'Belum diisi' %></b>
+              </summary>
+              <textarea name="days[<%= day.key %>]" class="form-textarea report-day-input" rows="5" placeholder="Contoh: Member mulai memahami materi utama, perlu latihan tambahan pada speaking..."><%= day.text %></textarea>
+            </details>
+          <% }) %>
+        </div>
+        <div class="form-actions">
+          <a href="/tutor/report" class="btn btn-outline">Batal</a>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan Report</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const reportInputs = Array.from(document.querySelectorAll('.report-day-input'));
+const filledBadge = document.getElementById('reportFilledCount');
+function updateReportFilledState() {
+  let filled = 0;
+  reportInputs.forEach((input) => {
+    const day = input.closest('.report-write-day');
+    const badge = day.querySelector('summary b');
+    const hasValue = input.value.trim().length > 0;
+    if (hasValue) filled += 1;
+    badge.textContent = hasValue ? 'Terisi' : 'Belum diisi';
+    badge.classList.toggle('is-filled', hasValue);
+  });
+  filledBadge.innerHTML = `<i class="fas fa-file-lines"></i> ${filled}/15 terisi`;
+}
+reportInputs.forEach((input) => input.addEventListener('input', updateReportFilledState));
+updateReportFilledState();
+</script>
+
+<%- include('../partials/footer') %>

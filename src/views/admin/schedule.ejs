@@ -1,0 +1,258 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'admin' }) %>
+
+<%
+  const qs = (over = {}) => {
+    const base = {
+      search: filters.search || '', program_id: filters.programId || '', tutor_id: filters.tutorId || '',
+      status: filters.status || '', period: filters.period || '', page: pagination.page,
+    };
+    return new URLSearchParams({ ...base, ...over }).toString();
+  };
+  const backUrl = '/admin/schedule?' + qs();
+%>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+
+  <div class="sub-banner">
+    <a href="/admin" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <div class="sub-banner-titles">
+      <h1>Kelola Jadwal</h1>
+      <p class="sub-banner-desc">Kelola semua sesi: cari, filter, edit, dan hapus per sesi.</p>
+    </div>
+    <div class="sub-banner-actions">
+      <a href="/admin/schedule-plot" class="btn btn-light"><i class="fas fa-bolt"></i> Plot Jadwal</a>
+      <a href="/admin/schedule-import" class="btn btn-light"><i class="fas fa-file-csv"></i> Import CSV</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Stats -->
+    <div class="stats-row stats-row-4">
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-total"><i class="fas fa-calendar-days"></i></div>
+        <div class="stat-info"><span class="stat-value"><%= stats.total %></span><span class="stat-label">Total Sesi</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-rate"><i class="fas fa-clock"></i></div>
+        <div class="stat-info"><span class="stat-value"><%= stats.upcoming %></span><span class="stat-label">Akan Datang</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-present"><i class="fas fa-check-double"></i></div>
+        <div class="stat-info"><span class="stat-value"><%= stats.completed %></span><span class="stat-label">Selesai</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-absent"><i class="fas fa-ban"></i></div>
+        <div class="stat-info"><span class="stat-value"><%= stats.cancelled %></span><span class="stat-label">Dibatalkan</span></div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="section-card">
+      <form method="GET" action="/admin/schedule" class="schedule-manage-filter">
+        <div class="smf-field smf-search">
+          <label><i class="fas fa-magnifying-glass"></i> Cari judul</label>
+          <input type="text" name="search" class="form-input" value="<%= filters.search %>" placeholder="mis. Sesi TOEFL...">
+        </div>
+        <div class="smf-field">
+          <label><i class="far fa-calendar-alt"></i> Periode</label>
+          <select name="period" class="form-input">
+            <option value="">Semua Periode</option>
+            <% periods.forEach(p => { %><option value="<%= p.value %>" <%= filters.period === p.value ? 'selected' : '' %>><%= p.label %></option><% }) %>
+          </select>
+        </div>
+        <div class="smf-field">
+          <label><i class="fas fa-book"></i> Program</label>
+          <select name="program_id" class="form-input">
+            <option value="">Semua Program</option>
+            <% programs.forEach(p => { %><option value="<%= p.id %>" <%= filters.programId === p.id ? 'selected' : '' %>><%= p.name %></option><% }) %>
+          </select>
+        </div>
+        <div class="smf-field">
+          <label><i class="fas fa-chalkboard-teacher"></i> Tutor</label>
+          <select name="tutor_id" class="form-input">
+            <option value="">Semua Tutor</option>
+            <% tutors.forEach(t => { %><option value="<%= t.id %>" <%= filters.tutorId === t.id ? 'selected' : '' %>><%= t.name %></option><% }) %>
+          </select>
+        </div>
+        <div class="smf-field">
+          <label><i class="fas fa-filter"></i> Status</label>
+          <select name="status" class="form-input">
+            <option value="">Semua Status</option>
+            <option value="upcoming" <%= filters.status === 'upcoming' ? 'selected' : '' %>>Akan Datang</option>
+            <option value="completed" <%= filters.status === 'completed' ? 'selected' : '' %>>Selesai</option>
+            <option value="cancelled" <%= filters.status === 'cancelled' ? 'selected' : '' %>>Dibatalkan</option>
+          </select>
+        </div>
+        <div class="smf-actions">
+          <button type="submit" class="btn btn-primary"><i class="fas fa-magnifying-glass"></i> Terapkan</button>
+          <a href="/admin/schedule" class="btn btn-outline"><i class="fas fa-rotate-left"></i> Reset</a>
+        </div>
+      </form>
+    </div>
+
+    <!-- List -->
+    <div class="section-card">
+      <div class="list-meta">
+        <span><i class="fas fa-list"></i> <%= pagination.total %> sesi<%= (filters.search || filters.programId || filters.tutorId || filters.status || filters.period) ? ' (terfilter)' : '' %></span>
+        <% if (pagination.totalPages > 1) { %><span>Halaman <%= pagination.page %> / <%= pagination.totalPages %></span><% } %>
+      </div>
+
+      <% if (!schedules.length) { %>
+        <div class="empty-state"><i class="fas fa-calendar-times"></i><p>Tidak ada jadwal yang cocok.</p></div>
+      <% } else { %>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr><th>Tanggal</th><th>Judul Sesi</th><th>Program</th><th>Tutor</th><th>Waktu</th><th>Peserta</th><th>Status</th><th class="th-actions">Aksi</th></tr>
+            </thead>
+            <tbody>
+              <% schedules.forEach(s => { %>
+              <tr>
+                <td><strong><%= formatDate(s.date) %></strong></td>
+                <td><strong><%= s.title %></strong><% if (s.location) { %><div class="table-subtext"><i class="fas fa-location-dot"></i> <%= s.location %></div><% } %></td>
+                <td><span class="td-program"><%= s.program_name %></span></td>
+                <td><%= s.tutor_name %></td>
+                <td><i class="far fa-clock"></i> <%= s.start_hm %> - <%= s.end_hm %></td>
+                <td><span class="peserta-count"><i class="fas fa-users"></i> <%= s.member_count %></span></td>
+                <td><span class="badge-pill badge-<%= s.status %>"><%= s.status === 'upcoming' ? 'Akan Datang' : s.status === 'completed' ? 'Selesai' : 'Dibatalkan' %></span></td>
+                <td class="td-actions">
+                  <button type="button" class="btn btn-sm btn-outline"
+                    data-edit-schedule
+                    data-id="<%= s.id %>"
+                    data-program="<%= s.program_id %>"
+                    data-tutor="<%= s.tutor_id %>"
+                    data-title="<%= s.title %>"
+                    data-description="<%= s.description || '' %>"
+                    data-date="<%= s.date_iso %>"
+                    data-start="<%= s.start_hm %>"
+                    data-end="<%= s.end_hm %>"
+                    data-location="<%= s.location || '' %>"
+                    data-link="<%= s.meeting_link || '' %>"
+                    data-status="<%= s.status %>">
+                    <i class="fas fa-pen"></i> Edit
+                  </button>
+                  <form action="/admin/schedule/<%= s.id %>/delete" method="POST" style="display:inline" onsubmit="return confirm('Hapus jadwal &quot;<%= s.title %>&quot; beserta peserta &amp; presensinya?')">
+                    <input type="hidden" name="back" value="<%= backUrl %>">
+                    <button class="btn btn-sm btn-danger" title="Hapus"><i class="fas fa-trash"></i></button>
+                  </form>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+
+        <% if (pagination.totalPages > 1) { %>
+          <div class="pagination">
+            <% if (pagination.page > 1) { %>
+              <a href="/admin/schedule?<%= qs({ page: pagination.page - 1 }) %>" class="btn btn-sm btn-outline"><i class="fas fa-chevron-left"></i> Sebelumnya</a>
+            <% } %>
+            <span class="pagination-info">Halaman <%= pagination.page %> dari <%= pagination.totalPages %></span>
+            <% if (pagination.page < pagination.totalPages) { %>
+              <a href="/admin/schedule?<%= qs({ page: pagination.page + 1 }) %>" class="btn btn-sm btn-outline">Berikutnya <i class="fas fa-chevron-right"></i></a>
+            <% } %>
+          </div>
+        <% } %>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal" id="editScheduleModal" style="display:none">
+  <div class="modal-overlay" onclick="toggleModal('editScheduleModal')"></div>
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Edit Jadwal</h3>
+      <button class="modal-close" onclick="toggleModal('editScheduleModal')"><i class="fas fa-times"></i></button>
+    </div>
+    <form id="editScheduleForm" method="POST" class="modal-form">
+      <input type="hidden" name="back" value="<%= backUrl %>">
+      <div class="form-group">
+        <label class="form-label">Judul Sesi <span class="req">*</span></label>
+        <input type="text" name="title" class="form-input" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Program <span class="req">*</span></label>
+          <select name="program_id" class="form-input" required>
+            <% programs.forEach(p => { %><option value="<%= p.id %>"><%= p.name %></option><% }) %>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tutor <span class="req">*</span></label>
+          <select name="tutor_id" class="form-input" required>
+            <% tutors.forEach(t => { %><option value="<%= t.id %>"><%= t.name %></option><% }) %>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Tanggal <span class="req">*</span></label>
+          <input type="date" name="date" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-input">
+            <option value="upcoming">Akan Datang</option>
+            <option value="completed">Selesai</option>
+            <option value="cancelled">Dibatalkan</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Jam Mulai <span class="req">*</span></label>
+          <input type="time" name="start_time" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Jam Selesai <span class="req">*</span></label>
+          <input type="time" name="end_time" class="form-input" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Lokasi</label>
+        <input type="text" name="location" class="form-input" placeholder="mis. Online via Zoom">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Link Meeting / Zoom</label>
+        <input type="url" name="meeting_link" class="form-input" placeholder="https://zoom.us/...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Catatan / Deskripsi</label>
+        <textarea name="description" class="form-input" rows="2"></textarea>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-outline" onclick="toggleModal('editScheduleModal')">Batal</button>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan Perubahan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById('editScheduleForm');
+  document.querySelectorAll('[data-edit-schedule]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var d = btn.dataset;
+      form.action = '/admin/schedule/' + d.id;
+      form.querySelector('[name="title"]').value = d.title || '';
+      form.querySelector('[name="program_id"]').value = d.program || '';
+      form.querySelector('[name="tutor_id"]').value = d.tutor || '';
+      form.querySelector('[name="date"]').value = d.date || '';
+      form.querySelector('[name="start_time"]').value = d.start || '';
+      form.querySelector('[name="end_time"]').value = d.end || '';
+      form.querySelector('[name="location"]').value = d.location || '';
+      form.querySelector('[name="meeting_link"]').value = d.link || '';
+      form.querySelector('[name="status"]').value = d.status || 'upcoming';
+      form.querySelector('[name="description"]').value = d.description || '';
+      toggleModal('editScheduleModal');
+    });
+  });
+})();
+</script>
+
+<%- include('../partials/footer') %>

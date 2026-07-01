@@ -6,9 +6,11 @@
   <div class="sub-banner">
     <a href="/tutor/questionnaire" class="back-link"><i class="fas fa-arrow-left"></i></a>
     <h1><%= questionnaire.title %></h1>
+    <% if (!isTeachingQuestionnaire) { %>
     <button class="btn btn-light" onclick="toggleModal('addQModal')">
       <i class="fas fa-plus"></i> Tambah Soal
     </button>
+    <% } %>
   </div>
 
   <div class="container">
@@ -16,8 +18,29 @@
       <!-- Questions list -->
       <div>
         <div class="section-card">
-          <h3 class="section-title"><i class="fas fa-list"></i> Daftar Soal (<%= questions.length %>)</h3>
-          <% if (questions.length === 0) { %>
+          <h3 class="section-title"><i class="fas fa-list"></i> Daftar Soal (<%= isTeachingQuestionnaire ? teachingRatings.length + teachingEssays.length + 4 : questions.length %>)</h3>
+          <% if (isTeachingQuestionnaire) { %>
+            <div class="question-review-card">
+              <div class="question-num">Field utama</div>
+              <p class="question-text">Select Tutor, Select a Study Program, Study Period</p>
+            </div>
+            <% teachingRatings.forEach(([key, label], idx) => { %>
+              <div class="question-review-card">
+                <div class="question-num">Rating <%= idx + 1 %> · Skor 1-5</div>
+                <p class="question-text"><%= label %></p>
+              </div>
+            <% }) %>
+            <% teachingEssays.forEach(([key, label], idx) => { %>
+              <div class="question-review-card">
+                <div class="question-num">Essay <%= idx + 1 %></div>
+                <p class="question-text"><%= label %></p>
+              </div>
+            <% }) %>
+            <div class="question-review-card">
+              <div class="question-num">Pilihan YA/TIDAK</div>
+              <p class="question-text">Apakah tutor memberikan referensi untuk self study diluar pembelajaran di kelas?</p>
+            </div>
+          <% } else if (questions.length === 0) { %>
             <div class="empty-state"><i class="fas fa-question"></i><p>Belum ada soal.</p></div>
           <% } else { %>
             <% questions.forEach((q, idx) => { %>
@@ -49,15 +72,31 @@
             <div class="empty-state"><i class="fas fa-inbox"></i><p>Belum ada respon.</p></div>
           <% } else { %>
             <% responses.forEach(r => { %>
-            <div class="response-item">
-              <strong><%= r.member_name %></strong>
-              <div class="response-score">
+            <details class="response-detail">
+              <summary>
+                <span>
+                  <strong><%= r.member_name %></strong>
+                  <small><%= formatDate(r.submitted_at) %></small>
+                </span>
                 <span class="score-badge score-<%= r.max_score > 0 && r.score/r.max_score >= 0.7 ? 'good' : 'low' %>">
                   <%= r.score %>/<%= r.max_score %>
                 </span>
-              </div>
-              <small><%= formatDate(r.submitted_at) %></small>
-            </div>
+              </summary>
+              <% if (isTeachingQuestionnaire) { %>
+                <div class="response-answer-list">
+                  <div><span>Tutor</span><strong><%= r.answer_map.tutor_name || '-' %></strong></div>
+                  <div><span>Study Program</span><strong><%= r.answer_map.study_program_name || '-' %></strong></div>
+                  <div><span>Study Period</span><strong><%= r.answer_map.study_period || '-' %></strong></div>
+                  <% teachingRatings.forEach(([key, label]) => { %>
+                    <div><span><%= label %></span><strong><%= r.answer_map.ratings && r.answer_map.ratings[key] ? r.answer_map.ratings[key] : '-' %></strong></div>
+                  <% }) %>
+                  <% teachingEssays.forEach(([key, label]) => { %>
+                    <div><span><%= label %></span><strong><%= r.answer_map.essays && r.answer_map.essays[key] ? r.answer_map.essays[key] : '-' %></strong></div>
+                  <% }) %>
+                  <div><span>Self Study Reference</span><strong><%= r.answer_map.self_study_reference || '-' %></strong></div>
+                </div>
+              <% } %>
+            </details>
             <% }) %>
           <% } %>
         </div>
@@ -65,6 +104,7 @@
     </div>
   </div>
 
+  <% if (!isTeachingQuestionnaire) { %>
   <!-- Add Question Modal -->
   <div class="modal" id="addQModal" style="display:none">
     <div class="modal-overlay" onclick="toggleModal('addQModal')"></div>
@@ -110,8 +150,10 @@
       </form>
     </div>
   </div>
+  <% } %>
 </div>
 
+<% if (!isTeachingQuestionnaire) { %>
 <script>
 function updateQForm(type) {
   document.getElementById('optionsSection').style.display = type === 'multiple_choice' ? 'block' : 'none';
@@ -128,5 +170,6 @@ function prepareOptions() {
   }
 }
 </script>
+<% } %>
 
 <%- include('../partials/footer') %>

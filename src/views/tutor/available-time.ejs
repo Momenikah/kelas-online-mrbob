@@ -5,65 +5,308 @@
   <%- include('../partials/flash') %>
   <div class="sub-banner">
     <a href="/tutor" class="back-link"><i class="fas fa-arrow-left"></i></a>
-    <h1>Waktu Tersedia</h1>
+    <h1>Available Time</h1>
+    <p class="sub-banner-desc">Atur ketersediaan jam mengajar Anda setiap periode mingguan.</p>
+    <a href="/tutor/available-time/export.csv" class="btn btn-light">
+      <i class="fas fa-download"></i> Export CSV
+    </a>
   </div>
 
   <div class="container">
-    <div class="two-col">
-      <!-- Add new time -->
-      <div class="section-card">
-        <h3 class="section-title"><i class="fas fa-plus-circle"></i> Tambah Waktu Tersedia</h3>
-        <form action="/tutor/available-time" method="POST">
-          <div class="form-group">
-            <label class="form-label">Hari</label>
-            <select name="day_of_week" class="form-input" required>
-              <% days.forEach((d, i) => { %>
-              <option value="<%= i %>"><%= d %></option>
-              <% }) %>
-            </select>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Jam Mulai</label>
-              <input type="time" name="start_time" class="form-input" required>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Jam Selesai</label>
-              <input type="time" name="end_time" class="form-input" required>
-            </div>
-          </div>
-          <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Simpan</button>
-        </form>
+    <!-- Summary stats -->
+    <div class="at-stats">
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--brand-600)"><i class="fas fa-calendar-week"></i></span>
+        <div>
+          <strong><%= stats.periods %></strong>
+          <small>Periode tersimpan</small>
+        </div>
       </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--success)"><i class="fas fa-circle-check"></i></span>
+        <div>
+          <strong><%= stats.activeSlots %></strong>
+          <small>Slot aktif</small>
+        </div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--info)"><i class="fas fa-hourglass-half"></i></span>
+        <div>
+          <strong><%= stats.weeklyHours %> jam</strong>
+          <small>Total jam / minggu</small>
+        </div>
+      </div>
+    </div>
 
-      <!-- Current schedule -->
-      <div class="section-card">
-        <h3 class="section-title"><i class="fas fa-clock"></i> Jadwal Waktu Tersedia</h3>
-        <% if (availableTimes.length === 0) { %>
-          <div class="empty-state"><i class="fas fa-clock"></i><p>Belum ada waktu tersedia.</p></div>
-        <% } else { %>
-          <div class="time-grid">
-            <% days.forEach((dayName, dayIdx) => { %>
-              <% const dayTimes = availableTimes.filter(t => t.day_of_week == dayIdx); %>
-              <% if (dayTimes.length > 0) { %>
-              <div class="time-day-group">
-                <h4 class="time-day-name"><%= dayName %></h4>
-                <% dayTimes.forEach(t => { %>
-                <div class="time-slot">
-                  <span><%= formatTime(t.start_time) %> - <%= formatTime(t.end_time) %></span>
-                  <form action="/tutor/available-time/<%= t.id %>/delete" method="POST" style="display:inline">
-                    <button class="btn-icon btn-danger-icon" title="Hapus"><i class="fas fa-times"></i></button>
-                  </form>
-                </div>
-                <% }) %>
-              </div>
-              <% } %>
+    <!-- Available Time form (FluentForm parity) -->
+    <div class="section-card">
+      <h3 class="section-title" id="formTitle"><i class="fas fa-pen-to-square"></i> <span data-form-mode>Tambah Available Time</span></h3>
+      <form action="/tutor/available-time" method="POST" id="availableTimeForm">
+        <div class="form-group">
+          <label class="form-label">Nama Tutor <span class="req">*</span></label>
+          <input type="text" class="form-input ff-read-only" value="<%= user.name %>" readonly>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Periode <span class="req">*</span></label>
+          <select name="periode" class="form-input" id="periodeSelect" required>
+            <option value="">- Select -</option>
+            <% periods.forEach(p => { %>
+            <option value="<%= p.value %>" <%= p.value === currentPeriod ? 'selected' : '' %>><%= p.label %><%= p.value === currentPeriod ? ' (minggu ini)' : '' %></option>
             <% }) %>
+          </select>
+          <p class="field-hint">Menyimpan periode yang sudah ada akan menggantikan seluruh slotnya.</p>
+        </div>
+
+        <h4 class="section-subtitle">Jam Belajar</h4>
+        <div class="repeater" id="atRepeater">
+          <div class="repeater-head">
+            <span>Jam Belajar <span class="req">*</span></span>
+            <span>Hari</span>
+            <span>Custom</span>
+            <span></span>
           </div>
-        <% } %>
-      </div>
+          <div class="repeater-row" data-row>
+            <select name="jam_belajar[]" class="form-input" required>
+              <% hourSlots.forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+            </select>
+            <select name="hari[]" class="form-input" data-hari>
+              <% dayCategories.forEach(c => { %><option value="<%= c.value %>"><%= c.label %></option><% }) %>
+            </select>
+            <input type="text" name="custom[]" class="form-input" data-custom placeholder="Senin, Rabu, Jumat" disabled>
+            <div class="repeater-actions">
+              <button type="button" class="btn-icon btn-add" data-add title="Tambah baris"><i class="fas fa-plus"></i></button>
+              <button type="button" class="btn-icon btn-remove" data-remove title="Hapus baris"><i class="fas fa-minus"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-ghost btn-sm at-add-row" data-add><i class="fas fa-plus"></i> Tambah Slot</button>
+
+        <!-- Live preview -->
+        <div class="at-preview" id="atPreview" hidden>
+          <span class="at-preview-label"><i class="fas fa-eye"></i> Pratinjau:</span>
+          <div class="at-preview-chips" data-preview-chips></div>
+        </div>
+
+        <div class="notes-box">
+          <p><strong>Catatan pengisian:</strong></p>
+          <ol>
+            <li>Available time diisi di awal setiap periode, paling lambat Sabtu pukul 23.59.</li>
+            <li>Weekdays = Senin sampai Jumat.</li>
+            <li>Weekend = Sabtu &amp; Minggu.</li>
+            <li>Custom = isi hari sendiri, contoh: Senin, Rabu, Kamis. Kolom Custom hanya diisi jika memilih Custom.</li>
+          </ol>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Catatan (opsional)</label>
+          <textarea name="notes" class="form-textarea" id="notesField" rows="2" placeholder="Catatan tambahan untuk admin..."></textarea>
+        </div>
+
+        <div class="at-form-actions">
+          <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-save"></i> Simpan <span data-slot-count>(1 slot)</span></button>
+          <button type="button" class="btn btn-ghost at-reset-btn" data-reset hidden><i class="fas fa-rotate-left"></i> Batal Edit</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Saved available time -->
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-clock"></i> Available Time Tersimpan</h3>
+      <% if (savedPeriods.length === 0) { %>
+        <div class="empty-state"><i class="fas fa-clock"></i><p>Belum ada available time. Isi formulir di atas.</p></div>
+      <% } else { %>
+        <% savedPeriods.forEach(period => { %>
+        <%
+          const periodIso = period.period_start ? new Date(period.period_start).toISOString().slice(0,10) : null;
+          const activeCount = period.slots.filter(s => s.is_available).length;
+          const editData = {
+            periode: periodIso,
+            notes: period.notes || '',
+            slots: period.slots.map(s => ({ slot: s.slotValue, hari: s.categoryValue, custom: s.customDays })),
+          };
+        %>
+        <div class="period-card">
+          <div class="period-head">
+            <div class="period-head-info">
+              <h4><i class="fas fa-calendar-week"></i> <%= period.period_label %></h4>
+              <span class="period-meta"><%= period.slots.length %> slot &middot; <%= activeCount %> aktif</span>
+            </div>
+            <div class="period-head-actions">
+              <% if (periodIso) { %>
+              <button type="button" class="btn btn-sm btn-ghost" data-edit-period="<%= JSON.stringify(editData) %>"><i class="fas fa-pen"></i> Edit</button>
+              <form action="/tutor/available-time/period/<%= periodIso %>/delete" method="POST"
+                    onsubmit="return confirm('Hapus seluruh slot periode ini?')">
+                <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i> Hapus</button>
+              </form>
+              <% } %>
+            </div>
+          </div>
+          <% if (period.notes) { %><p class="period-note"><i class="fas fa-note-sticky"></i> <%= period.notes %></p><% } %>
+          <div class="table-wrapper">
+            <table class="data-table at-slot-table">
+              <thead>
+                <tr><th>Jam Belajar</th><th>Hari</th><th>Detail Hari</th><th>Status</th><th></th></tr>
+              </thead>
+              <tbody>
+                <% period.slots.forEach(slot => { %>
+                <tr class="<%= slot.is_available ? '' : 'is-off' %>">
+                  <td><strong><i class="far fa-clock"></i> <%= slot.slotLabel %></strong></td>
+                  <td><span class="cat-badge cat-<%= slot.categoryValue %>"><%= slot.categoryLabel %></span></td>
+                  <td><%= slot.daysLabel %></td>
+                  <td>
+                    <span class="badge-pill badge-<%= slot.is_available ? 'completed' : 'cancelled' %>">
+                      <%= slot.is_available ? 'Aktif' : 'Nonaktif' %>
+                    </span>
+                  </td>
+                  <td class="td-actions">
+                    <form action="/tutor/available-time/<%= slot.id %>/toggle" method="POST" style="display:inline">
+                      <button class="btn-icon btn-toggle-icon" title="<%= slot.is_available ? 'Nonaktifkan' : 'Aktifkan' %>">
+                        <i class="fas fa-toggle-<%= slot.is_available ? 'on' : 'off' %>"></i>
+                      </button>
+                    </form>
+                    <form action="/tutor/available-time/<%= slot.id %>/delete" method="POST" style="display:inline"
+                          onsubmit="return confirm('Hapus slot ini?')">
+                      <button class="btn-icon btn-danger-icon" title="Hapus"><i class="fas fa-times"></i></button>
+                    </form>
+                  </td>
+                </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <% }) %>
+      <% } %>
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+  var repeater = document.getElementById('atRepeater');
+  var form = document.getElementById('availableTimeForm');
+  var preview = document.getElementById('atPreview');
+  var previewChips = preview.querySelector('[data-preview-chips]');
+  var slotCount = form.querySelector('[data-slot-count]');
+  var resetBtn = form.querySelector('[data-reset]');
+  var formModeLabel = document.querySelector('[data-form-mode]');
+  var periodeSelect = document.getElementById('periodeSelect');
+  var notesField = document.getElementById('notesField');
+  var defaultPeriode = periodeSelect.value;
+
+  function syncCustom(row) {
+    var hari = row.querySelector('[data-hari]');
+    var custom = row.querySelector('[data-custom]');
+    if (!hari || !custom) return;
+    var isCustom = hari.value === 'custom';
+    custom.disabled = !isCustom;
+    if (!isCustom) custom.value = '';
+  }
+
+  function bindRow(row) {
+    var hari = row.querySelector('[data-hari]');
+    if (hari) hari.addEventListener('change', function () { syncCustom(row); refresh(); });
+    syncCustom(row);
+  }
+
+  function dayLabel(hari, custom) {
+    if (hari === 'weekend') return 'Sabtu & Minggu';
+    if (hari === 'custom') return (custom || '').trim() || 'Custom';
+    return 'Senin - Jumat';
+  }
+
+  function refresh() {
+    var rows = repeater.querySelectorAll('[data-row]');
+    slotCount.textContent = '(' + rows.length + ' slot)';
+    previewChips.innerHTML = '';
+    rows.forEach(function (row) {
+      var jam = row.querySelector('[name="jam_belajar[]"]');
+      var hari = row.querySelector('[data-hari]');
+      var custom = row.querySelector('[data-custom]');
+      if (!jam) return;
+      var chip = document.createElement('span');
+      chip.className = 'at-chip cat-' + (hari ? hari.value : 'weekdays');
+      chip.innerHTML = '<i class="far fa-clock"></i> ' + jam.value.replace(/ WIB/g, '') +
+        ' · ' + dayLabel(hari ? hari.value : '', custom ? custom.value : '');
+      previewChips.appendChild(chip);
+    });
+    preview.hidden = rows.length === 0;
+  }
+
+  function addRow() {
+    var rows = repeater.querySelectorAll('[data-row]');
+    var clone = rows[rows.length - 1].cloneNode(true);
+    clone.querySelectorAll('select, input').forEach(function (el) {
+      if (el.tagName === 'SELECT') el.selectedIndex = 0;
+      else el.value = '';
+    });
+    repeater.appendChild(clone);
+    bindRow(clone);
+    refresh();
+    return clone;
+  }
+
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('[data-add]')) { addRow(); return; }
+    var removeBtn = e.target.closest('[data-remove]');
+    if (removeBtn && repeater.contains(removeBtn)) {
+      var allRows = repeater.querySelectorAll('[data-row]');
+      if (allRows.length > 1) { removeBtn.closest('[data-row]').remove(); refresh(); }
+      return;
+    }
+    var editBtn = e.target.closest('[data-edit-period]');
+    if (editBtn) { loadPeriod(JSON.parse(editBtn.getAttribute('data-edit-period'))); }
+  });
+
+  repeater.addEventListener('change', refresh);
+  repeater.addEventListener('input', refresh);
+
+  function setRowCount(n) {
+    var rows = repeater.querySelectorAll('[data-row]');
+    while (rows.length > n) { rows[rows.length - 1].remove(); rows = repeater.querySelectorAll('[data-row]'); }
+    while (rows.length < n) { addRow(); rows = repeater.querySelectorAll('[data-row]'); }
+  }
+
+  function loadPeriod(data) {
+    setRowCount(data.slots.length || 1);
+    var rows = repeater.querySelectorAll('[data-row]');
+    data.slots.forEach(function (slot, i) {
+      var row = rows[i];
+      if (!row) return;
+      var jam = row.querySelector('[name="jam_belajar[]"]');
+      var hari = row.querySelector('[data-hari]');
+      var custom = row.querySelector('[data-custom]');
+      if (jam) jam.value = slot.slot;
+      if (hari) hari.value = slot.hari;
+      syncCustom(row);
+      if (custom && slot.hari === 'custom') custom.value = slot.custom || '';
+    });
+    if (data.periode) periodeSelect.value = data.periode;
+    notesField.value = data.notes || '';
+    formModeLabel.textContent = 'Edit Available Time';
+    resetBtn.hidden = false;
+    refresh();
+    document.getElementById('formTitle').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  resetBtn.addEventListener('click', function () {
+    setRowCount(1);
+    var row = repeater.querySelector('[data-row]');
+    row.querySelectorAll('select').forEach(function (s) { s.selectedIndex = 0; });
+    row.querySelector('[data-custom]').value = '';
+    syncCustom(row);
+    periodeSelect.value = defaultPeriode;
+    notesField.value = '';
+    formModeLabel.textContent = 'Tambah Available Time';
+    resetBtn.hidden = true;
+    refresh();
+  });
+
+  repeater.querySelectorAll('[data-row]').forEach(bindRow);
+  refresh();
+})();
+</script>
 
 <%- include('../partials/footer') %>

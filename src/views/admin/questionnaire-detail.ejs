@@ -1,0 +1,118 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'admin' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+
+  <div class="sub-banner">
+    <a href="/admin/questionnaire" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1><%= questionnaire.title %></h1>
+    <p class="sub-banner-desc">Mode view-only untuk admin.</p>
+  </div>
+
+  <div class="container">
+    <div class="section-card">
+      <div class="presence-selected-meta">
+        <span><i class="fas fa-book-open"></i> <%= questionnaire.program_name %></span>
+        <span><i class="fas fa-user"></i> <%= questionnaire.creator_name || '-' %></span>
+        <span><i class="fas fa-clock"></i> <%= questionnaire.duration_minutes %> menit</span>
+        <% if (questionnaire.due_date) { %><span><i class="fas fa-calendar"></i> <%= formatDate(questionnaire.due_date) %></span><% } %>
+      </div>
+      <% if (questionnaire.description) { %><p class="quiz-desc" style="margin-top:10px"><%= questionnaire.description %></p><% } %>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <div class="section-card">
+          <h3 class="section-title"><i class="fas fa-list"></i> Daftar Soal (<%= isTeachingQuestionnaire ? teachingRatings.length + teachingEssays.length + 4 : questions.length %>)</h3>
+          <% if (isTeachingQuestionnaire) { %>
+            <div class="question-review-card">
+              <div class="question-num">Field utama</div>
+              <p class="question-text">Select Tutor, Select a Study Program, Study Period</p>
+            </div>
+            <% teachingRatings.forEach(([key, label], idx) => { %>
+              <div class="question-review-card">
+                <div class="question-num">Rating <%= idx + 1 %> · Skor 1-5</div>
+                <p class="question-text"><%= label %></p>
+              </div>
+            <% }) %>
+            <% teachingEssays.forEach(([key, label], idx) => { %>
+              <div class="question-review-card">
+                <div class="question-num">Essay <%= idx + 1 %></div>
+                <p class="question-text"><%= label %></p>
+              </div>
+            <% }) %>
+            <div class="question-review-card">
+              <div class="question-num">Pilihan YA/TIDAK</div>
+              <p class="question-text">Apakah tutor memberikan referensi untuk self study diluar pembelajaran di kelas?</p>
+            </div>
+          <% } else if (questions.length === 0) { %>
+            <div class="empty-state compact"><i class="fas fa-question"></i><p>Belum ada soal.</p></div>
+          <% } else { %>
+            <% questions.forEach((q, idx) => { %>
+              <div class="question-review-card">
+                <div class="question-num">Soal <%= idx + 1 %> · <%= q.question_type.replace('_', ' ') %></div>
+                <p class="question-text"><%= q.question_text %></p>
+                <% if (q.options && q.question_type === 'multiple_choice') { %>
+                  <% const opts = Array.isArray(q.options) ? q.options : JSON.parse(q.options); %>
+                  <div class="options-preview">
+                    <% opts.forEach((o, i) => { %>
+                      <span class="option-preview <%= o === q.correct_answer ? 'correct' : '' %>"><%= String.fromCharCode(65+i) %>. <%= o %></span>
+                    <% }) %>
+                  </div>
+                <% } %>
+              </div>
+            <% }) %>
+          <% } %>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-card">
+          <h3 class="section-title"><i class="fas fa-users"></i> Respon (<%= responses.length %>)</h3>
+          <% if (responses.length === 0) { %>
+            <div class="empty-state compact"><i class="fas fa-inbox"></i><p>Belum ada respon.</p></div>
+          <% } else { %>
+            <% responses.forEach(r => { %>
+              <details class="response-detail">
+                <summary>
+                  <span>
+                    <strong><%= r.respondent_name %></strong>
+                    <small><%= r.respondent_role %> · <%= formatDate(r.submitted_at) %></small>
+                  </span>
+                  <span class="score-badge score-<%= r.max_score > 0 && r.score/r.max_score >= 0.7 ? 'good' : 'low' %>"><%= r.score %>/<%= r.max_score %></span>
+                </summary>
+                <% if (isTeachingQuestionnaire) { %>
+                <div class="response-answer-list">
+                  <div><span>Tutor</span><strong><%= r.answer_map.tutor_name || '-' %></strong></div>
+                  <div><span>Study Program</span><strong><%= r.answer_map.study_program_name || '-' %></strong></div>
+                  <div><span>Study Period</span><strong><%= r.answer_map.study_period || '-' %></strong></div>
+                  <% teachingRatings.forEach(([key, label]) => { %>
+                    <div><span><%= label %></span><strong><%= r.answer_map.ratings && r.answer_map.ratings[key] ? r.answer_map.ratings[key] : '-' %></strong></div>
+                  <% }) %>
+                  <% teachingEssays.forEach(([key, label]) => { %>
+                    <div><span><%= label %></span><strong><%= r.answer_map.essays && r.answer_map.essays[key] ? r.answer_map.essays[key] : '-' %></strong></div>
+                  <% }) %>
+                  <div><span>Self Study Reference</span><strong><%= r.answer_map.self_study_reference || '-' %></strong></div>
+                </div>
+                <% } else { %>
+                <div class="response-answer-list">
+                  <% questions.forEach((q, idx) => { %>
+                    <% const answer = r.answer_map[q.id] || r.answer_map[String(q.id)] || '-'; %>
+                    <div>
+                      <span>Soal <%= idx + 1 %></span>
+                      <strong><%= answer %></strong>
+                    </div>
+                  <% }) %>
+                </div>
+                <% } %>
+              </details>
+            <% }) %>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

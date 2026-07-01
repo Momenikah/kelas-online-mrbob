@@ -102,4 +102,39 @@ app.listen(PORT, () => {
   console.log(`  KELASONLINE - Super Seru`);
   console.log(`  Server berjalan di http://localhost:${PORT}`);
   console.log(`========================================\n`);
+
+  // Keep the programs table aligned with the registration catalog.
+  const { query } = require('./config/database');
+  const { ensurePrograms } = require('./utils/catalog');
+  const { seedPeriods } = require('./utils/periods');
+  ensurePrograms(query)
+    .then((n) => console.log(`Catalog: ${n} program tersinkron di tabel programs.`))
+    .catch((err) => console.error('Gagal sinkronisasi katalog program:', err.message));
+  seedPeriods(query)
+    .then((n) => console.log(`Periode: ${n} periode tersedia.`))
+    .catch((err) => console.error('Gagal menyiapkan periode:', err.message));
+  const { ensureMemberPresenceTable } = require('./utils/memberPresence');
+  ensureMemberPresenceTable(query)
+    .then(() => console.log('Tabel member_presences siap.'))
+    .catch((err) => console.error('Gagal menyiapkan tabel presensi member:', err.message));
+  const { ensureClassProofTable } = require('./utils/classProofs');
+  ensureClassProofTable(query)
+    .then(() => console.log('Tabel class_proofs siap.'))
+    .catch((err) => console.error('Gagal menyiapkan tabel foto kelas:', err.message));
+  const { ensureMemberReportsTable } = require('./utils/memberReports');
+  ensureMemberReportsTable(query)
+    .then(() => console.log('Tabel member_reports siap.'))
+    .catch((err) => console.error('Gagal menyiapkan tabel report member:', err.message));
+  const { ensureCertificateDetailsColumn } = require('./utils/certificates');
+  ensureCertificateDetailsColumn(query)
+    .then(() => console.log('Kolom detail sertifikat siap.'))
+    .catch((err) => console.error('Gagal menyiapkan detail sertifikat:', err.message));
+  const { ensureSupportFeedbackTable } = require('./utils/supportFeedback');
+  ensureSupportFeedbackTable(query)
+    .then(() => console.log('Tabel support_feedback siap.'))
+    .catch((err) => console.error('Gagal menyiapkan tabel support feedback:', err.message));
+  const { ensureUserAccessColumns } = require('./utils/userAccess');
+  ensureUserAccessColumns(query)
+    .then(() => console.log('Kolom akses user siap.'))
+    .catch((err) => console.error('Gagal menyiapkan akses user:', err.message));
 });

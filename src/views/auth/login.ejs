@@ -1,68 +1,153 @@
 <%- include('../partials/head') %>
 
-<div class="auth-wrapper">
-  <div class="auth-card">
-    <div class="auth-logo">
-      <div class="logo-box logo-lg">
-        <span class="logo-super">Super</span>
-        <span class="logo-seru">Seru!</span>
-      </div>
-      <p class="auth-subtitle">Learning Management Platform</p>
+<div class="login-split">
+
+  <!-- ============ LEFT: INTERACTIVE SHOWCASE ============ -->
+  <aside class="login-showcase" id="loginShowcase">
+    <div class="showcase-blobs" aria-hidden="true">
+      <span class="blob blob-1"></span>
+      <span class="blob blob-2"></span>
+      <span class="blob blob-3"></span>
     </div>
 
-    <% if (error && error.length > 0) { %>
-      <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <%= error[0] %></div>
-    <% } %>
-    <% if (success && success.length > 0) { %>
-      <div class="alert alert-success"><i class="fas fa-check-circle"></i> <%= success[0] %></div>
-    <% } %>
-
-    <h2 class="auth-title">Masuk ke Akun</h2>
-
-    <form action="/login" method="POST" class="auth-form">
-      <div class="form-group">
-        <label class="form-label"><i class="fas fa-envelope"></i> Email</label>
-        <input type="email" name="email" class="form-input" placeholder="Masukkan email Anda" required>
+    <div class="showcase-inner">
+      <div class="showcase-brand">
+        <span class="showcase-logo"><img src="/img/logo-mrbob.webp" alt="Mr.BOB"></span>
+        <span class="showcase-brand-name">Super&nbsp;Seru</span>
       </div>
-      <div class="form-group">
-        <label class="form-label"><i class="fas fa-lock"></i> Password</label>
-        <div class="input-password-wrapper">
-          <input type="password" name="password" id="passwordInput" class="form-input" placeholder="Masukkan password" required>
-          <button type="button" class="toggle-password" onclick="togglePassword()">
-            <i class="fas fa-eye" id="eyeIcon"></i>
-          </button>
+
+      <h1 class="showcase-headline">Belajar lebih <span>terarah,</span><br>hasil lebih <span>nyata.</span></h1>
+      <p class="showcase-sub">Pantau progres, jadwal, dan sertifikatmu dalam satu dashboard yang rapi.</p>
+
+      <!-- floating interactive mockup -->
+      <div class="mock-scene" id="mockScene">
+        <div class="mock-card mock-main" data-depth="0.18">
+          <div class="mock-head">
+            <span class="mock-avatar"><i class="fas fa-user-graduate"></i></span>
+            <div>
+              <p class="mock-name">Halo, Member 👋</p>
+              <p class="mock-role">Program TOEFL Preparation</p>
+            </div>
+          </div>
+          <div class="mock-progress-row">
+            <div class="mock-progress-label"><span>Progres Modul</span><span class="mock-pct" data-count="78">0%</span></div>
+            <div class="mock-bar"><i style="--w:78%"></i></div>
+          </div>
+          <div class="mock-progress-row">
+            <div class="mock-progress-label"><span>Kehadiran</span><span class="mock-pct" data-count="92">0%</span></div>
+            <div class="mock-bar mock-bar-alt"><i style="--w:92%"></i></div>
+          </div>
+        </div>
+
+        <div class="mock-card mock-stat" data-depth="0.34">
+          <span class="mock-stat-icon"><i class="fas fa-trophy"></i></span>
+          <div>
+            <p class="mock-stat-num" data-count="14">0</p>
+            <p class="mock-stat-cap">Sertifikat</p>
+          </div>
+        </div>
+
+        <div class="mock-card mock-schedule" data-depth="0.28">
+          <span class="mock-sched-icon"><i class="fas fa-video"></i></span>
+          <div class="mock-sched-body">
+            <p class="mock-sched-title">Speaking Class</p>
+            <p class="mock-sched-time"><i class="far fa-clock"></i> Hari ini · 19.00 WIB</p>
+          </div>
+          <span class="mock-live">LIVE</span>
+        </div>
+
+        <div class="mock-badge" data-depth="0.5">
+          <i class="fas fa-fire"></i>
+          <span><b>7</b> hari beruntun</span>
         </div>
       </div>
-      <button type="submit" class="btn btn-primary btn-full">
-        <i class="fas fa-sign-in-alt"></i> Masuk
-      </button>
-    </form>
 
-    <div class="auth-footer">
-      <p>Belum punya akun? <a href="/register" class="auth-link">Daftar sekarang</a></p>
+      <ul class="showcase-features">
+        <li><i class="fas fa-chart-line"></i> Laporan perkembangan</li>
+        <li><i class="fas fa-calendar-check"></i> Jadwal &amp; presensi</li>
+        <li><i class="fas fa-certificate"></i> Sertifikat digital</li>
+      </ul>
     </div>
+  </aside>
 
-    <div class="demo-accounts">
-      <p class="demo-title">Akun Demo:</p>
-      <div class="demo-grid">
-        <div class="demo-item" onclick="fillLogin('admin@kelasonline.com','admin123')">
-          <i class="fas fa-user-shield"></i> Admin
+  <!-- ============ RIGHT: LOGIN FORM ============ -->
+  <main class="login-formside">
+    <div class="login-form-card">
+      <div class="login-form-brand">
+        <img src="/img/logo-mrbob.webp" alt="Mr.BOB" class="app-logo">
+      </div>
+
+      <% if (error && error.length > 0) { %>
+        <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <%= error[0] %></div>
+      <% } %>
+      <% if (success && success.length > 0) { %>
+        <div class="alert alert-success"><i class="fas fa-check-circle"></i> <%= success[0] %></div>
+      <% } %>
+
+      <h2 class="login-form-title">Selamat datang kembali</h2>
+      <p class="login-form-lead">Masuk untuk melanjutkan belajar.</p>
+
+      <form action="/login" method="POST" class="auth-form">
+        <div class="form-group">
+          <label class="form-label"><i class="fas fa-envelope"></i> Email</label>
+          <div class="field-wrap">
+            <i class="fas fa-envelope field-ico"></i>
+            <input type="email" name="email" class="form-input has-ico" placeholder="nama@email.com" autocomplete="email" required>
+          </div>
         </div>
-        <div class="demo-item" onclick="fillLogin('tutor@kelasonline.com','tutor123')">
-          <i class="fas fa-chalkboard-teacher"></i> Tutor
+        <div class="form-group">
+          <label class="form-label"><i class="fas fa-lock"></i> Password</label>
+          <div class="field-wrap">
+            <i class="fas fa-lock field-ico"></i>
+            <input type="password" name="password" id="passwordInput" class="form-input has-ico has-action" placeholder="Masukkan password" autocomplete="current-password" required>
+            <button type="button" class="toggle-password" onclick="togglePassword()" aria-label="Tampilkan password">
+              <i class="fas fa-eye" id="eyeIcon"></i>
+            </button>
+          </div>
         </div>
-        <div class="demo-item" onclick="fillLogin('member@kelasonline.com','member123')">
-          <i class="fas fa-user-graduate"></i> Member
+
+        <div class="login-options">
+          <label class="login-remember">
+            <input type="checkbox" name="remember"><span>Ingat saya</span>
+          </label>
+          <a href="/konfirmasi-transfer" class="auth-link login-help">Konfirmasi pembayaran</a>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full btn-lg">
+          <i class="fas fa-sign-in-alt"></i> Masuk
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        <p>Belum punya akun? <a href="/register" class="auth-link">Daftar sekarang</a></p>
+      </div>
+
+      <div class="demo-accounts">
+        <p class="demo-title"><i class="fas fa-wand-magic-sparkles"></i> Coba akun demo — klik untuk isi otomatis</p>
+        <div class="demo-grid">
+          <div class="demo-item" onclick="fillLogin('admin@kelasonline.com','admin123')">
+            <i class="fas fa-user-shield"></i> Admin
+          </div>
+          <div class="demo-item" onclick="fillLogin('tutor@kelasonline.com','tutor123')">
+            <i class="fas fa-chalkboard-teacher"></i> Tutor
+          </div>
+          <div class="demo-item" onclick="fillLogin('member@kelasonline.com','member123')">
+            <i class="fas fa-user-graduate"></i> Member
+          </div>
         </div>
       </div>
     </div>
-  </div>
+  </main>
+
 </div>
 
 <script>
 function fillLogin(email, pass) {
   document.querySelector('input[name="email"]').value = email;
   document.querySelector('input[name="password"]').value = pass;
+  document.querySelectorAll('.demo-item').forEach(d => d.classList.remove('is-active'));
+  if (window.event && window.event.currentTarget) window.event.currentTarget.classList.add('is-active');
+  document.querySelector('.auth-form .btn-primary').focus();
 }
 function togglePassword() {
   const input = document.getElementById('passwordInput');

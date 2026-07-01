@@ -3,9 +3,12 @@
 
 <div class="page-wrapper">
   <%- include('../partials/flash') %>
-  <div class="sub-banner">
+  <div class="sub-banner cert-member-banner">
     <a href="/member" class="back-link"><i class="fas fa-arrow-left"></i></a>
-    <h1>E-Sertifikat</h1>
+    <div>
+      <h1>E-Sertifikat</h1>
+      <p class="sub-banner-desc">Preview sertifikat sebelum download PDF.</p>
+    </div>
   </div>
 
   <div class="container">
@@ -16,47 +19,169 @@
         <small>Selesaikan program untuk mendapatkan sertifikat.</small>
       </div>
     <% } else { %>
-      <div class="cert-grid">
-        <% certificates.forEach(c => { %>
-        <div class="cert-card">
-          <div class="cert-bg">
-            <div class="cert-ribbon"><i class="fas fa-award"></i></div>
-            <div class="cert-logo">Super<br>Seru!</div>
-            <div class="cert-body">
-              <p class="cert-with">Sertifikat Kelulusan</p>
-              <h3 class="cert-name"><%= user.name %></h3>
-              <p class="cert-desc">Telah berhasil menyelesaikan program</p>
-              <h4 class="cert-program"><%= c.program_name %></h4>
-              <div class="cert-footer-row">
-                <div>
-                  <p class="cert-num">No: <%= c.certificate_number %></p>
-                  <p class="cert-date">Diterbitkan: <%= formatDate(c.issued_date) %></p>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="cert-actions">
-            <button class="btn btn-outline" onclick="printCert('<%= c.id %>')">
-              <i class="fas fa-print"></i> Cetak
-            </button>
-            <button class="btn btn-primary" onclick="downloadCert('<%= c.id %>')">
-              <i class="fas fa-download"></i> Unduh
-            </button>
-          </div>
+      <div class="cert-member-toolbar">
+        <div>
+          <span><i class="fas fa-layer-group"></i> <%= certificates.length %> dokumen</span>
+          <strong>Sertifikat tersedia</strong>
         </div>
+      </div>
+
+      <div class="cert-member-grid">
+        <% certificates.forEach(c => { %>
+        <%
+          let d = c.details || {};
+          if (typeof d === 'string') {
+            try { d = JSON.parse(d || '{}'); } catch (e) { d = {}; }
+          }
+          const scores = d.scores || {};
+          const category = String(d.category || '').toLowerCase();
+          const isToefl = category.includes('toefl');
+          const isIelts = category.includes('ielts');
+          const isTest = isToefl || isIelts;
+          const hasReport = category.includes('speaking') || category.includes('holiday');
+          const improvement = d.improvement || {};
+          const programName = d.program_label || c.program_name || '-';
+          const recipientName = c.member_name || d.member_name || user.name || '-';
+          const periodLabel = d.period_label || formatDate(c.issued_date);
+          const gradeRaw = d.grade || '-';
+          const gradeText = /^grade\s/i.test(gradeRaw) ? gradeRaw : `Grade ${gradeRaw}`;
+          const issueDate = c.issued_date ? new Date(c.issued_date) : new Date();
+          const dateSlash = `${String(issueDate.getDate()).padStart(2, '0')}/${String(issueDate.getMonth() + 1).padStart(2, '0')}/${issueDate.getFullYear()}`;
+          const certNo = c.certificate_number || '';
+          const testTitle = isIelts ? 'IELTS Test' : 'TOEFL Test';
+          const templateSrc = isTest ? '/img/certificates/template-TOEFL-IELTS-1.png' : '/img/certificates/sertifikat-umum.png';
+          const show = (value, fallback = '-') => (value !== undefined && value !== null && String(value).trim() !== '' ? value : fallback);
+        %>
+        <article class="cert-member-card">
+          <button type="button"
+                  class="cert-member-preview"
+                  data-cert-preview="/member/certificate/<%= c.id %>/print?preview=1&embed=1"
+                  data-cert-download="/member/certificate/<%= c.id %>/print"
+                  data-cert-title="<%= programName %>">
+            <div class="cert-member-sheet <%= isTest ? 'is-test' : 'is-general' %>">
+              <img src="<%= templateSrc %>" alt="">
+              <% if (isTest) { %>
+                <div class="cm-name cm-test-name"><%= recipientName %></div>
+                <div class="cm-title cm-test-title"><%= testTitle %></div>
+                <div class="cm-score-list">
+                  <% if (isToefl) { %>
+                    <span><b>Listening Comprehension</b><i>:</i><em><%= show(scores.listening_score) %></em></span>
+                    <span><b>Structure &amp; Written</b><i>:</i><em><%= show(scores.structure_score) %></em></span>
+                    <span><b>Reading Comprehension</b><i>:</i><em><%= show(scores.reading_score) %></em></span>
+                  <% } else { %>
+                    <span><b>Listening</b><i>:</i><em><%= show(scores.listening_score, '') %></em></span>
+                    <span><b>Reading</b><i>:</i><em><%= show(scores.reading_score, '') %></em></span>
+                    <span><b>Writing</b><i>:</i><em><%= show(scores.writing_score, '') %></em></span>
+                    <span><b>Speaking</b><i>:</i><em><%= show(scores.speaking_score, '') %></em></span>
+                  <% } %>
+                  <span class="is-total"><b>Total Score</b><i>:</i><em><%= show(scores.total_score) %></em></span>
+                </div>
+                <div class="cm-period">Date of periode : <%= periodLabel %></div>
+              <% } else { %>
+                <div class="cm-name cm-general-name"><%= recipientName %></div>
+                <% if (d.grade) { %><div class="cm-general-grade"><%= gradeText %></div><% } %>
+                <div class="cm-program"><%= programName %></div>
+                <div class="cm-period cm-general-period"><%= periodLabel %></div>
+              <% } %>
+            </div>
+          </button>
+
+          <div class="cert-member-meta">
+            <div>
+              <span><%= isTest ? testTitle : 'Certificate of Achievement' %></span>
+              <h3><%= programName %></h3>
+            </div>
+            <div class="cert-member-badges">
+              <% if (d.grade) { %><span><i class="fas fa-star"></i> <%= gradeText %></span><% } %>
+              <% if (hasReport) { %><span><i class="fas fa-file-lines"></i> Personal Report</span><% } %>
+              <span><i class="fas fa-calendar"></i> <%= periodLabel %></span>
+            </div>
+            <small>No: <%= c.certificate_number %> - Terbit <%= formatDate(c.issued_date) %></small>
+          </div>
+
+          <% if (hasReport) { %>
+          <div class="cert-member-report">
+            <div class="cert-member-report-head">
+              <span><i class="fas fa-file-lines"></i> Personal Report</span>
+              <% if (scores.cefr_score) { %><strong><%= scores.cefr_score %></strong><% } %>
+            </div>
+            <div class="cert-member-report-scores">
+              <span>Speaking <b><%= show(scores.speaking_score) %></b></span>
+              <span>Vocabulary <b><%= show(scores.vocabulary_score) %></b></span>
+              <span>Grammar <b><%= show(scores.grammar_score) %></b></span>
+              <span>Pronunciation <b><%= show(scores.pronunciation_score) %></b></span>
+              <span>Understanding <b><%= show(scores.understanding_score) %></b></span>
+            </div>
+            <% if (improvement.before || improvement.after) { %>
+              <p><strong>Before:</strong> <%= show(improvement.before, '-') %></p>
+              <p><strong>After:</strong> <%= show(improvement.after, '-') %></p>
+            <% } %>
+          </div>
+          <% } %>
+
+          <div class="cert-member-actions">
+            <button type="button" class="btn btn-outline" data-cert-preview="/member/certificate/<%= c.id %>/print?preview=1&embed=1" data-cert-download="/member/certificate/<%= c.id %>/print" data-cert-title="<%= programName %>">
+              <i class="fas fa-eye"></i> Preview
+            </button>
+            <a class="btn btn-primary" href="/member/certificate/<%= c.id %>/print" target="_blank" rel="noopener">
+              <i class="fas fa-download"></i> Download PDF
+            </a>
+          </div>
+        </article>
         <% }) %>
       </div>
     <% } %>
   </div>
 </div>
 
+<div class="cert-member-modal" id="certMemberModal" aria-hidden="true">
+  <div class="cert-member-modal-overlay" data-cert-close></div>
+  <div class="cert-member-modal-panel">
+    <div class="cert-member-modal-head">
+      <div>
+        <span>Preview Sertifikat</span>
+        <strong id="certMemberModalTitle">Sertifikat</strong>
+      </div>
+      <div class="cert-member-modal-actions">
+        <a class="btn btn-primary" id="certMemberModalDownload" href="#" target="_blank" rel="noopener">
+          <i class="fas fa-download"></i> Download PDF
+        </a>
+        <button type="button" class="btn-icon" data-cert-close title="Tutup"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+    <iframe id="certMemberFrame" title="Preview sertifikat"></iframe>
+  </div>
+</div>
+
 <script>
-function printCert(id) {
-  window.print();
+const certModal = document.getElementById('certMemberModal');
+const certFrame = document.getElementById('certMemberFrame');
+const certModalTitle = document.getElementById('certMemberModalTitle');
+const certModalDownload = document.getElementById('certMemberModalDownload');
+
+function openCertPreview(button) {
+  certFrame.src = button.dataset.certPreview;
+  certModalTitle.textContent = button.dataset.certTitle || 'Sertifikat';
+  certModalDownload.href = button.dataset.certDownload;
+  certModal.classList.add('is-open');
+  certModal.setAttribute('aria-hidden', 'false');
 }
-function downloadCert(id) {
-  alert('Fitur unduh akan segera tersedia.');
+
+function closeCertPreview() {
+  certModal.classList.remove('is-open');
+  certModal.setAttribute('aria-hidden', 'true');
+  certFrame.src = 'about:blank';
 }
+
+document.querySelectorAll('[data-cert-preview]').forEach((button) => {
+  button.addEventListener('click', () => openCertPreview(button));
+});
+document.querySelectorAll('[data-cert-close]').forEach((button) => {
+  button.addEventListener('click', closeCertPreview);
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && certModal.classList.contains('is-open')) closeCertPreview();
+});
 </script>
 
 <%- include('../partials/footer') %>

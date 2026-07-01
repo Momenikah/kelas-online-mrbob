@@ -1,0 +1,86 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+
+  <div class="sub-banner">
+    <a href="<%= backHref %>" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Help & Support</h1>
+    <p class="sub-banner-desc">Kirim feedback, kendala, atau request bantuan ke tim Kelas Online Mr.BOB.</p>
+  </div>
+
+  <div class="container support-shell">
+    <section class="section-card support-hero-card">
+      <div>
+        <span class="support-eyebrow"><i class="fas fa-headset"></i> Feedback Center</span>
+        <h2>Butuh bantuan atau punya masukan?</h2>
+        <p>Isi form berikut. Pesan akan masuk ke <strong><%= supportEmail %></strong> lengkap dengan data akun kamu.</p>
+      </div>
+      <div class="support-contact-card">
+        <i class="fas fa-envelope"></i>
+        <span>Email Support</span>
+        <strong><%= supportEmail %></strong>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <form action="<%= basePath %>" method="POST" class="support-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Kategori <span class="req">*</span></label>
+            <select name="category" class="form-input" required>
+              <option value="Feedback">Feedback</option>
+              <option value="Kendala Teknis">Kendala Teknis</option>
+              <option value="Jadwal / Kelas">Jadwal / Kelas</option>
+              <option value="Presensi">Presensi</option>
+              <option value="Sertifikat / Report">Sertifikat / Report</option>
+              <option value="Billing / Pembayaran">Billing / Pembayaran</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Prioritas</label>
+            <select name="priority" class="form-input">
+              <option value="Normal">Normal</option>
+              <option value="Penting">Penting</option>
+              <option value="Urgent">Urgent</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Subjek <span class="req">*</span></label>
+          <input type="text" name="subject" class="form-input" maxlength="140" required placeholder="Contoh: Tidak bisa download sertifikat">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Email Balasan</label>
+            <input type="email" name="contact_email" class="form-input" value="<%= user.email || '' %>" placeholder="email kamu">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Halaman Terkait</label>
+            <input type="text" name="page_url" class="form-input" placeholder="Contoh: /member/certificate">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Feedback / Pesan <span class="req">*</span></label>
+          <textarea name="message" class="form-textarea support-message" required minlength="10" rows="7" placeholder="Ceritakan kendala atau masukan kamu dengan jelas..."></textarea>
+        </div>
+
+        <div class="support-profile-note">
+          <i class="fas fa-circle-info"></i>
+          <span>Dikirim sebagai <strong><%= roleLabel %></strong>: <%= user.name %> &lt;<%= user.email %>&gt;</span>
+        </div>
+
+        <div class="form-actions">
+          <a href="<%= backHref %>" class="btn btn-outline">Batal</a>
+          <button class="btn btn-primary"><i class="fas fa-paper-plane"></i> Kirim Feedback</button>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

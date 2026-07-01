@@ -1,30 +1,50 @@
 <%- include('../partials/head') %>
-<%- include('../partials/navbar', { activeNav: 'member' }) %>
+<%- include('../partials/navbar', { activeNav: typeof activeNav !== 'undefined' ? activeNav : 'member' }) %>
+<%
+  const qBackHref = typeof backHref !== 'undefined' ? backHref : '/member/questionnaire';
+  const qSubmitBasePath = typeof submitBasePath !== 'undefined' ? submitBasePath : '/member/questionnaire';
+  const responseAnswers = response && response.answers
+    ? (typeof response.answers === 'string' ? JSON.parse(response.answers) : response.answers)
+    : {};
+  const teachingMode = typeof isTeachingQuestionnaire !== 'undefined' && isTeachingQuestionnaire;
+  const qTotal = teachingMode ? 12 : questions.length;
+%>
 
 <div class="page-wrapper">
+  <%- include('../partials/flash') %>
+
   <div class="sub-banner">
-    <a href="/member/questionnaire" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <a href="<%= qBackHref %>" class="back-link"><i class="fas fa-arrow-left"></i></a>
     <h1><%= questionnaire.title %></h1>
+    <p class="sub-banner-desc">Isi semua pertanyaan dengan teliti. Jawaban akan masuk ke halaman view-only admin.</p>
   </div>
 
   <div class="container">
-    <div class="quiz-take-wrapper">
-      <div class="quiz-take-header">
-        <div class="quiz-take-meta">
+    <div class="quiz-take-wrapper qform-shell">
+      <div class="qform-hero">
+        <div>
+          <span class="qform-eyebrow"><i class="fas fa-clipboard-question"></i> Questionnaire</span>
+          <h2><%= questionnaire.title %></h2>
+          <% if (questionnaire.description) { %><p><%= questionnaire.description %></p><% } %>
+        </div>
+        <div class="qform-meta">
           <span><i class="fas fa-book"></i> <%= questionnaire.program_name %></span>
-          <span><i class="fas fa-clock"></i> Durasi: <%= questionnaire.duration_minutes %> menit</span>
+          <span><i class="fas fa-clock"></i> <%= questionnaire.duration_minutes %> menit</span>
           <% if (questionnaire.due_date) { %>
-            <span><i class="fas fa-calendar"></i> Deadline: <%= formatDate(questionnaire.due_date) %></span>
+            <span><i class="fas fa-calendar"></i> <%= formatDate(questionnaire.due_date) %></span>
           <% } %>
         </div>
-        <% if (questionnaire.description) { %><p class="quiz-take-desc"><%= questionnaire.description %></p><% } %>
+      </div>
+
+      <div class="qform-progress">
+        <span><%= response ? 'Sudah dikirim' : `0 dari ${qTotal} terjawab` %></span>
+        <div><b id="qProgressBar" style="width:<%= response ? 100 : 0 %>%"></b></div>
       </div>
 
       <% if (response) { %>
-        <!-- Already submitted - show results -->
         <div class="result-card">
           <div class="result-icon"><i class="fas fa-award"></i></div>
-          <h2>Hasil Kuis</h2>
+          <h2>Hasil Questionnaire</h2>
           <div class="result-score">
             <span class="score-big"><%= response.score %></span>
             <span class="score-max">/ <%= response.max_score %></span>
@@ -33,64 +53,144 @@
           <p>Dikumpulkan: <%= formatDate(response.submitted_at) %></p>
         </div>
 
-        <!-- Show questions with answers -->
+        <% if (teachingMode) { %>
+          <div class="section-card qstandard-review">
+            <h3 class="section-title"><i class="fas fa-chalkboard-teacher"></i> Kegiatan Ajar Mengajar Oleh Tutor</h3>
+            <div class="kv-grid">
+              <div class="kv"><span>Tutor</span><strong><%= responseAnswers.tutor_name || '-' %></strong></div>
+              <div class="kv"><span>Study Program</span><strong><%= responseAnswers.study_program_name || '-' %></strong></div>
+              <div class="kv"><span>Study Period</span><strong><%= responseAnswers.study_period || '-' %></strong></div>
+              <div class="kv"><span>Self Study</span><strong><%= responseAnswers.self_study_reference || '-' %></strong></div>
+            </div>
+            <div class="qstandard-answer-list">
+              <% teachingRatings.forEach(([key, label]) => { %>
+                <div><span><%= label %></span><strong><%= responseAnswers.ratings && responseAnswers.ratings[key] ? responseAnswers.ratings[key] : '-' %></strong></div>
+              <% }) %>
+              <% teachingEssays.forEach(([key, label]) => { %>
+                <div class="wide"><span><%= label %></span><p><%= responseAnswers.essays && responseAnswers.essays[key] ? responseAnswers.essays[key] : '-' %></p></div>
+              <% }) %>
+            </div>
+          </div>
+        <% } else { %>
         <% questions.forEach((q, idx) => { %>
-        <div class="question-review-card">
-          <div class="question-num">Soal <%= idx + 1 %></div>
-          <p class="question-text"><%= q.question_text %></p>
-          <div class="answer-review">
-            <strong>Jawabanmu:</strong>
-            <span class="answer-text"><%= response.answers ? (JSON.parse(typeof response.answers === 'string' ? response.answers : JSON.stringify(response.answers))[q.id] || '-') : '-' %></span>
-          </div>
-          <% if (q.correct_answer) { %>
-          <div class="correct-answer"><strong>Jawaban benar:</strong> <%= q.correct_answer %></div>
-          <% } %>
-        </div>
-        <% }) %>
-
-      <% } else { %>
-        <!-- Form to take quiz -->
-        <form action="/member/questionnaire/<%= questionnaire.id %>/submit" method="POST" id="quizForm">
-          <% if (questionnaire.duration_minutes) { %>
-          <div class="timer-bar">
-            <i class="fas fa-stopwatch"></i>
-            Sisa waktu: <span id="timer" class="timer-count"><%= questionnaire.duration_minutes %>:00</span>
-          </div>
-          <% } %>
-
-          <% questions.forEach((q, idx) => { %>
-          <div class="question-card">
-            <div class="question-num">Soal <%= idx + 1 %> <span class="question-pts">(<%= q.points %> poin)</span></div>
+          <div class="question-review-card">
+            <div class="question-num">Pertanyaan <%= idx + 1 %></div>
             <p class="question-text"><%= q.question_text %></p>
-
-            <% if (q.question_type === 'multiple_choice' && q.options) { %>
-              <% const opts = Array.isArray(q.options) ? q.options : JSON.parse(q.options); %>
-              <div class="options-grid">
-                <% opts.forEach((opt, oi) => { %>
-                <label class="option-label">
-                  <input type="radio" name="q_<%= q.id %>" value="<%= opt %>" required>
-                  <span class="option-letter"><%= String.fromCharCode(65+oi) %></span>
-                  <span class="option-text"><%= opt %></span>
-                </label>
-                <% }) %>
-              </div>
-            <% } else if (q.question_type === 'essay') { %>
-              <textarea name="q_<%= q.id %>" class="form-textarea" rows="4" placeholder="Tulis jawaban Anda..."></textarea>
-            <% } else if (q.question_type === 'rating') { %>
-              <div class="rating-options">
-                <% for(let i = 1; i <= 5; i++) { %>
-                <label class="rating-label">
-                  <input type="radio" name="q_<%= q.id %>" value="<%= i %>">
-                  <span class="rating-star"><%= i %> ★</span>
-                </label>
-                <% } %>
-              </div>
+            <div class="answer-review">
+              <strong>Jawaban:</strong>
+              <span class="answer-text"><%= responseAnswers[q.id] || responseAnswers[String(q.id)] || '-' %></span>
+            </div>
+            <% if (q.correct_answer) { %>
+              <div class="correct-answer"><strong>Jawaban benar:</strong> <%= q.correct_answer %></div>
             <% } %>
           </div>
+        <% }) %>
+        <% } %>
+      <% } else { %>
+        <form action="<%= qSubmitBasePath %>/<%= questionnaire.id %>/submit" method="POST" id="quizForm">
+          <% if (questionnaire.duration_minutes) { %>
+            <div class="timer-bar">
+              <i class="fas fa-stopwatch"></i>
+              Sisa waktu: <span id="timer" class="timer-count"><%= questionnaire.duration_minutes %>:00</span>
+            </div>
+          <% } %>
+
+          <% if (teachingMode) { %>
+            <div class="qstandard-card">
+              <h3>Kegiatan Ajar Mengajar Oleh Tutor</h3>
+              <div class="form-group">
+                <label class="form-label">Select Tutor <span class="req">*</span></label>
+                <select name="tutor_id" id="qTutorSelect" class="form-input" required>
+                  <option value="">- Select -</option>
+                  <% teachingOptions.tutors.forEach(t => { %><option value="<%= t.id %>" data-name="<%= t.name %>"><%= t.name %></option><% }) %>
+                </select>
+                <input type="hidden" name="tutor_name" id="qTutorName">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Select a Study Program <span class="req">*</span></label>
+                <select name="study_program_id" id="qProgramSelect" class="form-input" required>
+                  <option value="">- Select -</option>
+                  <% teachingOptions.programs.forEach(p => { %><option value="<%= p.id %>" data-name="<%= p.name %>"><%= p.name %></option><% }) %>
+                </select>
+                <input type="hidden" name="study_program_name" id="qProgramName">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Study Period <span class="req">*</span></label>
+                <select name="study_period" class="form-input" required>
+                  <option value="">- Select -</option>
+                  <% teachingOptions.periods.forEach(p => { %><option value="<%= p.label %>"><%= p.label %></option><% }) %>
+                </select>
+              </div>
+
+              <div class="qstandard-scale">
+                <strong>BERIKAN SKOR 1 - 5 UNTUK KELAS INI</strong>
+                <ul>
+                  <li>Sangat baik = 5</li>
+                  <li>Baik = 4</li>
+                  <li>Cukup = 3</li>
+                  <li>Kurang = 2</li>
+                  <li>Sangat kurang = 1</li>
+                </ul>
+              </div>
+
+              <% teachingRatings.forEach(([key, label]) => { %>
+                <div class="qstandard-range">
+                  <label><%= label %> : <span class="req">*</span></label>
+                  <input type="range" name="<%= key %>" min="0" max="5" value="0" data-rating-required>
+                  <output>0</output>
+                </div>
+              <% }) %>
+
+              <% teachingEssays.forEach(([key, label]) => { %>
+                <div class="form-group">
+                  <label class="form-label"><%= label %> <span class="req">*</span></label>
+                  <textarea name="<%= key %>" class="form-textarea qform-textarea" rows="4" required></textarea>
+                </div>
+              <% }) %>
+
+              <div class="form-group">
+                <label class="form-label">Apakah tutor memberikan referensi untuk self study diluar pembelajaran di kelas? <span class="req">*</span></label>
+                <div class="qstandard-radio">
+                  <label><input type="radio" name="self_study_reference" value="YA" required> YA</label>
+                  <label><input type="radio" name="self_study_reference" value="TIDAK" required> TIDAK</label>
+                </div>
+              </div>
+            </div>
+          <% } else { %>
+          <% questions.forEach((q, idx) => { %>
+            <div class="question-card qform-question">
+              <div class="question-num">Pertanyaan <%= idx + 1 %> <span class="question-pts"><%= q.points %> poin</span></div>
+              <p class="question-text"><%= q.question_text %></p>
+
+              <% if (q.question_type === 'multiple_choice' && q.options) { %>
+                <% const opts = Array.isArray(q.options) ? q.options : JSON.parse(q.options); %>
+                <div class="options-grid">
+                  <% opts.forEach((opt, oi) => { %>
+                    <label class="option-label qform-option">
+                      <input type="radio" name="q_<%= q.id %>" value="<%= opt %>" required>
+                      <span class="option-letter"><%= String.fromCharCode(65+oi) %></span>
+                      <span class="option-text"><%= opt %></span>
+                    </label>
+                  <% }) %>
+                </div>
+              <% } else if (q.question_type === 'essay') { %>
+                <textarea name="q_<%= q.id %>" class="form-textarea qform-textarea" rows="4" required placeholder="Tulis jawaban Anda..."></textarea>
+              <% } else if (q.question_type === 'rating') { %>
+                <div class="qform-rating">
+                  <% for (let i = 1; i <= 5; i++) { %>
+                    <label>
+                      <input type="radio" name="q_<%= q.id %>" value="<%= i %>" required>
+                      <span><strong><%= i %></strong><small><%= i === 1 ? 'Sangat kurang' : i === 2 ? 'Kurang' : i === 3 ? 'Cukup' : i === 4 ? 'Baik' : 'Sangat baik' %></small></span>
+                    </label>
+                  <% } %>
+                </div>
+              <% } %>
+            </div>
           <% }) %>
+          <% } %>
 
           <div class="quiz-submit-bar">
-            <button type="submit" class="btn btn-primary btn-lg" onclick="return confirm('Kumpulkan jawaban? Tidak dapat diubah setelah dikumpulkan.')">
+            <button type="submit" class="btn btn-primary btn-lg" onclick="return confirm('Kumpulkan jawaban sekarang?')">
               <i class="fas fa-paper-plane"></i> Kumpulkan Jawaban
             </button>
           </div>
@@ -99,6 +199,55 @@
     </div>
   </div>
 </div>
+
+<% if (!response) { %>
+<script>
+const form = document.getElementById('quizForm');
+const progressBar = document.getElementById('qProgressBar');
+const progressLabel = document.querySelector('.qform-progress span');
+const questionNames = Array.from(new Set(Array.from(form.querySelectorAll('[name^="q_"]')).map((el) => el.name)));
+const isTeachingMode = <%= teachingMode ? 'true' : 'false' %>;
+function updateQuestionProgress() {
+  const teachingNames = isTeachingMode
+    ? ['tutor_id','study_program_id','study_period', ...Array.from(form.querySelectorAll('[data-rating-required]')).map((el) => el.name), 'change_after_meetings','testimonial','suggestion','self_study_reference']
+    : questionNames;
+  const answered = teachingNames.filter((name) => {
+    const fields = Array.from(form.querySelectorAll(`[name="${name}"]`));
+    return fields.some((field) => {
+      if (field.type === 'radio') return field.checked;
+      if (field.type === 'range') return Number(field.value) > 0;
+      return field.value.trim().length > 0;
+    });
+  }).length;
+  const pct = teachingNames.length ? Math.round((answered / teachingNames.length) * 100) : 0;
+  progressBar.style.width = `${pct}%`;
+  progressLabel.textContent = `${answered} dari ${teachingNames.length} terjawab`;
+}
+form.addEventListener('input', updateQuestionProgress);
+form.addEventListener('change', updateQuestionProgress);
+document.querySelectorAll('.qstandard-range input').forEach((range) => {
+  const output = range.parentElement.querySelector('output');
+  const sync = () => { output.textContent = range.value; };
+  range.addEventListener('input', sync);
+  sync();
+});
+document.getElementById('qTutorSelect')?.addEventListener('change', function () {
+  document.getElementById('qTutorName').value = this.options[this.selectedIndex]?.dataset.name || '';
+});
+document.getElementById('qProgramSelect')?.addEventListener('change', function () {
+  document.getElementById('qProgramName').value = this.options[this.selectedIndex]?.dataset.name || '';
+});
+form.addEventListener('submit', function (event) {
+  if (!isTeachingMode) return;
+  const invalidRating = Array.from(form.querySelectorAll('[data-rating-required]')).some((range) => Number(range.value) <= 0);
+  if (invalidRating) {
+    event.preventDefault();
+    alert('Lengkapi semua skor rating 1 - 5 terlebih dahulu.');
+  }
+});
+updateQuestionProgress();
+</script>
+<% } %>
 
 <% if (!response && questionnaire.duration_minutes) { %>
 <script>

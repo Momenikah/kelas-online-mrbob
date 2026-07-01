@@ -1,0 +1,53 @@
+<div class="pay-methods">
+  <h2><i class="fas fa-money-bill-transfer"></i> Metode Pembayaran</h2>
+  <p class="pay-methods-sub">Transfer sesuai total pembayaran ke rekening berikut atau scan QRIS, lalu unggah bukti pembayaran.</p>
+  <div class="pay-methods-grid">
+    <div class="pay-bank">
+      <div class="pay-bank-head">
+        <span class="pay-bank-logo">BRI</span>
+        <span class="pay-bank-name">KELAS ONLINE</span>
+      </div>
+      <button type="button" class="pay-acc" data-copy="055501001605561" title="Salin nomor rekening">
+        <span class="pay-acc-no">0555 0100 1605 561</span>
+        <i class="fas fa-copy"></i>
+      </button>
+      <p class="pay-acc-holder">a.n. LKBI MR BOB QQ ONLINE</p>
+    </div>
+    <div class="pay-qris">
+      <span class="pay-qris-label"><i class="fas fa-qrcode"></i> Scan QRIS</span>
+      <img src="/img/qriskelasonline.jpeg" alt="QRIS Kelas Online Mr.BOB" loading="lazy">
+      <span class="pay-qris-note">Semua e-wallet &amp; m-banking</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  document.querySelectorAll('.pay-acc[data-copy]').forEach(function (btn) {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', function () {
+      var value = btn.getAttribute('data-copy');
+      var done = function () {
+        var icon = btn.querySelector('i');
+        if (!icon) return;
+        var prev = icon.className;
+        icon.className = 'fas fa-check';
+        btn.classList.add('is-copied');
+        setTimeout(function () { icon.className = prev; btn.classList.remove('is-copied'); }, 1600);
+      };
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(value).then(done).catch(done);
+      } else {
+        var tmp = document.createElement('input');
+        tmp.value = value;
+        document.body.appendChild(tmp);
+        tmp.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        tmp.remove();
+        done();
+      }
+    });
+  });
+})();
+</script>

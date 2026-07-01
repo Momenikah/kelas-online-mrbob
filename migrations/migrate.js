@@ -114,6 +114,21 @@ async function migrate() {
       ON CONFLICT DO NOTHING
     `);
 
+    await client.query(`
+      INSERT INTO schedule_members (schedule_id, member_id)
+      SELECT s.id, e.member_id
+      FROM schedules s
+      JOIN enrollments e ON e.program_id = s.program_id AND e.status = 'active'
+      ON CONFLICT DO NOTHING
+    `);
+
+    await client.query(`
+      INSERT INTO presences (schedule_id, member_id, status, source)
+      SELECT sm.schedule_id, sm.member_id, 'absent', 'system'
+      FROM schedule_members sm
+      ON CONFLICT DO NOTHING
+    `);
+
     // Seed modules
     await client.query(`
       INSERT INTO modules (program_id, title, description, content, order_number, is_premium, created_by)
@@ -253,13 +268,17 @@ async function migrate() {
       ON CONFLICT DO NOTHING
     `);
 
-    // Seed available times for tutor
+    // Seed available times for tutor (FluentForm-style: Periode + Jam Belajar + Hari)
     await client.query(`
-      INSERT INTO available_times (tutor_id, day_of_week, start_time, end_time, is_available)
-      SELECT u.id, day, '09:00', '12:00', true
-      FROM users u, (VALUES (1),(2),(3),(4),(5)) AS d(day)
+      INSERT INTO available_times (tutor_id, period_label, period_start, day_category, custom_days, start_time, end_time, is_available)
+      SELECT u.id, v.period_label, v.period_start::date, v.day_category, v.custom_days, v.start_time::time, v.end_time::time, true
+      FROM users u,
+        (VALUES
+          ('Minggu Ini', date_trunc('week', CURRENT_DATE)::date, 'weekdays', NULL, '09:00', '10:00'),
+          ('Minggu Ini', date_trunc('week', CURRENT_DATE)::date, 'weekdays', NULL, '13:00', '14:00'),
+          ('Minggu Ini', date_trunc('week', CURRENT_DATE)::date, 'weekend', NULL, '10:00', '11:00')
+        ) AS v(period_label, period_start, day_category, custom_days, start_time, end_time)
       WHERE u.email = 'tutor@kelasonline.com'
-      ON CONFLICT DO NOTHING
     `);
 
     console.log('');

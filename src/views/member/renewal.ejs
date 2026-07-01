@@ -3,64 +3,194 @@
 
 <div class="page-wrapper">
   <%- include('../partials/flash') %>
-  <div class="sub-banner">
+  <div class="sub-banner renewal-banner">
     <a href="/member" class="back-link"><i class="fas fa-arrow-left"></i></a>
-    <h1>Perpanjang Program</h1>
+    <div>
+      <h1>Renewal Program</h1>
+      <p class="sub-banner-desc">Isi form singkat, admin akan cek pembayaran dan update masa aktif.</p>
+    </div>
   </div>
 
-  <div class="container">
-    <!-- Current enrollments -->
-    <% if (enrollments.length > 0) { %>
-    <div class="section-card">
-      <h3 class="section-title"><i class="fas fa-id-card"></i> Program Aktif Saat Ini</h3>
-      <% enrollments.forEach(e => { %>
-      <div class="renewal-item">
-        <div class="renewal-info">
-          <h4><%= e.program_name %></h4>
-          <span>Aktif: <%= formatDate(e.start_date) %> - <%= formatDate(e.end_date) %></span>
-          <% const daysLeft = Math.ceil((new Date(e.end_date) - new Date()) / (1000 * 60 * 60 * 24)); %>
-          <% if (daysLeft <= 14) { %>
-            <span class="renewal-warning"><i class="fas fa-exclamation-triangle"></i> Berakhir dalam <%= daysLeft %> hari</span>
-          <% } %>
+  <div class="container renewal-simple-page">
+    <div class="renewal-simple-top">
+      <section class="section-card renewal-simple-form" id="renewal-form">
+        <div class="renewal-simple-head">
+          <div>
+            <span>Form Renewal</span>
+            <h2>Ajukan Program</h2>
+          </div>
+          <strong><%= stats.nearestDays === null ? '-' : stats.nearestDays + ' hari' %></strong>
         </div>
-        <span class="badge-status badge-<%= e.status %>"><%= e.status %></span>
-      </div>
-      <% }) %>
-    </div>
-    <% } %>
 
-    <!-- Available programs -->
-    <h3 class="section-title mt-20"><i class="fas fa-star"></i> Paket Program</h3>
-    <div class="program-grid">
-      <% programs.forEach(p => { %>
-      <div class="program-card">
-        <div class="program-card-header">
-          <i class="fas fa-graduation-cap"></i>
+        <form action="/member/renewal" method="POST" enctype="multipart/form-data" class="renewal-form-card">
+          <div class="form-row renewal-program-row">
+            <div class="form-group">
+              <label class="form-label">Program <span class="required">*</span></label>
+              <select name="program_id" id="renewalProgram" class="form-input" required>
+                <option value="">-- Pilih Program --</option>
+                <% programs.forEach(p => { %>
+                  <option value="<%= p.id %>"
+                          data-price="<%= p.price || 0 %>"
+                          data-renewal-price="<%= p.renewal_price || 0 %>"
+                          data-duration="<%= p.duration_months || '' %>"
+                          <%= recommended && String(recommended.program_id) === String(p.id) ? 'selected' : '' %>>
+                    <%= p.name %>
+                  </option>
+                <% }) %>
+              </select>
+              <small class="field-hint">Harga renewal otomatis potong Rp100.000 dari harga program.</small>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Mulai Belajar <span class="required">*</span></label>
+              <input type="date" name="preferred_start_date" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Jam Belajar <span class="required">*</span></label>
+              <select name="study_time" class="form-input" required>
+                <option value="">-- Pilih Jam --</option>
+                <% studyTimes.forEach(slot => { %>
+                  <option value="<%= slot %>"><%= slot %></option>
+                <% }) %>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nomor WhatsApp <span class="required">*</span></label>
+              <input type="text" name="phone" class="form-input" value="<%= memberPhone || '' %>" placeholder="08xxxxxxxxxx" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Bukti Transfer <small>(opsional)</small></label>
+              <label class="renewal-upload">
+                <input type="file" name="transfer_proof" accept="image/*" id="renewalProofInput">
+                <i class="fas fa-cloud-arrow-up"></i>
+                <span id="renewalProofLabel">Upload bukti jika sudah transfer</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Catatan</label>
+            <textarea name="notes" class="form-textarea" rows="3" placeholder="Contoh: lanjut tutor yang sama, prefer jam malam, atau sudah transfer ke BCA."></textarea>
+          </div>
+
+          <div class="renewal-mini-summary">
+            <span id="renewalSummaryProgram">Belum pilih program</span>
+            <strong id="renewalSummaryPrice">-</strong>
+            <small id="renewalSummaryDuration">-</small>
+          </div>
+          <div class="renewal-discount-note" id="renewalDiscountNote">
+            <i class="fas fa-tags"></i>
+            <span>Renewal mendapat potongan Rp100.000 setiap program.</span>
+          </div>
+
+          <div class="form-actions renewal-simple-actions">
+            <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Kirim Form</button>
+          </div>
+        </form>
+      </section>
+
+      <aside class="section-card renewal-simple-side">
+        <div class="renewal-simple-head">
+          <div>
+            <span>Program Aktif</span>
+            <h2><%= stats.activeCount %> Program</h2>
+          </div>
+          <i class="fas fa-id-card"></i>
         </div>
-        <h4 class="program-name"><%= p.name %></h4>
-        <p class="program-desc"><%= p.description %></p>
-        <div class="program-detail">
-          <span><i class="fas fa-clock"></i> <%= p.duration_months %> Bulan</span>
-          <span class="program-price"><%= formatCurrency(p.price) %></span>
-        </div>
-        <button class="btn btn-primary btn-full" onclick="confirmRenewal('<%= p.id %>', '<%= p.name %>', '<%= formatCurrency(p.price) %>')">
-          <i class="fas fa-shopping-cart"></i> Daftar / Perpanjang
-        </button>
-      </div>
-      <% }) %>
+
+        <% if (enrollments.length === 0) { %>
+          <div class="empty-state renewal-empty"><i class="fas fa-book-open"></i><p>Belum ada program aktif.</p></div>
+        <% } else { %>
+          <div class="renewal-compact-list">
+            <% enrollments.forEach(e => { %>
+              <button type="button" class="renewal-compact-item is-<%= e.urgency %>"
+                      data-active-pick data-id="<%= e.program_id %>">
+                <span>
+                  <strong><%= e.program_name %></strong>
+                  <small><%= formatDate(e.end_date) %></small>
+                </span>
+                <% if (e.days_left !== null && e.days_left >= 0) { %>
+                  <b><%= e.days_left %> hari</b>
+                <% } else { %>
+                  <b>Expired</b>
+                <% } %>
+              </button>
+            <% }) %>
+          </div>
+        <% } %>
+      </aside>
     </div>
 
-    <div class="renewal-note">
-      <i class="fas fa-info-circle"></i>
-      <p>Untuk pembayaran dan pendaftaran program, silakan hubungi admin atau kunjungi kantor kami. Tim kami siap membantu Anda.</p>
-    </div>
+    <section class="section-card renewal-simple-history" id="riwayat-renewal">
+      <div class="renewal-simple-head">
+        <div>
+          <span>Riwayat</span>
+          <h2>Status Pengajuan</h2>
+        </div>
+        <strong><%= renewalRequests.length %></strong>
+      </div>
+
+      <% if (renewalRequests.length === 0) { %>
+        <div class="empty-state renewal-empty"><i class="fas fa-inbox"></i><p>Belum ada pengajuan renewal.</p></div>
+      <% } else { %>
+        <div class="renewal-history-list">
+          <% renewalRequests.forEach(r => { %>
+            <div class="renewal-history-item">
+              <div>
+                <strong><%= r.program_name %></strong>
+                <span>Renewal • <%= formatDate(r.preferred_start_date) %> • <%= r.study_time || '-' %> • <%= formatCurrency(r.package_price || 0) %></span>
+              </div>
+              <span class="badge-pill badge-renewal-<%= r.status %>"><%= r.status %></span>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
   </div>
 </div>
 
 <script>
-function confirmRenewal(id, name, price) {
-  alert(`Program: ${name}\nHarga: ${price}\n\nSilakan hubungi admin untuk melanjutkan pendaftaran.`);
+const renewalProgram = document.getElementById('renewalProgram');
+const renewalSummaryProgram = document.getElementById('renewalSummaryProgram');
+const renewalSummaryPrice = document.getElementById('renewalSummaryPrice');
+const renewalSummaryDuration = document.getElementById('renewalSummaryDuration');
+const renewalDiscountNote = document.getElementById('renewalDiscountNote');
+
+function formatRupiah(value) {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value || 0));
 }
+
+function updateRenewalSummary() {
+  const selected = renewalProgram.options[renewalProgram.selectedIndex];
+  const renewalPrice = Number(selected && selected.dataset ? selected.dataset.renewalPrice : 0);
+  renewalSummaryProgram.textContent = selected && selected.value ? selected.textContent.trim() : 'Belum pilih program';
+  renewalSummaryPrice.textContent = selected && selected.value ? `Renewal ${formatRupiah(renewalPrice)}` : '-';
+  renewalSummaryDuration.textContent = selected && selected.value && selected.dataset.duration ? selected.dataset.duration + ' bulan' : '-';
+  renewalDiscountNote.style.display = selected && selected.value ? 'flex' : 'none';
+}
+
+if (renewalProgram) renewalProgram.addEventListener('change', updateRenewalSummary);
+document.querySelectorAll('[data-active-pick]').forEach((button) => {
+  button.addEventListener('click', () => {
+    renewalProgram.value = button.dataset.id || '';
+    updateRenewalSummary();
+    document.getElementById('renewal-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+
+const renewalProofInput = document.getElementById('renewalProofInput');
+const renewalProofLabel = document.getElementById('renewalProofLabel');
+if (renewalProofInput) {
+  renewalProofInput.addEventListener('change', () => {
+    renewalProofLabel.textContent = renewalProofInput.files.length ? renewalProofInput.files[0].name : 'Upload bukti jika sudah transfer';
+  });
+}
+updateRenewalSummary();
 </script>
 
 <%- include('../partials/footer') %>

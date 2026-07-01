@@ -44,7 +44,50 @@
           <span class="stat-label">Sesi Selesai</span>
         </div>
       </div>
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-rate"><i class="fas fa-percent"></i></div>
+        <div class="stat-info">
+          <span class="stat-value"><%= attendanceRate %>%</span>
+          <span class="stat-label">Rata-rata Kehadiran</span>
+        </div>
+      </div>
     </div>
+
+    <!-- Available time reminder -->
+    <% if (!hasAvailableThisWeek) { %>
+    <div class="section-card alert-panel">
+      <div class="reminder-row">
+        <div>
+          <h3 class="section-title" style="margin:0"><i class="fas fa-clock"></i> Available time minggu ini belum diisi</h3>
+          <p class="field-hint" style="margin-top:4px">Isi ketersediaan jam mengajar agar admin bisa membuatkan jadwal Anda.</p>
+        </div>
+        <a href="/tutor/available-time" class="btn btn-primary"><i class="fas fa-pen"></i> Isi Sekarang</a>
+      </div>
+    </div>
+    <% } %>
+
+    <!-- Sessions needing attendance -->
+    <% if (pendingPresence && pendingPresence.length > 0) { %>
+    <div class="section-card alert-panel">
+      <h3 class="section-title"><i class="fas fa-user-clock"></i> Sesi Belum Diisi Presensi <span class="count-badge"><%= pendingPresence.length %></span></h3>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead><tr><th>Tanggal</th><th>Sesi</th><th>Program</th><th>Peserta</th><th></th></tr></thead>
+          <tbody>
+            <% pendingPresence.forEach(s => { %>
+            <tr>
+              <td><%= formatDate(s.date) %><div class="table-subtext"><%= formatTime(s.start_time) %> - <%= formatTime(s.end_time) %></div></td>
+              <td><strong><%= s.title %></strong></td>
+              <td><%= s.program_name %></td>
+              <td><i class="fas fa-users"></i> <%= s.member_count %></td>
+              <td><a href="/tutor/presence?schedule_id=<%= s.id %>" class="btn btn-sm btn-primary"><i class="fas fa-user-check"></i> Isi Presensi</a></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <% } %>
   </div>
 
   <!-- Menu Grid -->
@@ -69,7 +112,7 @@
         <div class="menu-icon-wrap">
           <div class="menu-icon"><i class="fas fa-user-check"></i></div>
         </div>
-        <span class="menu-label">Presence</span>
+        <span class="menu-label">Presensi</span>
       </div>
 
       <div class="menu-card" onclick="window.location='/tutor/questionnaire'">
@@ -93,7 +136,7 @@
         <span class="menu-label">E-Certificate</span>
       </div>
 
-      <div class="menu-card" onclick="window.location='#'" title="Hubungi admin">
+      <div class="menu-card" onclick="window.location='/tutor/help-support'" title="Hubungi admin">
         <div class="menu-icon-wrap">
           <div class="menu-icon"><i class="fas fa-circle-info"></i></div>
         </div>
@@ -113,21 +156,52 @@
   <!-- Upcoming Schedules -->
   <% if (upcomingSchedules && upcomingSchedules.length > 0) { %>
   <div class="container">
-    <div class="section-card">
-      <h3 class="section-title"><i class="fas fa-calendar"></i> Jadwal Mengajar Berikutnya</h3>
-      <div class="schedule-list">
+    <div class="section-card upcoming-teach-card">
+      <div class="presence-header">
+        <div>
+          <h3>Jadwal Mengajar Berikutnya</h3>
+          <p>Ringkasan sesi terdekat, peserta, dan akses cepat untuk presensi.</p>
+        </div>
+        <span class="presence-session-count"><i class="fas fa-calendar-check"></i> <%= upcomingSchedules.length %> sesi</span>
+      </div>
+      <div class="schedule-list upcoming-teach-list">
         <% upcomingSchedules.forEach(s => { %>
-        <div class="schedule-item">
+        <% const sessionDate = new Date(s.date); %>
+        <% const today = new Date(); today.setHours(0,0,0,0); %>
+        <% const compareDate = new Date(sessionDate); compareDate.setHours(0,0,0,0); %>
+        <% const dayDiff = Math.round((compareDate - today) / 86400000); %>
+        <% const relativeLabel = dayDiff === 0 ? 'Hari ini' : dayDiff === 1 ? 'Besok' : dayDiff > 1 ? `${dayDiff} hari lagi` : 'Terlewat'; %>
+        <% const memberCount = Number(s.member_count || 0); %>
+        <% const presentCount = Number(s.present_count || 0); %>
+        <% const presenceRate = memberCount > 0 ? Math.round((presentCount / memberCount) * 100) : 0; %>
+        <div class="schedule-item upcoming-teach-item">
           <div class="schedule-date-badge">
             <span class="sdb-day"><%= new Date(s.date).toLocaleDateString('id-ID', {day:'2-digit'}) %></span>
             <span class="sdb-month"><%= new Date(s.date).toLocaleDateString('id-ID', {month:'short'}) %></span>
           </div>
-          <div class="schedule-info">
-            <strong><%= s.title %></strong>
-            <span><i class="fas fa-book"></i> <%= s.program_name %></span>
-            <span><i class="fas fa-clock"></i> <%= formatTime(s.start_time) %> - <%= formatTime(s.end_time) %></span>
+          <div class="schedule-info upcoming-teach-info">
+            <div class="upcoming-title-row">
+              <strong><%= s.title %></strong>
+              <span class="upcoming-relative <%= dayDiff === 0 ? 'today' : '' %>"><%= relativeLabel %></span>
+            </div>
+            <div class="upcoming-meta-grid">
+              <span><i class="fas fa-book"></i> <%= s.program_name %></span>
+              <span><i class="fas fa-clock"></i> <%= formatTime(s.start_time) %> - <%= formatTime(s.end_time) %></span>
+              <span><i class="fas fa-users"></i> <%= memberCount %> peserta</span>
+              <% if (s.location) { %><span><i class="fas fa-location-dot"></i> <%= s.location %></span><% } %>
+            </div>
+            <div class="upcoming-presence-mini">
+              <span><%= presentCount %>/<%= memberCount %> sudah hadir</span>
+              <div><b style="width:<%= presenceRate %>%"></b></div>
+            </div>
           </div>
-          <a href="/tutor/schedule" class="btn btn-sm btn-outline">Detail</a>
+          <div class="upcoming-actions">
+            <% if (s.meeting_link) { %>
+              <a href="<%= s.meeting_link %>" target="_blank" rel="noopener" class="btn btn-sm btn-primary"><i class="fas fa-video"></i> Join</a>
+            <% } %>
+            <a href="/tutor/presence?schedule_id=<%= s.id %>" class="btn btn-sm btn-outline"><i class="fas fa-user-check"></i> Presensi</a>
+            <a href="/tutor/schedule" class="btn btn-sm btn-outline">Detail</a>
+          </div>
         </div>
         <% }) %>
       </div>

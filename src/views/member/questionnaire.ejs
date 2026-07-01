@@ -1,12 +1,14 @@
 <%- include('../partials/head') %>
-<%- include('../partials/navbar', { activeNav: 'member' }) %>
+<%- include('../partials/navbar', { activeNav: typeof activeNav !== 'undefined' ? activeNav : 'member' }) %>
+<% const questionnaireBasePath = typeof basePath !== 'undefined' ? basePath : '/member/questionnaire'; %>
 
 <div class="page-wrapper">
   <%- include('../partials/flash') %>
 
   <div class="sub-banner">
-    <a href="/member" class="back-link"><i class="fas fa-arrow-left"></i></a>
-    <h1>Kuesioner & Kuis</h1>
+    <a href="<%= (typeof activeNav !== 'undefined' && activeNav === 'tutor') ? '/tutor' : '/member' %>" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1><%= title %></h1>
+    <p class="sub-banner-desc">Pilih questionnaire, isi jawaban, lalu kirim. Admin hanya melihat hasil yang sudah masuk.</p>
   </div>
 
   <div class="container">
@@ -43,12 +45,12 @@
               </div>
               <span>Skor kamu</span>
             </div>
-            <a href="/member/questionnaire/<%= q.id %>" class="btn btn-outline btn-full">
+            <a href="<%= questionnaireBasePath %>/<%= q.id %>" class="btn btn-outline btn-full">
               <i class="fas fa-eye"></i> Lihat Hasil
             </a>
           <% } else { %>
-            <a href="/member/questionnaire/<%= q.id %>" class="btn btn-primary btn-full">
-              <i class="fas fa-play"></i> Mulai Kuis
+            <a href="<%= questionnaireBasePath %>/<%= q.id %>" class="btn btn-primary btn-full">
+              <i class="fas fa-pen"></i> Isi Questionnaire
             </a>
           <% } %>
         </div>

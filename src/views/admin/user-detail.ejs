@@ -1,0 +1,205 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'admin' }) %>
+
+<% const v = (val) => (val === null || val === undefined || String(val).trim() === '') ? '-' : val; %>
+<% const isSelf = profile.id === user.id; %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/admin/users" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Detail Pengguna</h1>
+    <p class="sub-banner-desc"><%= profile.name %> &middot; <%= profile.email %></p>
+  </div>
+
+  <div class="container">
+    <!-- Identity header -->
+    <div class="section-card udetail-head">
+      <% if (profile.photo) { %>
+        <img src="<%= profile.photo %>" class="udetail-avatar-img" alt="<%= profile.name %>">
+      <% } else { %>
+        <div class="udetail-avatar"><%= getInitials(profile.name) %></div>
+      <% } %>
+      <div class="udetail-head-info">
+        <h2><%= profile.name %></h2>
+        <div class="udetail-badges">
+          <span class="badge-pill badge-<%= profile.role %>"><%= profile.role %></span>
+          <span class="badge-pill badge-<%= profile.is_active ? 'completed' : 'cancelled' %>"><%= profile.is_active ? 'Aktif' : 'Non-aktif' %></span>
+          <% if (profile.is_vip) { %><span class="badge-pill badge-vip">⭐ VIP</span><% } %>
+          <% if (profile.is_luxury) { %><span class="badge-pill badge-active">Luxury Class</span><% } %>
+          <% if (profile.role === 'tutor') { %><span class="badge-pill badge-active">Grade <%= profile.tutor_grade || 'B' %></span><% } %>
+          <% if (registration) { %><span class="badge-pill badge-<%= registration.status === 'confirmed' ? 'completed' : 'pending' %>"><%= registration.status === 'confirmed' ? 'Pembayaran FIX' : 'Menunggu pembayaran' %></span><% } %>
+        </div>
+        <p class="udetail-meta">Bergabung <%= formatDate(profile.created_at) %></p>
+      </div>
+    </div>
+
+    <!-- Account edit -->
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-user-gear"></i> Akun</h3>
+      <form action="/admin/users/<%= profile.id %>" method="POST" class="modal-form" data-user-form>
+        <input type="hidden" name="redirect_to" value="detail">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Nama</label>
+            <input type="text" name="name" class="form-input" value="<%= profile.name %>" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" name="email" class="form-input" value="<%= profile.email %>" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Phone</label>
+            <input type="tel" name="phone" class="form-input" value="<%= profile.phone || '' %>">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password Baru</label>
+            <input type="password" name="password" class="form-input" minlength="6" placeholder="Kosongkan jika tidak diubah">
+            <p class="field-hint">Isi hanya jika ingin mengganti password.</p>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Role</label>
+            <select name="role" class="form-input" data-role-select required <%= isSelf ? 'data-self' : '' %>>
+              <option value="member" <%= profile.role === 'member' ? 'selected' : '' %>>Member</option>
+              <option value="tutor" <%= profile.role === 'tutor' ? 'selected' : '' %>>Tutor</option>
+              <option value="admin" <%= profile.role === 'admin' ? 'selected' : '' %>>Admin</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="margin-bottom:8px">Status</label>
+            <div class="check-row">
+              <label class="check-inline" data-role-only="member"><input type="checkbox" name="is_vip" <%= profile.is_vip ? 'checked' : '' %>> Member VIP</label>
+              <label class="check-inline" data-role-only="member"><input type="checkbox" name="is_luxury" <%= profile.is_luxury ? 'checked' : '' %>> Luxury Class</label>
+              <label class="check-inline"><input type="checkbox" name="is_active" <%= profile.is_active ? 'checked' : '' %>> Aktif</label>
+            </div>
+          </div>
+        </div>
+        <div class="form-group" data-role-only="tutor">
+          <label class="form-label">Grade Tutor</label>
+          <select name="tutor_grade" class="form-input">
+            <option value="A" <%= profile.tutor_grade === 'A' ? 'selected' : '' %>>Grade A</option>
+            <option value="B" <%= !profile.tutor_grade || profile.tutor_grade === 'B' ? 'selected' : '' %>>Grade B</option>
+            <option value="C" <%= profile.tutor_grade === 'C' ? 'selected' : '' %>>Grade C</option>
+          </select>
+          <p class="field-hint">Grade A dapat dipilih oleh member Luxury Class.</p>
+        </div>
+        <div class="form-group" data-role-only="tutor">
+          <label class="form-label">Bio Pengajar</label>
+          <textarea name="bio" class="form-textarea" rows="3" maxlength="420" placeholder="Pengalaman mengajar, keahlian, dan gaya mengajar..."><%= profile.bio || '' %></textarea>
+          <p class="field-hint">Tampil di profil tutor.</p>
+        </div>
+        <% if (isSelf) { %><p class="field-hint"><i class="fas fa-circle-info"></i> Ini akun Anda — role & status aktif tidak bisa diturunkan sendiri.</p><% } %>
+        <div class="form-actions">
+          <a href="/admin/users" class="btn btn-outline">Kembali</a>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan Perubahan</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Registration data -->
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-id-card"></i> Data Pendaftaran</h3>
+      <% if (!registration) { %>
+        <div class="empty-state"><i class="fas fa-id-card"></i><p>Tidak ada data pendaftaran untuk pengguna ini.</p></div>
+      <% } else { %>
+        <h4 class="kv-subtitle">Data Diri</h4>
+        <div class="kv-grid">
+          <div class="kv"><span>ID Pendaftaran</span><strong><%= v(registration.registration_code) %></strong></div>
+          <div class="kv"><span>Kota</span><strong><%= v(registration.city) %></strong></div>
+          <div class="kv"><span>Usia</span><strong><%= v(registration.age) %></strong></div>
+          <div class="kv"><span>Pekerjaan</span><strong><%= v(registration.occupation) %></strong></div>
+          <div class="kv"><span>Jenjang Pendidikan</span><strong><%= v(registration.education_level) %></strong></div>
+          <div class="kv"><span>Latar Pendidikan</span><strong><%= v(registration.education_background) %></strong></div>
+          <div class="kv"><span>Instagram</span><strong><%= v(registration.instagram) %></strong></div>
+          <div class="kv"><span>Nama Teman</span><strong><%= v(registration.friend_name) %></strong></div>
+        </div>
+
+        <h4 class="kv-subtitle">Program &amp; Paket</h4>
+        <div class="kv-grid">
+          <div class="kv"><span>Tipe Peserta</span><strong><%= v(registration.program_type) %></strong></div>
+          <div class="kv"><span>Program</span><strong><%= v(registration.selected_class) %></strong></div>
+          <div class="kv"><span>Tipe Paket</span><strong><%= v(registration.package_group) %></strong></div>
+          <div class="kv"><span>Paket</span><strong><%= v(registration.package_name) %></strong></div>
+          <div class="kv"><span>Durasi</span><strong><%= v(registration.duration) %></strong></div>
+          <div class="kv"><span>Jumlah Pertemuan</span><strong><%= v(registration.meeting_count) %></strong></div>
+          <div class="kv"><span>Jam Belajar</span><strong><%= v(registration.study_time) %></strong></div>
+          <div class="kv"><span>Mulai Belajar</span><strong><%= v(registration.start_date) %></strong></div>
+          <div class="kv"><span>Tutor Pilihan</span><strong><%= v(registration.preferred_tutor) %></strong></div>
+        </div>
+
+        <h4 class="kv-subtitle">Pembayaran</h4>
+        <div class="kv-grid">
+          <div class="kv"><span>Harga Paket</span><strong><%= registration.package_price ? formatCurrency(registration.package_price) : '-' %></strong></div>
+          <div class="kv"><span>Kode Unik</span><strong><%= v(registration.phone_last_three) %></strong></div>
+          <div class="kv"><span>Kupon</span><strong><%= v(registration.coupon_code) %></strong></div>
+          <div class="kv"><span>Referral</span><strong><%= v(registration.referral_code) %></strong></div>
+          <div class="kv"><span>Status</span><strong><%= registration.status === 'confirmed' ? 'Confirmed (FIX)' : 'Menunggu pembayaran' %></strong></div>
+          <div class="kv"><span>Tanggal Daftar</span><strong><%= formatDate(registration.created_at) %></strong></div>
+          <div class="kv"><span>Tanggal Konfirmasi</span><strong><%= registration.confirmed_at ? formatDate(registration.confirmed_at) : '-' %></strong></div>
+        </div>
+
+        <% if (registration.package_note) { %>
+          <div class="summary-note" style="margin-top:14px"><%= registration.package_note %></div>
+        <% } %>
+
+        <h4 class="kv-subtitle">Bukti Transfer</h4>
+        <% if (registration.transfer_proof) { %>
+          <a href="<%= registration.transfer_proof %>" target="_blank" rel="noopener" class="proof-thumb">
+            <img src="<%= registration.transfer_proof %>" alt="Bukti transfer">
+          </a>
+          <p class="field-hint"><a href="<%= registration.transfer_proof %>" target="_blank" rel="noopener">Buka gambar penuh</a></p>
+        <% } else { %>
+          <div class="empty-state"><i class="fas fa-receipt"></i><p>Belum ada bukti transfer.</p></div>
+        <% } %>
+      <% } %>
+    </div>
+
+    <!-- Enrollments -->
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-layer-group"></i> Enrollment</h3>
+      <% if (!enrollments.length) { %>
+        <div class="empty-state"><i class="fas fa-layer-group"></i><p>Belum ada enrollment.</p></div>
+      <% } else { %>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead><tr><th>Program</th><th>Mulai</th><th>Selesai</th><th>Status</th></tr></thead>
+            <tbody>
+              <% enrollments.forEach(e => { %>
+              <tr>
+                <td><%= e.program_name %></td>
+                <td><%= e.start_date ? formatDate(e.start_date) : '-' %></td>
+                <td><%= e.end_date ? formatDate(e.end_date) : '-' %></td>
+                <td><span class="badge-pill badge-<%= e.status === 'active' ? 'completed' : 'cancelled' %>"><%= e.status %></span></td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  function syncRoleFields(form) {
+    var select = form.querySelector('[data-role-select]');
+    if (!select) return;
+    var role = select.value;
+    form.querySelectorAll('[data-role-only]').forEach(function (el) {
+      el.style.display = el.dataset.roleOnly.split(',').indexOf(role) !== -1 ? '' : 'none';
+    });
+  }
+  document.querySelectorAll('[data-user-form]').forEach(function (form) {
+    var select = form.querySelector('[data-role-select]');
+    if (select) select.addEventListener('change', function () { syncRoleFields(form); });
+    syncRoleFields(form);
+  });
+})();
+</script>
+
+<%- include('../partials/footer') %>

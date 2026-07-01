@@ -1,0 +1,64 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav }) %>
+<% const filledDays = reportDays.filter(day => day.text); %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+
+  <div class="sub-banner">
+    <a href="<%= backHref %>" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Member Report</h1>
+    <div class="sub-banner-actions no-print">
+      <button type="button" class="btn btn-light" onclick="window.print()"><i class="fas fa-file-pdf"></i> Download PDF</button>
+      <% if (canEdit) { %>
+        <a href="<%= editHref %>" class="btn btn-light"><i class="fas fa-pen"></i> Edit Report</a>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="report-detail-shell">
+      <div class="report-profile-card">
+        <div class="report-profile-head">
+          <div>
+            <span class="qform-eyebrow"><i class="fas fa-file-lines"></i> Report Detail</span>
+            <h2>The Report of <%= report.member_name %></h2>
+            <p class="report-profile-sub"><%= filledDays.length %> dari 15 day sudah diisi</p>
+          </div>
+          <div class="report-member-photo">
+            <% if (report.member_photo) { %>
+              <img src="<%= report.member_photo %>" alt="<%= report.member_name %>">
+            <% } else { %>
+              <span><%= getInitials(report.member_name) %></span>
+            <% } %>
+          </div>
+        </div>
+        <div class="report-profile-grid">
+          <div><span>Paket</span><strong><%= report.package_name || '-' %></strong></div>
+          <% const _ps = report.period_start ? new Date(report.period_start) : null; %>
+          <div><span>Periode</span><strong><%= (_ps && !isNaN(_ps)) ? _ps.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '-' %></strong></div>
+          <div><span>Program</span><strong><%= report.program_name %></strong></div>
+          <div><span>Tutor</span><strong><%= report.tutor_name %></strong></div>
+        </div>
+      </div>
+
+      <% if (filledDays.length === 0) { %>
+        <div class="report-empty-panel">
+          <i class="fas fa-file-lines"></i>
+          <p>Belum ada catatan harian yang diisi.</p>
+        </div>
+      <% } else { %>
+        <div class="report-timeline">
+          <% filledDays.forEach(day => { %>
+            <article class="report-timeline-item">
+              <span class="report-timeline-day">Day <%= day.number %></span>
+              <p><%= day.text %></p>
+            </article>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

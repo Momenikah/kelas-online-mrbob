@@ -1,0 +1,104 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'admin' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+
+  <div class="sub-banner">
+    <a href="/admin" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Feedback Inbox</h1>
+    <p class="sub-banner-desc">Kelola feedback member dan tutor dari Help & Support.</p>
+  </div>
+
+  <div class="container">
+    <div class="at-stats">
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--brand-600)"><i class="fas fa-inbox"></i></span>
+        <div><strong><%= stats.total %></strong><small>Total feedback</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--warning)"><i class="fas fa-circle-exclamation"></i></span>
+        <div><strong><%= stats.new_count %></strong><small>Baru</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--info)"><i class="fas fa-spinner"></i></span>
+        <div><strong><%= stats.in_progress %></strong><small>Diproses</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--success)"><i class="fas fa-check"></i></span>
+        <div><strong><%= stats.done %></strong><small>Selesai</small></div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <form method="GET" action="/admin/support-feedback" class="filter-form">
+        <input type="text" name="search" class="form-input" placeholder="Cari nama, email, subjek, atau isi pesan..." value="<%= filters.search || '' %>">
+        <select name="status" class="form-input">
+          <option value="">Semua status</option>
+          <option value="new" <%= filters.status === 'new' ? 'selected' : '' %>>Baru</option>
+          <option value="in_progress" <%= filters.status === 'in_progress' ? 'selected' : '' %>>Diproses</option>
+          <option value="done" <%= filters.status === 'done' ? 'selected' : '' %>>Selesai</option>
+          <option value="archived" <%= filters.status === 'archived' ? 'selected' : '' %>>Arsip</option>
+        </select>
+        <button class="btn btn-primary"><i class="fas fa-search"></i> Filter</button>
+        <a href="/admin/support-feedback" class="btn btn-outline">Reset</a>
+      </form>
+    </div>
+
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-headset"></i> Daftar Feedback</h3>
+      <% if (feedback.length === 0) { %>
+        <div class="empty-state"><i class="fas fa-inbox"></i><p>Belum ada feedback yang cocok.</p></div>
+      <% } else { %>
+        <div class="feedback-inbox">
+          <% feedback.forEach(item => { %>
+            <article class="feedback-item feedback-<%= item.status %>">
+              <div class="feedback-main">
+                <div class="feedback-head">
+                  <div>
+                    <span class="feedback-role"><%= item.role_label %></span>
+                    <h4><%= item.subject %></h4>
+                    <p><strong><%= item.name || '-' %></strong> &middot; <%= item.email || '-' %></p>
+                  </div>
+                  <div class="feedback-badges">
+                    <span class="feedback-status status-<%= item.status %>"><%= item.status === 'new' ? 'Baru' : item.status === 'in_progress' ? 'Diproses' : item.status === 'done' ? 'Selesai' : 'Arsip' %></span>
+                    <span class="feedback-email email-<%= item.email_status %>">Email: <%= item.email_status %></span>
+                  </div>
+                </div>
+                <div class="feedback-meta">
+                  <span><i class="fas fa-layer-group"></i> <%= item.category %></span>
+                  <span><i class="fas fa-flag"></i> <%= item.priority %></span>
+                  <span><i class="fas fa-clock"></i> <%= formatDate(item.created_at) %></span>
+                  <% if (item.page_url) { %><span><i class="fas fa-link"></i> <%= item.page_url %></span><% } %>
+                </div>
+                <details class="feedback-message">
+                  <summary>Lihat pesan</summary>
+                  <p><%= item.message %></p>
+                  <% if (item.email_error) { %>
+                    <div class="validation-text validation-error">Email error: <%= item.email_error %></div>
+                  <% } %>
+                </details>
+              </div>
+              <form action="/admin/support-feedback/<%= item.id %>/status" method="POST" class="feedback-actions">
+                <select name="status" class="form-input">
+                  <option value="new" <%= item.status === 'new' ? 'selected' : '' %>>Baru</option>
+                  <option value="in_progress" <%= item.status === 'in_progress' ? 'selected' : '' %>>Diproses</option>
+                  <option value="done" <%= item.status === 'done' ? 'selected' : '' %>>Selesai</option>
+                  <option value="archived" <%= item.status === 'archived' ? 'selected' : '' %>>Arsip</option>
+                </select>
+                <button class="btn btn-sm btn-primary"><i class="fas fa-save"></i> Update</button>
+                <% if (item.contact_email || item.email) { %>
+                  <a class="btn btn-sm btn-outline" href="mailto:<%= item.contact_email || item.email %>?subject=Re: <%= encodeURIComponent(item.subject) %>">
+                    <i class="fas fa-reply"></i> Reply
+                  </a>
+                <% } %>
+              </form>
+            </article>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

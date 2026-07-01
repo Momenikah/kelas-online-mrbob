@@ -1,0 +1,171 @@
+<%- include('../partials/head') %>
+
+<main class="signup-page">
+  <form action="/konfirmasi-transfer/<%= registration.registration_code %>" method="POST" enctype="multipart/form-data" class="signup-shell">
+    <header class="signup-header">
+      <a href="/pendaftaran/<%= registration.registration_code %>" class="signup-login-link">
+        <i class="fas fa-arrow-left"></i> Detail Pendaftaran
+      </a>
+      <div class="logo-box">
+        <img src="/img/logo-mrbob.webp" alt="Mr.BOB" class="app-logo">
+      </div>
+    </header>
+
+    <section class="thanks-panel">
+      <div class="signup-intro">
+        <div>
+          <p class="signup-kicker">Konfirmasi Transfer</p>
+          <h1>Upload Bukti Transfer</h1>
+        </div>
+        <span class="signup-badge"><%= registration.registration_code %></span>
+      </div>
+
+      <% if (error && error.length > 0) { %>
+        <div class="alert alert-danger signup-alert"><i class="fas fa-exclamation-circle"></i> <%= error[0] %></div>
+      <% } %>
+
+      <div class="transfer-callout">
+        <div>
+          <span>Total yang perlu dibayar</span>
+          <strong><%= formatCurrency(registration.package_price) %></strong>
+        </div>
+        <button type="button" class="copy-code-btn" id="copyCodeBtn" data-code="<%= registration.registration_code %>">
+          <i class="fas fa-copy"></i> Salin ID
+        </button>
+      </div>
+
+      <div class="confirm-layout">
+        <div class="confirm-summary">
+          <div>
+            <span>Nama</span>
+            <strong><%= registration.name %></strong>
+          </div>
+          <div>
+            <span>Email</span>
+            <strong><%= registration.email %></strong>
+          </div>
+          <div>
+            <span>Program</span>
+            <strong><%= registration.selected_class || '-' %></strong>
+          </div>
+          <div>
+            <span>Paket</span>
+            <strong><%= registration.package_name || '-' %></strong>
+          </div>
+          <div>
+            <span>Durasi</span>
+            <strong><%= registration.duration || '-' %></strong>
+          </div>
+          <div>
+            <span>Jam Belajar</span>
+            <strong><%= registration.study_time || '-' %></strong>
+          </div>
+          <% if (registration.preferred_tutor) { %>
+          <div>
+            <span>Tutor Pilihan</span>
+            <strong><%= registration.preferred_tutor %></strong>
+          </div>
+          <% } %>
+        </div>
+
+        <div class="bank-note">
+          <h2><i class="fas fa-building-columns"></i> Catatan Transfer</h2>
+          <p>Pastikan nominal transfer sesuai total pembayaran dan simpan bukti transfer dalam bentuk gambar yang jelas.</p>
+          <div class="bank-note-row">
+            <span>ID Pendaftaran</span>
+            <strong><%= registration.registration_code %></strong>
+          </div>
+          <% if (registration.package_note) { %>
+            <div class="summary-note"><%= registration.package_note %></div>
+          <% } %>
+        </div>
+      </div>
+
+      <%- include('../partials/payment-methods') %>
+
+      <div class="signup-section transfer-section">
+        <div class="signup-section-title">
+          <i class="fas fa-lock"></i>
+          <h2>Aktivasi Login</h2>
+        </div>
+        <div class="signup-field">
+          <label>Password Member Area <span>*</span></label>
+          <div class="confirm-password-field">
+            <input type="password" name="password" id="memberPassword" minlength="6" placeholder="Minimal 6 karakter" required>
+            <button type="button" id="toggleConfirmPassword" aria-label="Tampilkan password">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="signup-section transfer-section">
+        <div class="signup-section-title">
+          <i class="fas fa-receipt"></i>
+          <h2>Bukti Transfer</h2>
+        </div>
+        <label class="transfer-upload">
+          <input type="file" name="transfer_proof" id="transferProofInput" accept="image/*" required>
+          <i class="fas fa-cloud-upload-alt"></i>
+          <strong>Pilih gambar bukti transfer</strong>
+          <span id="transferProofName">Format JPG, PNG, GIF, atau WEBP. Maksimal 5MB.</span>
+        </label>
+        <img src="" alt="Preview bukti transfer" class="transfer-preview" id="transferPreview" hidden>
+      </div>
+
+      <button type="submit" class="signup-submit">Upload Bukti Transfer & Masuk</button>
+    </section>
+  </form>
+</main>
+
+<script>
+const transferProofInput = document.getElementById('transferProofInput');
+const transferProofName = document.getElementById('transferProofName');
+const transferPreview = document.getElementById('transferPreview');
+const memberPassword = document.getElementById('memberPassword');
+const toggleConfirmPassword = document.getElementById('toggleConfirmPassword');
+const copyCodeBtn = document.getElementById('copyCodeBtn');
+
+transferProofInput.addEventListener('change', () => {
+  const file = transferProofInput.files[0];
+  transferProofName.textContent = file
+    ? file.name
+    : 'Format JPG, PNG, GIF, atau WEBP. Maksimal 5MB.';
+
+  if (!file) {
+    transferPreview.hidden = true;
+    transferPreview.removeAttribute('src');
+    return;
+  }
+
+  transferPreview.src = URL.createObjectURL(file);
+  transferPreview.hidden = false;
+});
+
+toggleConfirmPassword.addEventListener('click', () => {
+  const isPassword = memberPassword.type === 'password';
+  memberPassword.type = isPassword ? 'text' : 'password';
+  toggleConfirmPassword.innerHTML = isPassword
+    ? '<i class="fas fa-eye-slash"></i>'
+    : '<i class="fas fa-eye"></i>';
+});
+
+copyCodeBtn.addEventListener('click', async () => {
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(copyCodeBtn.dataset.code);
+  } else {
+    const tempInput = document.createElement('input');
+    tempInput.value = copyCodeBtn.dataset.code;
+    document.body.appendChild(tempInput);
+    tempInput.select();
+    document.execCommand('copy');
+    tempInput.remove();
+  }
+  copyCodeBtn.innerHTML = '<i class="fas fa-check"></i> Tersalin';
+  setTimeout(() => {
+    copyCodeBtn.innerHTML = '<i class="fas fa-copy"></i> Salin ID';
+  }, 1600);
+});
+</script>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <%
+    const d = cert.details || {};
+    const scores = d.scores || {};
+    const improvement = d.improvement || {};
+    const recipientName = cert.member_name || user.name;
+    const category = d.category || '';
+    const categoryLower = String(category).toLowerCase();
+    const isToefl = categoryLower.includes('toefl');
+    const isIelts = categoryLower.includes('ielts');
+    const hasPersonalReport = categoryLower.includes('speaking') || categoryLower.includes('holiday');
+    const programName = d.program_label || cert.program_name || '-';
+    const periodLabel = d.period_label || formatDate(cert.issued_date);
+    const gradeRaw = d.grade || '-';
+    const gradeText = /^grade\s/i.test(gradeRaw) ? gradeRaw : `Grade ${gradeRaw}`;
+    const issueDate = cert.issued_date ? new Date(cert.issued_date) : new Date();
+    const dateSlash = `${String(issueDate.getDate()).padStart(2, '0')}/${String(issueDate.getMonth() + 1).padStart(2, '0')}/${issueDate.getFullYear()}`;
+    const certNo = cert.certificate_number || '';
+    const testTitle = isIelts ? 'IELTS Test' : 'TOEFL Test';
+    const resultLabel = (value) => {
+      const score = Number(value);
+      if (Number.isNaN(score)) return '-';
+      if (score >= 5) return 'Excellent';
+      if (score >= 4) return 'Very Good';
+      if (score >= 3) return 'Good';
+      if (score >= 2) return 'Fair';
+      return 'Need Improvement';
+    };
+    const show = (value, fallback = '-') => (value !== undefined && value !== null && String(value).trim() !== '' ? value : fallback);
+  %>
+  <title>Sertifikat - <%= recipientName %></title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #2f2f2f;
+      color: #000;
+      font-family: "DM Sans", Arial, sans-serif;
+    }
+    .toolbar {
+      max-width: 820px;
+      margin: 0 auto 16px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .toolbar a,
+    .toolbar button {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 16px;
+      background: #fff;
+      color: #252525;
+      font: inherit;
+      font-weight: 800;
+      text-decoration: none;
+      cursor: pointer;
+      box-shadow: 0 8px 22px rgba(0,0,0,.18);
+    }
+    .toolbar button { background: #8b3fe5; color: #fff; }
+    .print-stack {
+      display: grid;
+      gap: 18px;
+      justify-content: center;
+    }
+    .sheet {
+      position: relative;
+      width: min(794px, calc(100vw - 48px));
+      background: #fff;
+      box-shadow: 0 8px 30px rgba(0,0,0,.35);
+      overflow: hidden;
+      page-break-after: always;
+      break-after: page;
+    }
+    .sheet:last-child { page-break-after: auto; break-after: auto; }
+    .sheet-general { aspect-ratio: 2160 / 3056; }
+    .sheet-test { aspect-ratio: 1414 / 2000; }
+    .sheet-report { aspect-ratio: 1447 / 2048; }
+    .template-img {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      user-select: none;
+      pointer-events: none;
+    }
+    .sheet > :not(.template-img) { z-index: 1; }
+    .abs { position: absolute; line-height: 1.15; }
+    .top-code {
+      top: 5.1%;
+      right: 10.2%;
+      width: 28%;
+      text-align: right;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(9px, 1vw, 13px);
+    }
+    .serif {
+      font-family: Georgia, "Times New Roman", serif;
+      font-weight: 800;
+      letter-spacing: .2px;
+    }
+    .general-name {
+      left: 10.7%;
+      top: 36.5%;
+      width: 78%;
+      font-size: clamp(26px, 4.2vw, 46px);
+    }
+    .general-grade {
+      left: 11%;
+      top: 46.4%;
+      width: 78%;
+      font-size: clamp(24px, 4vw, 42px);
+    }
+    .general-program {
+      left: 11%;
+      top: 58.3%;
+      width: 79%;
+      font-size: clamp(25px, 3.8vw, 42px);
+      text-transform: uppercase;
+    }
+    .general-period {
+      left: 13.2%;
+      top: 68.9%;
+      width: 74%;
+      font-size: clamp(21px, 3.1vw, 34px);
+    }
+    .test-name {
+      left: 10.8%;
+      top: 40.4%;
+      width: 78%;
+      font-size: clamp(26px, 4.1vw, 43px);
+    }
+    .test-title {
+      left: 10.8%;
+      top: 50.8%;
+      width: 78%;
+      font-size: clamp(25px, 3.9vw, 42px);
+    }
+    .score-list {
+      left: 11%;
+      top: 58.1%;
+      width: 66%;
+      display: grid;
+      gap: .55em;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(15px, 2vw, 23px);
+      font-weight: 800;
+    }
+    .score-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 24px 120px;
+      align-items: baseline;
+    }
+    .test-period {
+      left: 10.8%;
+      top: 69.6%;
+      width: 78%;
+      font-size: clamp(19px, 2.7vw, 31px);
+    }
+    .report-title {
+      top: 14.2%;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      font-size: clamp(25px, 3.2vw, 36px);
+    }
+    .report-code {
+      top: 18.9%;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(8px, 1vw, 12px);
+      font-weight: 500;
+    }
+    .report-ident {
+      top: 22.1%;
+      left: 8.6%;
+      width: 82.8%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(13px, 1.55vw, 18px);
+      font-weight: 800;
+    }
+    .report-band {
+      left: 8.2%;
+      width: 83.5%;
+      height: 3.05%;
+      display: flex;
+      align-items: center;
+      padding-left: 8px;
+      background: #8248d8;
+      color: #fff;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(18px, 2.25vw, 26px);
+      font-weight: 800;
+    }
+    .report-band.personal { top: 28.3%; }
+    .report-band.improvement { top: 60.7%; }
+    .mini-score {
+      top: 32.7%;
+      left: 8.2%;
+      width: 83.5%;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      border: 1px solid #111;
+      font-family: Georgia, "Times New Roman", serif;
+      text-align: center;
+    }
+    .mini-score div {
+      min-height: 42px;
+      border-right: 1px solid #111;
+      display: grid;
+      align-content: center;
+      gap: 5px;
+      font-size: clamp(8px, .75vw, 11px);
+      font-weight: 700;
+    }
+    .mini-score div:last-child { border-right: 0; }
+    .mini-score strong { font-size: clamp(12px, 1.3vw, 18px); }
+    .report-table {
+      top: 38.8%;
+      left: 8.2%;
+      width: 83.5%;
+      border-collapse: collapse;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(10px, 1.05vw, 14px);
+      text-align: center;
+    }
+    .report-table th {
+      background: #8248d8;
+      color: #fff;
+      padding: 7px 6px;
+      border: 1px solid #111;
+      font-size: clamp(12px, 1.2vw, 16px);
+    }
+    .report-table td {
+      border: 1px solid #111;
+      padding: 7px 6px;
+      min-height: 27px;
+    }
+    .report-table td:first-child {
+      background: #fff36a;
+      font-weight: 800;
+    }
+    .improvement-table {
+      top: 66.2%;
+      left: 8.2%;
+      width: 83.5%;
+      border-collapse: collapse;
+      font-family: Georgia, "Times New Roman", serif;
+      text-align: center;
+      font-size: clamp(9px, .9vw, 12px);
+    }
+    .improvement-table th {
+      font-size: clamp(14px, 1.5vw, 20px);
+      padding-bottom: 4px;
+    }
+    .improvement-table td {
+      width: 50%;
+      border: 1px solid #111;
+      padding: 7px 9px;
+      min-height: 38px;
+    }
+    @media print {
+      body { padding: 0; background: #fff; }
+      .toolbar { display: none; }
+      .print-stack { display: block; }
+      .sheet {
+        width: 210mm;
+        height: 296.8mm;
+        box-shadow: none;
+        margin: 0;
+      }
+      @page { size: A4 portrait; margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <% if (typeof embed === 'undefined' || !embed) { %>
+  <div class="toolbar">
+    <a href="<%= backHref || (user.role === 'admin' ? '/admin/certificate' : user.role === 'tutor' ? '/tutor/certificate' : '/member/certificate') %>">&larr; Kembali</a>
+    <button onclick="window.print()">Download PDF</button>
+  </div>
+  <% } %>
+
+  <main class="print-stack">
+    <% if (isToefl || isIelts) { %>
+      <section class="sheet sheet-test">
+        <img class="template-img" src="/img/certificates/template-TOEFL-IELTS-1.png" alt="">
+        <div class="abs top-code"><%= dateSlash %>/<%= certNo %></div>
+        <div class="abs test-name serif"><%= recipientName %></div>
+        <div class="abs test-title serif"><%= testTitle %></div>
+        <div class="abs score-list">
+          <% if (isToefl) { %>
+            <div class="score-row"><span>Listening Comprehension</span><span>:</span><span><%= show(scores.listening_score) %></span></div>
+            <div class="score-row"><span>Structure & Written Comprehension</span><span>:</span><span><%= show(scores.structure_score) %></span></div>
+            <div class="score-row"><span>Reading Comprehension</span><span>:</span><span><%= show(scores.reading_score) %></span></div>
+          <% } else { %>
+            <div class="score-row"><span>Listening</span><span>:</span><span><%= show(scores.listening_score, '') %></span></div>
+            <div class="score-row"><span>Reading</span><span>:</span><span><%= show(scores.reading_score, '') %></span></div>
+            <div class="score-row"><span>Writing</span><span>:</span><span><%= show(scores.writing_score, '') %></span></div>
+            <div class="score-row"><span>Speaking</span><span>:</span><span><%= show(scores.speaking_score, '') %></span></div>
+          <% } %>
+          <div class="score-row" style="font-size:1.25em"><span>Total Score</span><span>:</span><span><%= show(scores.total_score) %></span></div>
+        </div>
+        <div class="abs test-period serif">Date of periode : <%= periodLabel %></div>
+      </section>
+    <% } else { %>
+      <section class="sheet sheet-general">
+        <img class="template-img" src="/img/certificates/sertifikat-umum.png" alt="">
+        <div class="abs top-code"><%= dateSlash %>/<%= certNo %></div>
+        <div class="abs general-name serif"><%= recipientName %></div>
+        <div class="abs general-grade serif"><%= gradeText %></div>
+        <div class="abs general-program serif"><%= programName %></div>
+        <div class="abs general-period serif"><%= periodLabel %></div>
+      </section>
+    <% } %>
+
+    <% if (hasPersonalReport) { %>
+      <section class="sheet sheet-report">
+        <img class="template-img" src="/img/certificates/Personal-Report.png" alt="">
+        <h1 class="abs report-title serif">Member Report</h1>
+        <div class="abs report-code"><%= dateSlash %>/<%= certNo %></div>
+        <div class="abs report-ident">
+          <span>Member's Name : <%= recipientName %></span>
+          <span>Tutor's Name : <%= show(d.tutor_name, '-') %></span>
+        </div>
+        <div class="abs report-band personal">Personal Report</div>
+        <div class="abs mini-score">
+          <div><span>Speaking</span><strong><%= show(scores.speaking_score) %></strong></div>
+          <div><span>Vocabulary</span><strong><%= show(scores.vocabulary_score) %></strong></div>
+          <div><span>Grammar</span><strong><%= show(scores.grammar_score) %></strong></div>
+          <div><span>Pronunciation</span><strong><%= show(scores.pronunciation_score) %></strong></div>
+          <div><span>Understanding</span><strong><%= show(scores.understanding_score) %></strong></div>
+          <div><span>CEFR</span><strong><%= show(scores.cefr_score) %></strong></div>
+        </div>
+        <table class="abs report-table">
+          <thead>
+            <tr><th>Section</th><th>Score</th><th>Result</th><th>Notes</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Speaking</td><td><%= show(scores.speaking_score) %></td><td><%= resultLabel(scores.speaking_score) %></td><td></td></tr>
+            <tr><td>Vocabulary</td><td><%= show(scores.vocabulary_score) %></td><td><%= resultLabel(scores.vocabulary_score) %></td><td></td></tr>
+            <tr><td>Grammar</td><td><%= show(scores.grammar_score) %></td><td><%= resultLabel(scores.grammar_score) %></td><td></td></tr>
+            <tr><td>Pronunciation</td><td><%= show(scores.pronunciation_score) %></td><td><%= resultLabel(scores.pronunciation_score) %></td><td></td></tr>
+            <tr><td>Understanding</td><td><%= show(scores.understanding_score) %></td><td><%= resultLabel(scores.understanding_score) %></td><td></td></tr>
+          </tbody>
+        </table>
+        <div class="abs report-band improvement">Improvement</div>
+        <table class="abs improvement-table">
+          <thead><tr><th>Before</th><th>After</th></tr></thead>
+          <tbody><tr><td><%= show(improvement.before, '') %></td><td><%= show(improvement.after, '') %></td></tr></tbody>
+        </table>
+      </section>
+    <% } %>
+  </main>
+
+  <script>
+    <% if (autoPrint !== false) { %>
+    window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 500); });
+    <% } %>
+  </script>
+</body>
+</html>

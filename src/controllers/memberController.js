@@ -2,7 +2,31 @@ const { query } = require('../config/database');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
+const at = require('../utils/availableTime');
 const kidsQuestions = require('../data/placementTestKids');
+const { normalizeReportDays, ensureMemberReportsTable } = require('../utils/memberReports');
+const { ensureCertificateDetailsColumn } = require('../utils/certificates');
+const { STUDY_TIME_SLOTS } = require('../utils/catalog');
+const { ensureRenewalRequestsTable } = require('../utils/renewalRequests');
+const { SUPPORT_EMAIL, sendSupportFeedback } = require('../utils/supportEmail');
+const { saveSupportFeedback, updateSupportFeedbackEmailStatus } = require('../utils/supportFeedback');
+const {
+  isTeachingQuestionnaire,
+  teachingQuestionnaireFilter,
+  teachingRatings,
+  teachingEssays,
+  ratingLabels,
+  buildTeachingQuestionnaireAnswer,
+  ensureTeachingQuestionnaires,
+} = require('../utils/questionnaireTemplate');
+
+const RENEWAL_DISCOUNT = 100000;
+const renewalPriceFor = (price) => Math.max(0, Number(price || 0) - RENEWAL_DISCOUNT);
+
+const removeUploadedFile = (file) => {
+  if (!file) return;
+  fs.unlink(path.join(__dirname, '../../public/uploads', file.filename), () => {});
+};
 
 function calcLevel(score) {
   // Map score (max 20) to LEVEL 1-5 (proportional to original 50-scale ranges)
@@ -13,25 +37,100 @@ function calcLevel(score) {
   return            { level_num: 5, level_label: 'LEVEL 5', level_desc: 'Advanced' };
 }
 
+const timeToMinutes = (time) => {
+  const [hour, minute] = String(time || '').slice(0, 5).split(':').map(Number);
+  return hour * 60 + minute;
+};
+
+const scheduleWindow = (schedule) => {
+  const datePart = schedule.date instanceof Date
+    ? `${schedule.date.getFullYear()}-${String(schedule.date.getMonth() + 1).padStart(2, '0')}-${String(schedule.date.getDate()).padStart(2, '0')}`
+    : String(schedule.date).slice(0, 10);
+  const start = new Date(`${datePart}T${String(schedule.start_time).slice(0, 5)}:00`);
+  const end = new Date(`${datePart}T${String(schedule.end_time).slice(0, 5)}:00`);
+  return {
+    opensAt: new Date(start.getTime() - 15 * 60 * 1000),
+    startsAt: start,
+    closesAt: new Date(end.getTime() + 30 * 60 * 1000),
+  };
+};
+
+const canCheckInSchedule = (schedule) => {
+  if (!schedule || schedule.status === 'cancelled') return false;
+  if (['present', 'late'].includes(schedule.presence_status)) return false;
+  const now = new Date();
+  const window = scheduleWindow(schedule);
+  return now >= window.opensAt && now <= window.closesAt;
+};
+
 exports.dashboard = async (req, res) => {
   try {
     const userId = req.session.user.id;
-    const [enrollResult, notifResult, schedResult] = await Promise.all([
+    await ensureTeachingQuestionnaires(query);
+    const [enrollResult, notifResult, schedResult, statsRes, pendingQuiz, luxuryRes] = await Promise.all([
       query(`SELECT e.*, p.name as program_name, p.description
              FROM enrollments e JOIN programs p ON e.program_id = p.id
              WHERE e.member_id = $1 AND e.status = 'active'`, [userId]),
       query(`SELECT * FROM notifications WHERE user_id = $1 AND is_read = false ORDER BY created_at DESC LIMIT 5`, [userId]),
       query(`SELECT s.*, u.name as tutor_name, p.name as program_name
-             FROM schedules s JOIN users u ON s.tutor_id = u.id JOIN programs p ON s.program_id = p.id
-             WHERE p.id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
+             FROM schedule_members sm
+             JOIN schedules s ON sm.schedule_id = s.id
+             JOIN users u ON s.tutor_id = u.id
+             JOIN programs p ON s.program_id = p.id
+             WHERE sm.member_id = $1
              AND s.date >= CURRENT_DATE ORDER BY s.date LIMIT 3`, [userId]),
+      query(`SELECT
+                (SELECT COUNT(*) FROM enrollments WHERE member_id = $1 AND status = 'active') AS programs,
+                (SELECT COUNT(*) FROM schedule_members WHERE member_id = $1) AS sessions,
+                (SELECT COUNT(*) FROM presences WHERE member_id = $1) AS pres_total,
+                (SELECT COUNT(*) FROM presences WHERE member_id = $1 AND status = 'present') AS pres_present,
+                (SELECT COUNT(*) FROM certificates WHERE member_id = $1) AS certificates`, [userId]),
+      query(`
+        WITH pending AS (
+          SELECT q.id, q.title, q.due_date, p.name as program_name,
+                 ROW_NUMBER() OVER (PARTITION BY p.name ORDER BY q.created_at DESC, q.id DESC) AS rn
+          FROM questionnaires q
+          JOIN programs p ON q.program_id = p.id
+          WHERE q.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
+            AND q.is_active = true
+            AND ${teachingQuestionnaireFilter('q')}
+            AND NOT EXISTS (SELECT 1 FROM questionnaire_responses qr WHERE qr.questionnaire_id = q.id AND qr.member_id = $1)
+        )
+        SELECT id, title, due_date, program_name
+        FROM pending
+        WHERE rn = 1
+        ORDER BY due_date NULLS LAST
+        LIMIT 5
+      `, [userId]),
+      query(`
+        SELECT r.package_name, r.package_group, r.preferred_tutor, r.preferred_tutor_id,
+               t.photo AS preferred_tutor_photo, t.bio AS preferred_tutor_bio, t.tutor_grade AS preferred_tutor_grade
+        FROM member_registrations r
+        LEFT JOIN users t ON t.id = r.preferred_tutor_id
+        WHERE r.user_id = $1 AND r.status = 'confirmed'
+        ORDER BY r.confirmed_at DESC NULLS LAST, r.created_at DESC
+        LIMIT 1
+      `, [userId]),
     ]);
+
+    const st = statsRes.rows[0];
+    const attendanceRate = Number(st.pres_total) > 0
+      ? Math.round((Number(st.pres_present) / Number(st.pres_total)) * 100) : 0;
+
     res.render('member/dashboard', {
       title: 'Member Area',
       user: req.session.user,
       enrollments: enrollResult.rows,
       notifications: notifResult.rows,
       upcomingSchedules: schedResult.rows,
+      stats: {
+        programs: st.programs,
+        sessions: st.sessions,
+        attendanceRate,
+        certificates: st.certificates,
+      },
+      pendingQuiz: pendingQuiz.rows,
+      luxuryAccess: luxuryRes.rows[0] || null,
     });
   } catch (err) {
     console.error(err);
@@ -42,20 +141,104 @@ exports.dashboard = async (req, res) => {
 exports.schedule = async (req, res) => {
   try {
     const userId = req.session.user.id;
-    const result = await query(`
-      SELECT s.*, u.name as tutor_name, p.name as program_name,
-             pr.status as presence_status
-      FROM schedules s
-      JOIN users u ON s.tutor_id = u.id
-      JOIN programs p ON s.program_id = p.id
-      LEFT JOIN presences pr ON s.id = pr.schedule_id AND pr.member_id = $1
-      WHERE p.id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
-      ORDER BY s.date DESC, s.start_time DESC
-    `, [userId]);
+    // Schedule is grouped per PERIODE (the week the member is registered for);
+    // the per-session / per-day breakdown lives on the Presensi page.
+    const period = /^\d{4}-\d{2}-\d{2}$/.test(req.query.period || '') ? req.query.period : '';
+
+    const params = [userId];
+    let periodFilter = '';
+    if (period) { params.push(period); periodFilter = ` AND date_trunc('week', s.date)::date = $${params.length}::date`; }
+
+    const [result, statsResult, periodsResult] = await Promise.all([
+      query(`
+        SELECT s.*, u.name as tutor_name, p.name as program_name,
+               COALESCE(pr.status, 'absent') as presence_status,
+               pr.check_in_time, pr.notes as presence_notes
+        FROM schedule_members sm
+        JOIN schedules s ON sm.schedule_id = s.id
+        JOIN users u ON s.tutor_id = u.id
+        JOIN programs p ON s.program_id = p.id
+        LEFT JOIN presences pr ON s.id = pr.schedule_id AND pr.member_id = $1
+        WHERE sm.member_id = $1${periodFilter}
+        ORDER BY s.date ASC, s.start_time ASC
+      `, params),
+      query(`
+        SELECT COUNT(*) AS total,
+               COUNT(*) FILTER (WHERE s.status <> 'cancelled' AND s.date >= CURRENT_DATE) AS upcoming,
+               COUNT(*) FILTER (WHERE s.status <> 'cancelled' AND s.date < CURRENT_DATE) AS completed
+        FROM schedule_members sm JOIN schedules s ON sm.schedule_id = s.id
+        WHERE sm.member_id = $1
+      `, [userId]),
+      query(`
+        SELECT DISTINCT date_trunc('week', s.date)::date AS period_start
+        FROM schedule_members sm JOIN schedules s ON sm.schedule_id = s.id
+        WHERE sm.member_id = $1
+        ORDER BY period_start DESC
+      `, [userId]),
+    ]);
+
+    // Group the member's sessions by weekly period (Monday-start).
+    const today = at.toISODate(new Date());
+    const groups = new Map();
+    result.rows.forEach((s) => {
+      const key = at.mondayOf(s.date);
+      if (!groups.has(key)) {
+        groups.set(key, {
+          period_start: key,
+          label: at.formatPeriodRange(key),
+          sessions: [],
+          programs: new Set(),
+          tutors: new Set(),
+          locations: new Set(),
+          counts: { total: 0, upcoming: 0, completed: 0, cancelled: 0 },
+          attendance: { present: 0, late: 0, excused: 0, absent: 0 },
+          next: null,
+        });
+      }
+      const g = groups.get(key);
+      g.sessions.push(s);
+      if (s.program_name) g.programs.add(s.program_name);
+      if (s.tutor_name) g.tutors.add(s.tutor_name);
+      if (s.location) g.locations.add(s.location);
+      g.counts.total += 1;
+      // Status is derived from the date, not the DB flag: any session whose date
+      // has passed counts as "Selesai" even if it's still marked upcoming in the DB.
+      const isFuture = s.status !== 'cancelled' && at.toISODate(s.date) >= today;
+      if (s.status === 'cancelled') g.counts.cancelled += 1;
+      else if (isFuture) g.counts.upcoming += 1;
+      else g.counts.completed += 1;
+      if (g.attendance[s.presence_status] !== undefined) g.attendance[s.presence_status] += 1;
+      // nearest upcoming session in this period (sessions already sorted asc)
+      if (isFuture && !g.next) g.next = s;
+    });
+
+    const periodGroups = Array.from(groups.values())
+      .map((g) => ({
+        period_start: g.period_start,
+        label: g.label,
+        programs: Array.from(g.programs),
+        tutors: Array.from(g.tutors),
+        location: Array.from(g.locations)[0] || '',
+        counts: g.counts,
+        attendance: g.attendance,
+        attended: g.attendance.present + g.attendance.late,
+        status: g.counts.upcoming > 0 ? 'upcoming' : (g.counts.completed > 0 ? 'completed' : 'cancelled'),
+        next: g.next,
+      }))
+      .sort((a, b) => (a.period_start < b.period_start ? 1 : -1));
+
+    const periods = periodsResult.rows.map((r) => ({
+      value: at.toISODate(r.period_start),
+      label: at.formatPeriodRange(at.toISODate(r.period_start)),
+    }));
+
     res.render('member/schedule', {
       title: 'Jadwal Kelas',
       user: req.session.user,
-      schedules: result.rows,
+      periodGroups,
+      periods,
+      filters: { period },
+      stats: statsResult.rows[0],
     });
   } catch (err) {
     console.error(err);
@@ -66,17 +249,36 @@ exports.schedule = async (req, res) => {
 exports.module = async (req, res) => {
   try {
     const userId = req.session.user.id;
-    const result = await query(`
-      SELECT m.*, p.name as program_name
-      FROM modules m JOIN programs p ON m.program_id = p.id
-      WHERE m.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
-        AND m.is_active = true
-      ORDER BY m.program_id, m.order_number
-    `, [userId]);
+    const programId = req.query.program_id || '';
+    const params = [userId];
+    let progFilter = '';
+    if (programId) { params.push(Number(programId)); progFilter = ` AND m.program_id = $${params.length}`; }
+
+    const [result, programsRes, statsRes] = await Promise.all([
+      query(`
+        SELECT m.*, p.name as program_name
+        FROM modules m JOIN programs p ON m.program_id = p.id
+        WHERE m.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
+          AND m.is_active = true${progFilter}
+        ORDER BY p.name, m.order_number
+      `, params),
+      query(`SELECT DISTINCT p.id, p.name FROM programs p
+             JOIN enrollments e ON e.program_id = p.id
+             WHERE e.member_id = $1 AND e.status = 'active' ORDER BY p.name`, [userId]),
+      query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE m.is_premium) AS premium
+             FROM modules m
+             WHERE m.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
+               AND m.is_active = true`, [userId]),
+    ]);
     res.render('member/module', {
       title: 'Modul Belajar',
       user: req.session.user,
       modules: result.rows,
+      programs: programsRes.rows,
+      filters: { programId },
+      stats: statsRes.rows[0],
+      isVip: req.session.user.is_vip || req.session.user.is_luxury,
+      isLuxury: req.session.user.is_luxury,
     });
   } catch (err) {
     console.error(err);
@@ -87,32 +289,74 @@ exports.module = async (req, res) => {
 exports.presence = async (req, res) => {
   try {
     const userId = req.session.user.id;
-    const [presResult, statsResult] = await Promise.all([
+    const [tutorsRes, periodsRes, programsRes, submissionsRes, schedulesRes] = await Promise.all([
+      query("SELECT id, name FROM users WHERE role = 'tutor' AND is_active = true ORDER BY name"),
+      query('SELECT period_start, label FROM periods ORDER BY period_start'),
+      query('SELECT id, name FROM programs WHERE is_active = true ORDER BY name'),
+      query(`SELECT mp.*, t.name as tutor_name, p.name as program_name
+             FROM member_presences mp
+             LEFT JOIN users t ON mp.tutor_id = t.id
+             LEFT JOIN programs p ON mp.program_id = p.id
+             WHERE mp.member_id = $1 ORDER BY mp.created_at DESC`, [userId]),
       query(`
-        SELECT pr.*, s.title as schedule_title, s.date, s.start_time, s.end_time, p.name as program_name
-        FROM presences pr JOIN schedules s ON pr.schedule_id = s.id
+        SELECT s.*, u.name as tutor_name, p.name as program_name,
+               COALESCE(pr.status, 'absent') as presence_status,
+               pr.check_in_time, pr.notes as presence_notes
+        FROM schedule_members sm
+        JOIN schedules s ON sm.schedule_id = s.id
+        JOIN users u ON s.tutor_id = u.id
         JOIN programs p ON s.program_id = p.id
-        WHERE pr.member_id = $1 ORDER BY s.date DESC
-      `, [userId]),
-      query(`
-        SELECT
-          COUNT(*) as total,
-          COUNT(*) FILTER (WHERE pr.status = 'present') as present,
-          COUNT(*) FILTER (WHERE pr.status = 'late') as late,
-          COUNT(*) FILTER (WHERE pr.status = 'absent') as absent,
-          COUNT(*) FILTER (WHERE pr.status = 'excused') as excused
-        FROM presences pr WHERE pr.member_id = $1
+        LEFT JOIN presences pr ON s.id = pr.schedule_id AND pr.member_id = $1
+        WHERE sm.member_id = $1
+        ORDER BY s.date DESC, s.start_time DESC
+        LIMIT 12
       `, [userId]),
     ]);
-    const stats = statsResult.rows[0];
-    const attendanceRate = stats.total > 0
-      ? Math.round(((parseInt(stats.present) + parseInt(stats.late)) / parseInt(stats.total)) * 100)
-      : 0;
+
+    const periods = periodsRes.rows.map((p) => ({
+      value: at.toISODate(p.period_start),
+      label: p.label || at.formatPeriodLabel(p.period_start),
+    }));
+    const submissions = submissionsRes.rows.map((s) => ({
+      ...s,
+      period_label: s.period_start ? at.formatPeriodLabel(s.period_start) : '-',
+    }));
+    const scheduleIds = schedulesRes.rows.map((s) => s.id);
+    let proofsBySchedule = {};
+    if (scheduleIds.length) {
+      const proofsRes = await query(
+        `SELECT cp.*, u.photo as uploader_photo
+         FROM class_proofs cp LEFT JOIN users u ON cp.uploaded_by = u.id
+         WHERE cp.schedule_id = ANY($1::int[]) ORDER BY cp.created_at DESC`,
+        [scheduleIds]
+      );
+      proofsBySchedule = proofsRes.rows.reduce((acc, p) => {
+        (acc[p.schedule_id] = acc[p.schedule_id] || []).push(p);
+        return acc;
+      }, {});
+    }
+    const schedules = schedulesRes.rows.map((schedule) => ({
+      ...schedule,
+      can_check_in: canCheckInSchedule(schedule),
+      class_proofs: proofsBySchedule[schedule.id] || [],
+    }));
+    const presenceStats = schedules.reduce((acc, schedule) => {
+      if (acc[schedule.presence_status] !== undefined) acc[schedule.presence_status] += 1;
+      acc.total += 1;
+      return acc;
+    }, { total: 0, present: 0, late: 0, excused: 0, absent: 0 });
+    const meetings = Array.from({ length: 24 }, (_, i) => i + 1);
+
     res.render('member/presence', {
       title: 'Presensi',
       user: req.session.user,
-      presences: presResult.rows,
-      stats: { ...stats, attendanceRate },
+      tutors: tutorsRes.rows,
+      periods,
+      programs: programsRes.rows,
+      meetings,
+      submissions,
+      schedules,
+      presenceStats,
     });
   } catch (err) {
     console.error(err);
@@ -120,23 +364,166 @@ exports.presence = async (req, res) => {
   }
 };
 
-exports.questionnaire = async (req, res) => {
+exports.submitPresence = async (req, res) => {
   try {
     const userId = req.session.user.id;
+    const tutorId = Number(req.body.tutor_id) || null;
+    const periodStart = req.body.period_start || null;
+    const programId = Number(req.body.program_id) || null;
+    const meeting = Number(req.body.meeting_number) || null;
+
+    if (!tutorId || !periodStart || !programId || !meeting) {
+      removeUploadedFile(req.file);
+      req.flash('error', 'Lengkapi tutor, periode, program, dan meeting.');
+      return res.redirect('/member/presence');
+    }
+    if (!req.file) {
+      req.flash('error', 'Screenshot kelas wajib diunggah.');
+      return res.redirect('/member/presence');
+    }
+
+    const screenshot = `/uploads/${req.file.filename}`;
+    await query(
+      `INSERT INTO member_presences (member_id, tutor_id, period_start, program_id, meeting_number, screenshot)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [userId, tutorId, periodStart, programId, meeting, screenshot]
+    );
+    req.flash('success', 'Presensi berhasil dikirim. Terima kasih!');
+    res.redirect('/member/presence');
+  } catch (err) {
+    console.error(err);
+    removeUploadedFile(req.file);
+    req.flash('error', 'Gagal mengirim presensi.');
+    res.redirect('/member/presence');
+  }
+};
+
+exports.checkInPresence = async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const scheduleId = req.params.schedule_id;
     const result = await query(`
-      SELECT q.*,
-             qr.id as response_id, qr.score, qr.max_score, qr.submitted_at,
-             p.name as program_name
-      FROM questionnaires q
-      JOIN programs p ON q.program_id = p.id
-      LEFT JOIN questionnaire_responses qr ON q.id = qr.questionnaire_id AND qr.member_id = $1
-      WHERE q.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
-        AND q.is_active = true
-      ORDER BY q.created_at DESC
+      SELECT s.*, COALESCE(pr.status, 'absent') as presence_status
+      FROM schedule_members sm
+      JOIN schedules s ON sm.schedule_id = s.id
+      LEFT JOIN presences pr ON pr.schedule_id = s.id AND pr.member_id = sm.member_id
+      WHERE sm.schedule_id = $1 AND sm.member_id = $2
+    `, [scheduleId, userId]);
+
+    const schedule = result.rows[0];
+    if (!schedule) {
+      req.flash('error', 'Jadwal tidak ditemukan untuk akun kamu.');
+      return res.redirect('/member/presence');
+    }
+    if (!canCheckInSchedule(schedule)) {
+      req.flash('error', 'Presensi belum dibuka, sudah ditutup, atau sudah terisi.');
+      return res.redirect('/member/presence');
+    }
+
+    const window = scheduleWindow(schedule);
+    const status = new Date() > window.startsAt ? 'late' : 'present';
+    await query(`
+      INSERT INTO presences (schedule_id, member_id, status, check_in_time, updated_by, updated_at, source)
+      VALUES ($1,$2,$3,NOW(),$2,NOW(),'member')
+      ON CONFLICT (schedule_id, member_id)
+      DO UPDATE SET status = $3, check_in_time = COALESCE(presences.check_in_time, NOW()),
+                    updated_by = $2, updated_at = NOW(), source = 'member'
+    `, [scheduleId, userId, status]);
+
+    req.flash('success', status === 'late' ? 'Check-in berhasil. Status kamu terlambat.' : 'Check-in berhasil. Selamat belajar!');
+    return res.redirect('/member/presence');
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal check-in presensi.');
+    return res.redirect('/member/presence');
+  }
+};
+
+exports.uploadClassProof = async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const scheduleId = req.params.schedule_id;
+    // pastikan member memang peserta sesi ini
+    const member = await query(
+      'SELECT 1 FROM schedule_members WHERE schedule_id = $1 AND member_id = $2',
+      [scheduleId, userId]
+    );
+    if (!member.rows.length) {
+      removeUploadedFile(req.file);
+      req.flash('error', 'Jadwal tidak ditemukan untuk akun kamu.');
+      return res.redirect('/member/presence');
+    }
+    if (!req.file) {
+      req.flash('error', 'Pilih gambar foto kelas terlebih dahulu.');
+      return res.redirect('/member/presence');
+    }
+    await query(
+      `INSERT INTO class_proofs (schedule_id, uploaded_by, uploader_role, uploader_name, image, caption)
+       VALUES ($1,$2,'member',$3,$4,$5)`,
+      [scheduleId, userId, req.session.user.name, `/uploads/${req.file.filename}`, (req.body.caption || '').trim() || null]
+    );
+    req.flash('success', 'Foto kelas berhasil diunggah.');
+    return res.redirect('/member/presence');
+  } catch (err) {
+    console.error(err);
+    removeUploadedFile(req.file);
+    req.flash('error', 'Gagal mengunggah foto kelas.');
+    return res.redirect('/member/presence');
+  }
+};
+
+exports.deleteClassProof = async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    // member hanya bisa menghapus foto yang ia unggah sendiri
+    const result = await query(
+      'SELECT id, image FROM class_proofs WHERE id = $1 AND uploaded_by = $2',
+      [req.params.id, userId]
+    );
+    const proof = result.rows[0];
+    if (!proof) {
+      req.flash('error', 'Foto tidak ditemukan.');
+      return res.redirect('/member/presence');
+    }
+    await query('DELETE FROM class_proofs WHERE id = $1', [proof.id]);
+    if (proof.image) fs.unlink(path.join(__dirname, '../../public', proof.image), () => {});
+    req.flash('success', 'Foto kelas dihapus.');
+    return res.redirect('/member/presence');
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal menghapus foto kelas.');
+    return res.redirect('/member/presence');
+  }
+};
+
+exports.questionnaire = async (req, res) => {
+  try {
+    if (req.session.user.role === 'admin') return res.redirect('/admin/questionnaire');
+    const userId = req.session.user.id;
+    await ensureTeachingQuestionnaires(query);
+    const result = await query(`
+      WITH available AS (
+        SELECT q.*,
+               qr.id as response_id, qr.score, qr.max_score, qr.submitted_at,
+               p.name as program_name,
+               ROW_NUMBER() OVER (PARTITION BY p.name ORDER BY q.created_at DESC, q.id DESC) AS rn
+        FROM questionnaires q
+        JOIN programs p ON q.program_id = p.id
+        LEFT JOIN questionnaire_responses qr ON q.id = qr.questionnaire_id AND qr.member_id = $1
+        WHERE q.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
+          AND q.is_active = true
+          AND ${teachingQuestionnaireFilter('q')}
+      )
+      SELECT *
+      FROM available
+      WHERE rn = 1
+      ORDER BY created_at DESC
     `, [userId]);
     res.render('member/questionnaire', {
-      title: 'Kuesioner & Kuis',
+      title: 'Questionnaire',
       user: req.session.user,
+      activeNav: 'member',
+      basePath: '/member/questionnaire',
       questionnaires: result.rows,
     });
   } catch (err) {
@@ -147,21 +534,40 @@ exports.questionnaire = async (req, res) => {
 
 exports.questionnaireShow = async (req, res) => {
   try {
+    if (req.session.user.role === 'admin') return res.redirect(`/admin/questionnaire/${req.params.id}`);
     const { id } = req.params;
     const userId = req.session.user.id;
-    const [qResult, questionsResult, responseResult] = await Promise.all([
+    const [qResult, questionsResult, responseResult, tutorsRes, programsRes, periodsRes] = await Promise.all([
       query('SELECT q.*, p.name as program_name FROM questionnaires q JOIN programs p ON q.program_id = p.id WHERE q.id = $1', [id]),
       query('SELECT * FROM questions WHERE questionnaire_id = $1 ORDER BY order_number', [id]),
       query('SELECT * FROM questionnaire_responses WHERE questionnaire_id = $1 AND member_id = $2', [id, userId]),
+      query("SELECT id, name FROM users WHERE role = 'tutor' AND is_active = true ORDER BY name"),
+      query('SELECT id, name FROM programs WHERE is_active = true ORDER BY name'),
+      query('SELECT period_start, label FROM periods ORDER BY period_start DESC'),
     ]);
     const questionnaire = qResult.rows[0];
     if (!questionnaire) return res.redirect('/member/questionnaire');
     res.render('member/questionnaire-take', {
       title: questionnaire.title,
       user: req.session.user,
+      activeNav: 'member',
+      backHref: '/member/questionnaire',
+      submitBasePath: '/member/questionnaire',
       questionnaire,
       questions: questionsResult.rows,
       response: responseResult.rows[0] || null,
+      isTeachingQuestionnaire: isTeachingQuestionnaire(questionnaire),
+      teachingRatings,
+      teachingEssays,
+      ratingLabels,
+      teachingOptions: {
+        tutors: tutorsRes.rows,
+        programs: programsRes.rows,
+        periods: periodsRes.rows.map((p) => ({
+          value: at.toISODate(p.period_start),
+          label: p.label || at.formatPeriodLabel(p.period_start),
+        })),
+      },
     });
   } catch (err) {
     console.error(err);
@@ -171,9 +577,26 @@ exports.questionnaireShow = async (req, res) => {
 
 exports.questionnaireSubmit = async (req, res) => {
   try {
+    if (req.session.user.role === 'admin') {
+      req.flash('error', 'Admin hanya dapat melihat hasil questionnaire.');
+      return res.redirect('/admin/questionnaire');
+    }
     const { id } = req.params;
     const userId = req.session.user.id;
     const answers = req.body;
+
+    const qResult = await query('SELECT * FROM questionnaires WHERE id = $1', [id]);
+    const questionnaire = qResult.rows[0];
+    if (questionnaire && isTeachingQuestionnaire(questionnaire)) {
+      const built = buildTeachingQuestionnaireAnswer(req.body);
+      await query(`
+        INSERT INTO questionnaire_responses (questionnaire_id, member_id, answers, score, max_score, started_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+        ON CONFLICT (questionnaire_id, member_id) DO UPDATE SET answers=$3, score=$4, max_score=$5, submitted_at=NOW()
+      `, [id, userId, JSON.stringify(built.answers), built.score, built.maxScore]);
+      req.flash('success', `Questionnaire berhasil dikumpulkan. Skor: ${built.score}/${built.maxScore}`);
+      return res.redirect('/member/questionnaire');
+    }
 
     const questionsResult = await query('SELECT * FROM questions WHERE questionnaire_id = $1', [id]);
     const questions = questionsResult.rows;
@@ -183,7 +606,7 @@ exports.questionnaireSubmit = async (req, res) => {
     const answerMap = {};
 
     questions.forEach(q => {
-      maxScore += q.points;
+      maxScore += q.question_type === 'rating' ? 5 : q.points;
       const userAnswer = answers[`q_${q.id}`] || '';
       answerMap[q.id] = userAnswer;
       if (q.question_type === 'multiple_choice' && userAnswer === q.correct_answer) {
@@ -191,13 +614,15 @@ exports.questionnaireSubmit = async (req, res) => {
       } else if (q.question_type === 'essay') {
         // Essay graded manually, give partial credit
         score += q.points > 0 && userAnswer.trim().length > 10 ? Math.floor(q.points * 0.5) : 0;
+      } else if (q.question_type === 'rating') {
+        score += Number(userAnswer || 0);
       }
     });
 
     await query(`
       INSERT INTO questionnaire_responses (questionnaire_id, member_id, answers, score, max_score, started_at)
       VALUES ($1, $2, $3, $4, $5, NOW())
-      ON CONFLICT (questionnaire_id, member_id) DO UPDATE SET answers=$3, score=$4, submitted_at=NOW()
+      ON CONFLICT (questionnaire_id, member_id) DO UPDATE SET answers=$3, score=$4, max_score=$5, submitted_at=NOW()
     `, [id, userId, JSON.stringify(answerMap), score, maxScore]);
 
     req.flash('success', `Kuis berhasil dikumpulkan! Skor kamu: ${score}/${maxScore}`);
@@ -212,15 +637,17 @@ exports.questionnaireSubmit = async (req, res) => {
 exports.report = async (req, res) => {
   try {
     const userId = req.session.user.id;
-    const [enrollResult, presStats, quizStats] = await Promise.all([
+    await ensureMemberReportsTable(query);
+    const [enrollResult, presStats, quizStats, reportsRes] = await Promise.all([
       query(`SELECT e.*, p.name as program_name FROM enrollments e JOIN programs p ON e.program_id = p.id WHERE e.member_id = $1`, [userId]),
       query(`
         SELECT p.name as program_name,
-               COUNT(pr.*) as total_schedules,
-               COUNT(pr.*) FILTER (WHERE pr.status = 'present') as present_count,
-               COUNT(pr.*) FILTER (WHERE pr.status = 'late') as late_count
+               COUNT(sm.schedule_id) as total_schedules,
+               COUNT(sm.schedule_id) FILTER (WHERE COALESCE(pr.status, 'absent') = 'present') as present_count,
+               COUNT(sm.schedule_id) FILTER (WHERE COALESCE(pr.status, 'absent') = 'late') as late_count
         FROM programs p
         JOIN schedules s ON s.program_id = p.id
+        JOIN schedule_members sm ON sm.schedule_id = s.id AND sm.member_id = $1
         LEFT JOIN presences pr ON s.id = pr.schedule_id AND pr.member_id = $1
         WHERE p.id IN (SELECT program_id FROM enrollments WHERE member_id = $1)
         GROUP BY p.name
@@ -230,6 +657,14 @@ exports.report = async (req, res) => {
         FROM questionnaire_responses qr JOIN questionnaires q ON qr.questionnaire_id = q.id
         WHERE qr.member_id = $1 ORDER BY qr.submitted_at DESC
       `, [userId]),
+      query(`
+        SELECT mr.*, t.name as tutor_name, p.name as program_name
+        FROM member_reports mr
+        JOIN users t ON t.id = mr.tutor_id
+        JOIN programs p ON p.id = mr.program_id
+        WHERE mr.member_id = $1
+        ORDER BY mr.period_start DESC, mr.updated_at DESC
+      `, [userId]),
     ]);
     res.render('member/report', {
       title: 'Laporan Member',
@@ -237,6 +672,42 @@ exports.report = async (req, res) => {
       enrollments: enrollResult.rows,
       presStats: presStats.rows,
       quizStats: quizStats.rows,
+      reports: reportsRes.rows,
+    });
+  } catch (err) {
+    console.error(err);
+    res.render('error', { title: 'Error', message: err.message, user: req.session.user });
+  }
+};
+
+exports.reportDetail = async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    await ensureMemberReportsTable(query);
+    const result = await query(`
+      SELECT mr.*, m.name as member_name, m.photo as member_photo,
+             t.name as tutor_name, p.name as program_name
+      FROM member_reports mr
+      JOIN users m ON m.id = mr.member_id
+      JOIN users t ON t.id = mr.tutor_id
+      JOIN programs p ON p.id = mr.program_id
+      WHERE mr.id = $1 AND mr.member_id = $2
+    `, [req.params.id, userId]);
+    const report = result.rows[0];
+    if (!report) return res.redirect('/member/report');
+    const days = normalizeReportDays(report.days);
+    res.render('shared/member-report-detail', {
+      title: 'Detail Member Report',
+      user: req.session.user,
+      activeNav: 'member',
+      backHref: '/member/report',
+      canEdit: false,
+      report,
+      reportDays: Array.from({ length: 15 }, (_, idx) => ({
+        number: idx + 1,
+        key: `day_${idx + 1}`,
+        text: days[`day_${idx + 1}`],
+      })),
     });
   } catch (err) {
     console.error(err);
@@ -247,6 +718,7 @@ exports.report = async (req, res) => {
 exports.certificate = async (req, res) => {
   try {
     const userId = req.session.user.id;
+    await ensureCertificateDetailsColumn(query);
     const result = await query(`
       SELECT c.*, p.name as program_name
       FROM certificates c JOIN programs p ON c.program_id = p.id
@@ -257,6 +729,33 @@ exports.certificate = async (req, res) => {
       title: 'E-Sertifikat',
       user: req.session.user,
       certificates: result.rows,
+    });
+  } catch (err) {
+    console.error(err);
+    res.render('error', { title: 'Error', message: err.message, user: req.session.user });
+  }
+};
+
+exports.certificatePrint = async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    await ensureCertificateDetailsColumn(query);
+    const result = await query(`
+      SELECT c.*, p.name as program_name
+      FROM certificates c JOIN programs p ON c.program_id = p.id
+      WHERE c.id = $1 AND c.member_id = $2 AND c.is_active = true
+    `, [req.params.id, userId]);
+    if (!result.rows.length) {
+      req.flash('error', 'Sertifikat tidak ditemukan.');
+      return res.redirect('/member/certificate');
+    }
+    res.render('member/certificate-print', {
+      title: 'Sertifikat',
+      user: req.session.user,
+      cert: result.rows[0],
+      autoPrint: req.query.preview !== '1',
+      embed: req.query.embed === '1',
+      backHref: '/member/certificate',
     });
   } catch (err) {
     console.error(err);
@@ -284,8 +783,34 @@ exports.profile = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.session.user.id;
-    const { name, phone, bio } = req.body;
+    const { name, phone, bio, current_password, new_password, confirm_password } = req.body;
     let photoPath = null;
+
+    if (new_password || confirm_password || current_password) {
+      if (!current_password || !new_password || !confirm_password) {
+        removeUploadedFile(req.file);
+        req.flash('error', 'Lengkapi password lama, password baru, dan konfirmasi password.');
+        return res.redirect('/member/profile');
+      }
+      if (new_password.length < 6) {
+        removeUploadedFile(req.file);
+        req.flash('error', 'Password baru minimal 6 karakter.');
+        return res.redirect('/member/profile');
+      }
+      if (new_password !== confirm_password) {
+        removeUploadedFile(req.file);
+        req.flash('error', 'Konfirmasi password baru tidak cocok.');
+        return res.redirect('/member/profile');
+      }
+
+      const userPassword = await query('SELECT password FROM users WHERE id = $1', [userId]);
+      const validPassword = await bcrypt.compare(current_password, userPassword.rows[0].password);
+      if (!validPassword) {
+        removeUploadedFile(req.file);
+        req.flash('error', 'Password lama tidak sesuai.');
+        return res.redirect('/member/profile');
+      }
+    }
 
     if (req.file) {
       const user = await query('SELECT photo FROM users WHERE id = $1', [userId]);
@@ -302,6 +827,10 @@ exports.updateProfile = async (req, res) => {
       : 'UPDATE users SET name=$1, phone=$2, bio=$3, updated_at=NOW() WHERE id=$4';
     const params = photoPath ? [name, phone, bio, photoPath, userId] : [name, phone, bio, userId];
     await query(updateQuery, params);
+    if (new_password) {
+      const hashedPassword = await bcrypt.hash(new_password, 10);
+      await query('UPDATE users SET password=$1, updated_at=NOW() WHERE id=$2', [hashedPassword, userId]);
+    }
 
     const updated = await query('SELECT * FROM users WHERE id = $1', [userId]);
     req.session.user = {
@@ -311,8 +840,9 @@ exports.updateProfile = async (req, res) => {
       role: updated.rows[0].role,
       photo: updated.rows[0].photo,
       is_vip: updated.rows[0].is_vip,
+      is_luxury: updated.rows[0].is_luxury,
     };
-    req.flash('success', 'Profil berhasil diperbarui.');
+    req.flash('success', new_password ? 'Profil dan password berhasil diperbarui.' : 'Profil berhasil diperbarui.');
     res.redirect('/member/profile');
   } catch (err) {
     console.error(err);
@@ -324,21 +854,162 @@ exports.updateProfile = async (req, res) => {
 exports.renewal = async (req, res) => {
   try {
     const userId = req.session.user.id;
-    const [enrollResult, programsResult] = await Promise.all([
-      query(`SELECT e.*, p.name as program_name, p.price, p.duration_months
+    await ensureRenewalRequestsTable(query);
+    const [enrollResult, programsResult, requestsResult, profileResult] = await Promise.all([
+      query(`SELECT e.*, p.name as program_name, p.description as program_description, p.price, p.duration_months
              FROM enrollments e JOIN programs p ON e.program_id = p.id
              WHERE e.member_id = $1 ORDER BY e.end_date`, [userId]),
       query('SELECT * FROM programs WHERE is_active = true ORDER BY price'),
+      query(`SELECT rr.*, p.name AS program_name
+             FROM renewal_requests rr
+             JOIN programs p ON p.id = rr.program_id
+             WHERE rr.member_id = $1
+             ORDER BY rr.created_at DESC
+             LIMIT 8`, [userId]),
+      query('SELECT phone FROM users WHERE id = $1', [userId]),
     ]);
+
+    // Normalise admin WhatsApp (0xxxx -> 62xxxx) for the renewal request link.
+    let adminWhatsapp = String(process.env.ADMIN_WHATSAPP || '').replace(/\D/g, '');
+    if (adminWhatsapp.startsWith('0')) adminWhatsapp = `62${adminWhatsapp.slice(1)}`;
+    else if (adminWhatsapp.startsWith('8')) adminWhatsapp = `62${adminWhatsapp}`;
+
+    const now = new Date();
+    const enrollments = enrollResult.rows.map((e) => {
+      const start = e.start_date ? new Date(e.start_date) : null;
+      const end = e.end_date ? new Date(e.end_date) : null;
+      const daysLeft = end ? Math.ceil((end - now) / (1000 * 60 * 60 * 24)) : null;
+      const totalDays = start && end ? Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24))) : 0;
+      const elapsedDays = start ? Math.max(0, Math.ceil((now - start) / (1000 * 60 * 60 * 24))) : 0;
+      const progress = totalDays ? Math.min(100, Math.max(0, Math.round((elapsedDays / totalDays) * 100))) : 0;
+      let urgency = 'safe';
+      let statusText = 'Aktif';
+      if (daysLeft !== null && daysLeft < 0) {
+        urgency = 'expired';
+        statusText = 'Sudah berakhir';
+      } else if (daysLeft !== null && daysLeft <= 7) {
+        urgency = 'danger';
+        statusText = 'Segera renewal';
+      } else if (daysLeft !== null && daysLeft <= 14) {
+        urgency = 'warning';
+        statusText = 'Hampir selesai';
+      }
+      return { ...e, days_left: daysLeft, progress, urgency, status_text: statusText };
+    });
+
+    const active = enrollments.filter((e) => e.status === 'active' && e.end_date);
+    let nearestDays = null;
+    active.forEach((e) => {
+      const d = e.days_left;
+      if (nearestDays === null || d < nearestDays) nearestDays = d;
+    });
+    const recommended = active.length
+      ? [...active].sort((a, b) => (a.days_left ?? 9999) - (b.days_left ?? 9999))[0]
+      : null;
+
+    const activeProgramNames = new Set(active.map((e) => String(e.program_name || '').trim().toLowerCase()));
+    const uniquePrograms = [];
+    const seenPrograms = new Set();
+    programsResult.rows.forEach((program) => {
+      const key = String(program.name || '').trim().toLowerCase();
+      if (!key || seenPrograms.has(key)) return;
+      seenPrograms.add(key);
+      const currentEnrollment = active.find((e) => String(e.program_name || '').trim().toLowerCase() === key);
+      uniquePrograms.push({
+        ...program,
+        renewal_price: renewalPriceFor(program.price),
+        is_current: activeProgramNames.has(key),
+        current_end_date: currentEnrollment ? currentEnrollment.end_date : null,
+        current_days_left: currentEnrollment ? currentEnrollment.days_left : null,
+      });
+    });
+
     res.render('member/renewal', {
       title: 'Perpanjang Program',
       user: req.session.user,
-      enrollments: enrollResult.rows,
-      programs: programsResult.rows,
+      enrollments,
+      programs: uniquePrograms,
+      renewalRequests: requestsResult.rows,
+      studyTimes: STUDY_TIME_SLOTS,
+      memberPhone: profileResult.rows[0] ? profileResult.rows[0].phone : '',
+      adminWhatsapp,
+      recommended,
+      stats: {
+        activeCount: active.length,
+        nearestDays,
+        availablePrograms: uniquePrograms.length,
+        expiringSoon: active.filter((e) => e.days_left !== null && e.days_left <= 14).length,
+      },
     });
   } catch (err) {
     console.error(err);
     res.render('error', { title: 'Error', message: err.message, user: req.session.user });
+  }
+};
+
+exports.submitRenewal = async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    await ensureRenewalRequestsTable(query);
+
+    const programId = Number(req.body.program_id);
+    const requestType = 'renewal';
+    const preferredStartDate = req.body.preferred_start_date || null;
+    const studyTime = String(req.body.study_time || '').trim();
+    const phone = String(req.body.phone || '').trim();
+    const notes = String(req.body.notes || '').trim();
+
+    if (!programId || !preferredStartDate || !studyTime || !phone) {
+      removeUploadedFile(req.file);
+      req.flash('error', 'Lengkapi program, tanggal mulai, jam belajar, dan WhatsApp.');
+      return res.redirect('/member/renewal#renewal-form');
+    }
+
+    const [memberResult, programResult] = await Promise.all([
+      query('SELECT name, email FROM users WHERE id = $1', [userId]),
+      query('SELECT id, name, price FROM programs WHERE id = $1 AND is_active = true', [programId]),
+    ]);
+
+    const member = memberResult.rows[0];
+    const program = programResult.rows[0];
+    if (!member || !program) {
+      removeUploadedFile(req.file);
+      req.flash('error', 'Program tidak ditemukan atau sudah tidak aktif.');
+      return res.redirect('/member/renewal#renewal-form');
+    }
+
+    const proofPath = req.file ? `/uploads/${req.file.filename}` : null;
+    const normalPrice = Number(program.price || 0);
+    const packagePrice = renewalPriceFor(normalPrice);
+    await query(`
+      INSERT INTO renewal_requests (
+        member_id, program_id, request_type, member_name, member_email, phone,
+        preferred_start_date, study_time, package_name, package_price,
+        transfer_proof, notes, status, updated_at
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending',NOW())
+    `, [
+      userId,
+      programId,
+      requestType,
+      member.name,
+      member.email,
+      phone,
+      preferredStartDate,
+      studyTime,
+      program.name,
+      packagePrice,
+      proofPath,
+      notes || null,
+    ]);
+
+    req.flash('success', 'Form renewal berhasil dikirim. Admin akan mengecek dan memproses request kamu.');
+    return res.redirect('/member/renewal#riwayat-renewal');
+  } catch (err) {
+    console.error(err);
+    removeUploadedFile(req.file);
+    req.flash('error', 'Gagal mengirim form renewal.');
+    return res.redirect('/member/renewal#renewal-form');
   }
 };
 
@@ -483,5 +1154,63 @@ exports.markNotifRead = async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.json({ success: false });
+  }
+};
+
+exports.helpSupport = (req, res) => {
+  res.render('shared/help-support', {
+    title: 'Help & Support',
+    user: req.session.user,
+    activeNav: 'member',
+    basePath: '/member/help-support',
+    backHref: '/member',
+    roleLabel: 'Member',
+    supportEmail: SUPPORT_EMAIL,
+    error: req.flash('error'),
+    success: req.flash('success'),
+  });
+};
+
+exports.submitHelpSupport = async (req, res) => {
+  try {
+    const subject = String(req.body.subject || '').trim();
+    const message = String(req.body.message || '').trim();
+    if (!subject || message.length < 10) {
+      req.flash('error', 'Lengkapi subjek dan isi feedback minimal 10 karakter.');
+      return res.redirect('/member/help-support');
+    }
+
+    const payload = {
+      user: req.session.user,
+      roleLabel: 'Member',
+      category: req.body.category || 'Feedback',
+      priority: req.body.priority || 'Normal',
+      subject,
+      message,
+      pageUrl: req.body.page_url,
+      contactEmail: req.body.contact_email,
+    };
+    const feedback = await saveSupportFeedback(query, payload);
+    let result;
+    try {
+      result = await sendSupportFeedback(payload);
+      await updateSupportFeedbackEmailStatus(query, feedback.id, result.skipped ? 'skipped' : 'sent');
+    } catch (emailErr) {
+      console.error(emailErr);
+      await updateSupportFeedbackEmailStatus(query, feedback.id, 'failed', emailErr.message);
+      result = { failed: true };
+    }
+
+    req.flash((result.skipped || result.failed) ? 'error' : 'success',
+      result.skipped
+        ? 'Feedback belum terkirim karena SMTP belum dikonfigurasi.'
+        : result.failed
+          ? 'Feedback tersimpan, tetapi email belum terkirim. Admin tetap bisa melihatnya.'
+        : 'Feedback berhasil dikirim. Terima kasih!');
+    return res.redirect('/member/help-support');
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal mengirim feedback. Coba lagi beberapa saat.');
+    return res.redirect('/member/help-support');
   }
 };

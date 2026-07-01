@@ -6,28 +6,136 @@
   <div class="sub-banner">
     <a href="/tutor" class="back-link"><i class="fas fa-arrow-left"></i></a>
     <h1>Laporan Member</h1>
+    <a href="/tutor/report/edit" class="btn btn-light"><i class="fas fa-plus"></i> Create/Update Report</a>
   </div>
 
   <div class="container">
+    <!-- Summary stats -->
+    <div class="at-stats">
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--brand-600)"><i class="fas fa-users"></i></span>
+        <div><strong><%= stats.members %></strong><small>Member</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--success)"><i class="fas fa-percent"></i></span>
+        <div><strong><%= stats.avgAttendance %>%</strong><small>Rata-rata kehadiran</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--info)"><i class="fas fa-star"></i></span>
+        <div><strong><%= stats.avgScore === null ? '-' : stats.avgScore + '%' %></strong><small>Rata-rata nilai kuis</small></div>
+      </div>
+    </div>
+
     <div class="section-card">
-      <h3 class="section-title"><i class="fas fa-chart-bar"></i> Performa Member</h3>
+      <form method="GET" action="/tutor/report" class="filter-form">
+        <select name="program_id" class="form-input" onchange="this.form.submit()">
+          <option value="">Semua Program</option>
+          <% programs.forEach(p => { %><option value="<%= p.id %>" <%= String(filters.programId) === String(p.id) ? 'selected' : '' %>><%= p.name %></option><% }) %>
+        </select>
+        <a href="/tutor/report" class="btn btn-outline">Reset</a>
+        <a href="/tutor/report/export.csv?<%= new URLSearchParams({ program_id: filters.programId || '' }).toString() %>" class="btn btn-outline"><i class="fas fa-download"></i> Export CSV</a>
+      </form>
+    </div>
+
+    <div class="section-card">
+      <div class="presence-header">
+        <div>
+          <h3>Member Report Harian</h3>
+          <p>Report diisi oleh tutor dari Day 1 sampai Day 15. Member dan admin hanya bisa melihat.</p>
+        </div>
+        <a href="/tutor/report/edit" class="btn btn-primary"><i class="fas fa-pen"></i> Isi Report</a>
+      </div>
+      <% if (writtenReports.length === 0) { %>
+        <div class="empty-state compact"><i class="fas fa-file-lines"></i><p>Belum ada member report yang diisi.</p></div>
+      <% } else { %>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead><tr><th>Member</th><th>Periode</th><th>Program</th><th>Paket</th><th>Update</th><th></th></tr></thead>
+            <tbody>
+              <% writtenReports.forEach(r => { %>
+                <tr>
+                  <td>
+                    <div class="member-name-cell">
+                      <% if (r.member_photo) { %><img src="<%= r.member_photo %>" class="table-avatar" alt="<%= r.member_name %>">
+                      <% } else { %><div class="table-avatar-init"><%= getInitials(r.member_name) %></div><% } %>
+                      <%= r.member_name %>
+                    </div>
+                  </td>
+                  <td><%= formatDate(r.period_start) %></td>
+                  <td><%= r.program_name %></td>
+                  <td><%= r.package_name || '-' %></td>
+                  <td><%= formatDate(r.updated_at) %></td>
+                  <td class="td-actions">
+                    <a href="/tutor/report/<%= r.id %>" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i> View</a>
+                    <a href="/tutor/report/edit?id=<%= r.id %>" class="btn btn-sm btn-primary"><i class="fas fa-pen"></i> Edit</a>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="section-card">
+      <div class="presence-header">
+        <div>
+          <h3>Statistik Performa</h3>
+          <p>Kehadiran menghitung status Hadir dan Terlambat. Gunakan indikator untuk menentukan follow-up.</p>
+        </div>
+        <span class="presence-session-count"><i class="fas fa-chart-line"></i> <%= reports.length %> data</span>
+      </div>
       <% if (reports.length === 0) { %>
         <div class="empty-state"><i class="fas fa-users"></i><p>Belum ada data member.</p></div>
       <% } else { %>
-        <div class="table-wrapper">
+        <% const perf = reports.map(r => {
+          const total = Number(r.total_sessions) || 0;
+          const present = Number(r.present_count) || 0;
+          const rate = total > 0 ? Math.round(present / total * 100) : 0;
+          const score = r.avg_score !== null && r.avg_score !== undefined ? Math.round(Number(r.avg_score)) : null;
+          return { rate, score, total, present };
+        }); %>
+        <% const needFollowUp = perf.filter(p => p.rate < 75).length; %>
+        <% const strongCount = perf.filter(p => p.rate >= 85).length; %>
+        <div class="performance-strip">
+          <div>
+            <span class="performance-kicker">Rata-rata</span>
+            <strong><%= stats.avgAttendance %>%</strong>
+            <small>Kehadiran kelas</small>
+          </div>
+          <div>
+            <span class="performance-kicker">Aman</span>
+            <strong><%= strongCount %></strong>
+            <small>Member >= 85%</small>
+          </div>
+          <div>
+            <span class="performance-kicker">Follow-up</span>
+            <strong><%= needFollowUp %></strong>
+            <small>Member < 75%</small>
+          </div>
+        </div>
+
+        <div class="table-wrapper performance-table-wrapper">
           <table class="data-table">
             <thead>
               <tr>
                 <th>Member</th>
                 <th>Program</th>
-                <th>Total Sesi</th>
-                <th>Hadir</th>
+                <th>Sesi</th>
                 <th>Kehadiran</th>
                 <th>Nilai Kuis</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
               <% reports.forEach(r => { %>
+              <% const total = Number(r.total_sessions) || 0; %>
+              <% const present = Number(r.present_count) || 0; %>
+              <% const late = Number(r.late_count) || 0; %>
+              <% const excused = Number(r.excused_count) || 0; %>
+              <% const rate = total > 0 ? Math.round(present / total * 100) : 0; %>
+              <% const statusClass = rate >= 85 ? 'good' : rate >= 75 ? 'ok' : 'low'; %>
+              <% const statusLabel = rate >= 85 ? 'Aman' : rate >= 75 ? 'Dipantau' : 'Follow-up'; %>
               <tr>
                 <td>
                   <div class="member-name-cell">
@@ -40,11 +148,15 @@
                   </div>
                 </td>
                 <td><%= r.program_name %></td>
-                <td><%= r.total_sessions %></td>
-                <td><%= r.present_count %></td>
                 <td>
-                  <% const rate = r.total_sessions > 0 ? Math.round(r.present_count / r.total_sessions * 100) : 0; %>
-                  <span class="score-badge score-<%= rate >= 75 ? 'good' : 'low' %>"><%= rate %>%</span>
+                  <strong><%= present %>/<%= total %></strong>
+                  <div class="table-subtext"><%= late %> terlambat · <%= excused %> izin</div>
+                </td>
+                <td>
+                  <div class="performance-rate">
+                    <span class="score-badge score-<%= rate >= 75 ? 'good' : 'low' %>"><%= rate %>%</span>
+                    <div class="performance-bar"><b style="width:<%= rate %>%"></b></div>
+                  </div>
                 </td>
                 <td>
                   <% if (r.avg_score !== null) { %>
@@ -53,6 +165,7 @@
                     </span>
                   <% } else { %><span class="text-muted">-</span><% } %>
                 </td>
+                <td><span class="performance-status <%= statusClass %>"><%= statusLabel %></span></td>
               </tr>
               <% }) %>
             </tbody>

@@ -55,6 +55,29 @@
       </div>
     </div>
 
+    <% if (stats.pendingPayments > 0) { %>
+    <div class="section-card alert-panel">
+      <h3 class="section-title"><i class="fas fa-hourglass-half"></i> Pendaftaran Menunggu Pembayaran <span class="count-badge"><%= stats.pendingPayments %></span></h3>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead><tr><th>Nama</th><th>Program</th><th>Paket</th><th>Nominal</th><th>Daftar</th><th></th></tr></thead>
+          <tbody>
+            <% pendingRegistrations.forEach(r => { %>
+            <tr>
+              <td><strong><%= r.name %></strong><div class="table-subtext"><%= r.email %></div></td>
+              <td><%= r.selected_class || '-' %></td>
+              <td><%= r.package_name || '-' %></td>
+              <td><%= formatCurrency(r.package_price) %></td>
+              <td><%= formatDate(r.created_at) %></td>
+              <td><a href="/admin/users/<%= r.user_id %>" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i> Detail</a></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <% } %>
+
     <div class="menu-grid">
       <div class="menu-card" onclick="window.location='/admin/users'">
         <div class="menu-icon-wrap"><div class="menu-icon"><i class="fas fa-users"></i></div></div>
@@ -68,10 +91,76 @@
         <div class="menu-icon-wrap"><div class="menu-icon"><i class="fas fa-id-card"></i></div></div>
         <span class="menu-label">Enrollment</span>
       </div>
+      <div class="menu-card" onclick="window.location='/admin/periods'">
+        <div class="menu-icon-wrap"><div class="menu-icon"><i class="fas fa-calendar-week"></i></div></div>
+        <span class="menu-label">Kelola Periode</span>
+      </div>
+      <div class="menu-card" onclick="window.location='/admin/schedule'">
+        <div class="menu-icon-wrap"><div class="menu-icon"><i class="fas fa-calendar-days"></i></div></div>
+        <span class="menu-label">Kelola Jadwal</span>
+      </div>
+      <div class="menu-card" onclick="window.location='/admin/schedule-plot'">
+        <div class="menu-icon-wrap"><div class="menu-icon"><i class="fas fa-calendar-plus"></i></div></div>
+        <span class="menu-label">Plot Jadwal</span>
+      </div>
+      <div class="menu-card" onclick="window.location='/admin/schedule-import'">
+        <div class="menu-icon-wrap"><div class="menu-icon"><i class="fas fa-file-csv"></i></div></div>
+        <span class="menu-label">Import Schedule</span>
+      </div>
+      <div class="menu-card" onclick="window.location='/admin/member-presence'">
+        <div class="menu-icon-wrap"><div class="menu-icon"><i class="fas fa-camera"></i></div></div>
+        <span class="menu-label">Presensi Member</span>
+      </div>
+      <div class="menu-card" onclick="window.location='/admin/questionnaire'">
+        <div class="menu-icon-wrap"><div class="menu-icon"><i class="fas fa-clipboard-question"></i></div></div>
+        <span class="menu-label">Questionnaire</span>
+      </div>
+      <div class="menu-card" onclick="window.location='/admin/report'">
+        <div class="menu-icon-wrap"><div class="menu-icon"><i class="fas fa-chart-line"></i></div></div>
+        <span class="menu-label">Member Report</span>
+      </div>
+      <div class="menu-card" onclick="window.location='/admin/certificate'">
+        <div class="menu-icon-wrap"><div class="menu-icon"><i class="fas fa-award"></i></div></div>
+        <span class="menu-label">Sertifikat</span>
+      </div>
+      <div class="menu-card" onclick="window.location='/admin/support-feedback'">
+        <div class="menu-icon-wrap">
+          <% if (stats.pendingFeedback > 0) { %><span class="card-badge badge-pending"><%= stats.pendingFeedback %> baru</span><% } %>
+          <div class="menu-icon"><i class="fas fa-headset"></i></div>
+        </div>
+        <span class="menu-label">Feedback Inbox</span>
+      </div>
       <div class="menu-card menu-card-logout" onclick="if(confirm('Keluar?')) window.location='/logout'">
         <div class="menu-icon-wrap"><div class="menu-icon menu-icon-logout"><i class="fas fa-right-from-bracket"></i></div></div>
         <span class="menu-label menu-label-logout">Log Out</span>
       </div>
+    </div>
+
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-calendar-day"></i> Jadwal Terdekat</h3>
+      <% if (upcomingSchedules.length === 0) { %>
+        <div class="empty-state"><i class="fas fa-calendar-day"></i><p>Belum ada jadwal mendatang.</p></div>
+      <% } else { %>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr><th>Tanggal</th><th>Waktu</th><th>Sesi</th><th>Program</th><th>Tutor</th><th>Peserta</th></tr>
+          </thead>
+          <tbody>
+            <% upcomingSchedules.forEach(s => { %>
+            <tr>
+              <td><%= formatDate(s.date) %></td>
+              <td><%= formatTime(s.start_time) %> - <%= formatTime(s.end_time) %></td>
+              <td><strong><%= s.title %></strong></td>
+              <td><%= s.program_name %></td>
+              <td><%= s.tutor_name %></td>
+              <td><i class="fas fa-users"></i> <%= s.member_count %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
     </div>
 
     <div class="section-card">

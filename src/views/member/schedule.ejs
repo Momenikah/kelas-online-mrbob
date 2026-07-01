@@ -10,51 +10,130 @@
   </div>
 
   <div class="container">
-    <% if (schedules.length === 0) { %>
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-total"><i class="fas fa-calendar-alt"></i></div>
+        <div class="stat-info"><span class="stat-value"><%= stats.total %></span><span class="stat-label">Total Sesi</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-rate"><i class="fas fa-clock"></i></div>
+        <div class="stat-info"><span class="stat-value"><%= stats.upcoming %></span><span class="stat-label">Akan Datang</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-present"><i class="fas fa-check-double"></i></div>
+        <div class="stat-info"><span class="stat-value"><%= stats.completed %></span><span class="stat-label">Selesai</span></div>
+      </div>
+    </div>
+
+    <!-- Filter -->
+    <div class="section-card">
+      <div class="schedule-toolbar">
+        <form method="GET" action="/member/schedule" class="schedule-filter">
+          <div class="schedule-filter-field">
+            <label><i class="far fa-calendar-alt"></i> Periode</label>
+            <select name="period" class="form-input" onchange="this.form.submit()">
+              <option value="">Semua Periode</option>
+              <% periods.forEach(p => { %>
+                <option value="<%= p.value %>" <%= filters.period === p.value ? 'selected' : '' %>><%= p.label %></option>
+              <% }) %>
+            </select>
+          </div>
+          <% if (filters.period) { %>
+            <a href="/member/schedule" class="btn btn-outline schedule-filter-reset"><i class="fas fa-rotate-left"></i> Reset</a>
+          <% } %>
+        </form>
+        <div class="schedule-view-toggle" role="group" aria-label="Pilih tampilan">
+          <button type="button" data-view="grid" class="is-active" title="Tampilan grid"><i class="fas fa-table-cells-large"></i></button>
+          <button type="button" data-view="list" title="Tampilan list"><i class="fas fa-list"></i></button>
+        </div>
+      </div>
+      <p class="schedule-filter-note"><i class="fas fa-circle-info"></i> Jadwal dikelompokkan per periode pendaftaran. Kehadiran per sesi diisi di halaman <a href="/member/presence">Presensi</a>.</p>
+    </div>
+
+    <% if (periodGroups.length === 0) { %>
       <div class="empty-state">
         <i class="fas fa-calendar-times"></i>
-        <p>Belum ada jadwal kelas.</p>
+        <p>Tidak ada jadwal pada periode ini.</p>
       </div>
     <% } else { %>
-      <div class="schedule-cards">
-        <% schedules.forEach(s => { %>
-        <div class="sched-card <%= s.status %>">
-          <div class="sched-card-header">
-            <div class="sched-date">
-              <span class="sched-day"><%= new Date(s.date).toLocaleDateString('id-ID', {day:'2-digit'}) %></span>
-              <span class="sched-month"><%= new Date(s.date).toLocaleDateString('id-ID', {month:'short', year:'numeric'}) %></span>
+      <div class="period-cards" id="periodCards">
+        <% periodGroups.forEach(g => { %>
+        <%
+          const done = g.counts.completed;
+          const noShow = Math.max(0, done - g.attended);
+          const rate = done > 0 ? Math.round((g.attended / done) * 100) : 0;
+        %>
+        <div class="period-card <%= g.status %>">
+          <div class="period-card-header">
+            <div class="period-range">
+              <span class="period-range-icon"><i class="fas fa-calendar-week"></i></span>
+              <div>
+                <span class="period-range-kicker">Periode</span>
+                <strong class="period-range-label"><%= g.label %></strong>
+              </div>
             </div>
-            <div class="sched-status-badge">
-              <% if (s.status === 'completed') { %>
-                <span class="badge-pill badge-completed"><i class="fas fa-check"></i> Selesai</span>
-              <% } else if (s.status === 'upcoming') { %>
-                <span class="badge-pill badge-upcoming"><i class="fas fa-clock"></i> Akan Datang</span>
-              <% } else if (s.status === 'cancelled') { %>
-                <span class="badge-pill badge-cancelled"><i class="fas fa-times"></i> Dibatalkan</span>
+            <% if (g.status === 'completed') { %>
+              <span class="badge-pill badge-completed"><i class="fas fa-check"></i> Selesai</span>
+            <% } else if (g.status === 'cancelled') { %>
+              <span class="badge-pill badge-cancelled"><i class="fas fa-times"></i> Dibatalkan</span>
+            <% } else { %>
+              <span class="badge-pill badge-upcoming"><i class="fas fa-clock"></i> Akan Datang</span>
+            <% } %>
+          </div>
+
+          <div class="period-card-body">
+            <div class="period-meta">
+              <span><i class="fas fa-book"></i> <%= g.programs.join(', ') || '-' %></span>
+              <span><i class="fas fa-chalkboard-teacher"></i> <%= g.tutors.join(', ') || '-' %></span>
+              <% if (g.location) { %><span><i class="fas fa-map-marker-alt"></i> <%= g.location %></span><% } %>
+            </div>
+
+            <div class="period-stats">
+              <div class="period-stat">
+                <span class="period-stat-value"><%= g.counts.total %></span>
+                <span class="period-stat-label">Sesi</span>
+              </div>
+              <div class="period-stat period-stat-ok">
+                <span class="period-stat-value"><%= g.attended %></span>
+                <span class="period-stat-label">Hadir</span>
+              </div>
+              <div class="period-stat">
+                <span class="period-stat-value"><%= g.counts.upcoming %></span>
+                <span class="period-stat-label">Akan Datang</span>
+              </div>
+              <% if (noShow > 0) { %>
+              <div class="period-stat period-stat-warn">
+                <span class="period-stat-value"><%= noShow %></span>
+                <span class="period-stat-label">Tidak Hadir</span>
+              </div>
               <% } %>
             </div>
-          </div>
-          <div class="sched-body">
-            <h3 class="sched-title"><%= s.title %></h3>
-            <div class="sched-meta">
-              <span><i class="fas fa-book"></i> <%= s.program_name %></span>
-              <span><i class="fas fa-chalkboard-teacher"></i> <%= s.tutor_name %></span>
-              <span><i class="fas fa-clock"></i> <%= formatTime(s.start_time) %> - <%= formatTime(s.end_time) %></span>
-              <% if (s.location) { %><span><i class="fas fa-map-marker-alt"></i> <%= s.location %></span><% } %>
+
+            <% if (done > 0) { %>
+            <div class="period-progress">
+              <div class="period-progress-top">
+                <span>Kehadiran</span>
+                <span><strong><%= g.attended %></strong>/<%= done %> sesi · <%= rate %>%</span>
+              </div>
+              <div class="period-progress-bar"><span style="width: <%= rate %>%"></span></div>
             </div>
-            <% if (s.description) { %><p class="sched-desc"><%= s.description %></p><% } %>
-          </div>
-          <div class="sched-footer">
-            <% if (s.presence_status) { %>
-              <span class="presence-pill presence-<%= s.presence_status %>">
-                <i class="fas fa-<%= s.presence_status === 'present' ? 'check' : s.presence_status === 'late' ? 'clock' : 'times' %>"></i>
-                <%= s.presence_status === 'present' ? 'Hadir' : s.presence_status === 'late' ? 'Terlambat' : s.presence_status === 'excused' ? 'Izin' : 'Tidak Hadir' %>
-              </span>
             <% } %>
-            <% if (s.meeting_link && s.status === 'upcoming') { %>
-              <a href="<%= s.meeting_link %>" target="_blank" class="btn btn-sm btn-primary">
-                <i class="fas fa-video"></i> Join Meeting
-              </a>
+
+            <% if (g.next) { %>
+            <div class="period-next">
+              <i class="fas fa-arrow-right"></i>
+              <span>Sesi terdekat: <strong><%= formatDate(g.next.date) %></strong> · <%= formatTime(g.next.start_time) %> - <%= formatTime(g.next.end_time) %></span>
+            </div>
+            <% } %>
+          </div>
+
+          <div class="period-card-footer">
+            <a href="/member/presence" class="btn btn-primary btn-sm period-btn-main"><i class="fas fa-user-check"></i> Lihat Presensi</a>
+            <% if (g.next && g.next.meeting_link) { %>
+            <div class="period-actions">
+              <a href="<%= g.next.meeting_link %>" target="_blank" rel="noopener" class="btn btn-outline btn-sm"><i class="fas fa-video"></i> Join Meeting</a>
+            </div>
             <% } %>
           </div>
         </div>
@@ -63,5 +142,23 @@
     <% } %>
   </div>
 </div>
+
+<script>
+(function () {
+  var container = document.getElementById('periodCards');
+  var buttons = document.querySelectorAll('.schedule-view-toggle button');
+  if (!buttons.length) return;
+  var KEY = 'scheduleView:member';
+  function apply(view) {
+    if (container) container.classList.toggle('is-list', view === 'list');
+    buttons.forEach(function (b) { b.classList.toggle('is-active', b.dataset.view === view); });
+    try { localStorage.setItem(KEY, view); } catch (e) {}
+  }
+  buttons.forEach(function (b) { b.addEventListener('click', function () { apply(b.dataset.view); }); });
+  var saved = 'grid';
+  try { saved = localStorage.getItem(KEY) || 'grid'; } catch (e) {}
+  apply(saved);
+})();
+</script>
 
 <%- include('../partials/footer') %>

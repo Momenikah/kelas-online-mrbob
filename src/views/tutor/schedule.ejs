@@ -6,104 +6,163 @@
   <div class="sub-banner">
     <a href="/tutor" class="back-link"><i class="fas fa-arrow-left"></i></a>
     <h1>Jadwal Mengajar</h1>
-    <button class="btn btn-light" onclick="toggleModal('scheduleModal')">
-      <i class="fas fa-plus"></i> Tambah Jadwal
-    </button>
+    <span class="schedule-managed-note"><i class="fas fa-circle-info"></i> Jadwal dibuat oleh admin</span>
   </div>
 
   <div class="container">
-    <% if (schedules.length === 0) { %>
-      <div class="empty-state"><i class="fas fa-calendar-times"></i><p>Belum ada jadwal.</p></div>
+    <!-- Filter + view toggle -->
+    <div class="section-card">
+      <div class="schedule-toolbar">
+        <form method="GET" action="/tutor/schedule" class="schedule-filter">
+          <div class="schedule-filter-field">
+            <label><i class="far fa-calendar-alt"></i> Periode</label>
+            <select name="period" class="form-input" onchange="this.form.submit()">
+              <option value="">Semua Periode</option>
+              <% periods.forEach(p => { %>
+                <option value="<%= p.value %>" <%= filters.period === p.value ? 'selected' : '' %>><%= p.label %></option>
+              <% }) %>
+            </select>
+          </div>
+          <% if (filters.period) { %>
+            <a href="/tutor/schedule" class="btn btn-outline schedule-filter-reset"><i class="fas fa-rotate-left"></i> Reset</a>
+          <% } %>
+        </form>
+        <div class="schedule-view-toggle" role="group" aria-label="Pilih tampilan">
+          <button type="button" data-view="grid" class="is-active" title="Tampilan grid"><i class="fas fa-table-cells-large"></i></button>
+          <button type="button" data-view="list" title="Tampilan list"><i class="fas fa-list"></i></button>
+        </div>
+      </div>
+      <p class="schedule-filter-note"><i class="fas fa-circle-info"></i> Jadwal dikelompokkan per periode. Presensi &amp; detail tiap sesi ada di halaman <a href="/tutor/presence">Presensi</a>.</p>
+    </div>
+
+    <%
+      // WhatsApp reminder link toward a member for the nearest session in a period.
+      function waReminderHref(phone, lines) {
+        const digits = String(phone || '').replace(/\D/g, '');
+        let p = digits;
+        if (p.startsWith('0')) p = '62' + p.slice(1);
+        else if (p.startsWith('8')) p = '62' + p;
+        const text = encodeURIComponent(lines.filter(Boolean).join('\n'));
+        return p ? `https://wa.me/${p}?text=${text}` : `https://api.whatsapp.com/send?text=${text}`;
+      }
+    %>
+
+    <% if (periodGroups.length === 0) { %>
+      <div class="empty-state"><i class="fas fa-calendar-times"></i><p><%= filters.period ? 'Tidak ada jadwal pada periode ini.' : 'Belum ada jadwal.' %></p></div>
     <% } else { %>
-      <div class="table-wrapper">
-        <table class="data-table">
-          <thead>
-            <tr><th>Tanggal</th><th>Judul Sesi</th><th>Program</th><th>Waktu</th><th>Peserta</th><th>Status</th><th>Aksi</th></tr>
-          </thead>
-          <tbody>
-            <% schedules.forEach(s => { %>
-            <tr>
-              <td><%= formatDate(s.date) %></td>
-              <td><strong><%= s.title %></strong></td>
-              <td><%= s.program_name %></td>
-              <td><%= formatTime(s.start_time) %> - <%= formatTime(s.end_time) %></td>
-              <td><i class="fas fa-users"></i> <%= s.present_count %>/<%= s.registered_count %></td>
-              <td>
-                <span class="badge-pill badge-<%= s.status %>">
-                  <%= s.status === 'upcoming' ? 'Akan Datang' : s.status === 'completed' ? 'Selesai' : 'Dibatalkan' %>
-                </span>
-              </td>
-              <td class="td-actions">
-                <a href="/tutor/presence?schedule_id=<%= s.id %>" class="btn btn-sm btn-outline">
-                  <i class="fas fa-user-check"></i> Presensi
-                </a>
-                <form action="/tutor/schedule/<%= s.id %>/delete" method="POST" style="display:inline" onsubmit="return confirm('Hapus jadwal ini?')">
-                  <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
-                </form>
-              </td>
-            </tr>
-            <% }) %>
-          </tbody>
-        </table>
+      <div class="period-cards" id="periodCards">
+        <% periodGroups.forEach(g => { %>
+        <div class="period-card <%= g.status %>">
+          <div class="period-card-header">
+            <div class="period-range">
+              <span class="period-range-icon"><i class="fas fa-calendar-week"></i></span>
+              <div>
+                <span class="period-range-kicker">Periode</span>
+                <strong class="period-range-label"><%= g.label %></strong>
+              </div>
+            </div>
+            <% if (g.status === 'completed') { %>
+              <span class="badge-pill badge-completed"><i class="fas fa-check"></i> Selesai</span>
+            <% } else if (g.status === 'cancelled') { %>
+              <span class="badge-pill badge-cancelled"><i class="fas fa-times"></i> Dibatalkan</span>
+            <% } else { %>
+              <span class="badge-pill badge-upcoming"><i class="fas fa-clock"></i> Akan Datang</span>
+            <% } %>
+          </div>
+
+          <div class="period-card-body">
+            <div class="period-meta">
+              <span><i class="fas fa-book"></i> <%= g.programs.join(', ') || '-' %></span>
+              <% if (g.location) { %><span><i class="fas fa-map-marker-alt"></i> <%= g.location %></span><% } %>
+            </div>
+
+            <div class="period-stats">
+              <div class="period-stat">
+                <span class="period-stat-value"><%= g.counts.total %></span>
+                <span class="period-stat-label">Sesi</span>
+              </div>
+              <div class="period-stat">
+                <span class="period-stat-value"><%= g.members.length %></span>
+                <span class="period-stat-label">Peserta</span>
+              </div>
+              <div class="period-stat period-stat-ok">
+                <span class="period-stat-value"><%= g.present_total %></span>
+                <span class="period-stat-label">Hadir</span>
+              </div>
+              <div class="period-stat">
+                <span class="period-stat-value"><%= g.counts.upcoming %></span>
+                <span class="period-stat-label">Akan Datang</span>
+              </div>
+            </div>
+
+            <% if (g.next) { %>
+            <div class="period-next">
+              <i class="fas fa-arrow-right"></i>
+              <span>Sesi terdekat: <strong><%= formatDate(g.next.date) %></strong> · <%= formatTime(g.next.start_time) %> - <%= formatTime(g.next.end_time) %></span>
+            </div>
+            <% } %>
+
+            <% if (g.members.length) { %>
+            <div class="period-members">
+              <span class="period-members-title"><i class="fas fa-user-group"></i> Peserta</span>
+              <div class="period-member-chips">
+                <% g.members.forEach(m => { %>
+                  <div class="period-member-chip">
+                    <span><%= m.name %></span>
+                    <% if (g.next && m.phone) {
+                         const waHref = waReminderHref(m.phone, [
+                           `Halo ${m.name}, mengingatkan jadwal kelas kamu 📣`,
+                           `📚 ${g.programs.join(', ') || 'Kelas'}`,
+                           `🗓️ ${formatDate(g.next.date)}`,
+                           `⏰ ${formatTime(g.next.start_time)} - ${formatTime(g.next.end_time)} WIB`,
+                           `👨‍🏫 Tutor: ${user.name}`,
+                           g.location ? `📍 ${g.location}` : '',
+                           g.next.meeting_link ? `🔗 Link kelas: ${g.next.meeting_link}` : '',
+                           `Mohon hadir tepat waktu ya 🙏`
+                         ]);
+                    %>
+                      <a href="<%= waHref %>" target="_blank" rel="noopener" class="wa-followup-btn" title="Follow up via WhatsApp"><i class="fab fa-whatsapp"></i></a>
+                    <% } else if (!m.phone) { %>
+                      <span class="wa-followup-missing" title="Nomor WhatsApp belum tersedia"><i class="fas fa-phone-slash"></i></span>
+                    <% } %>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+            <% } %>
+          </div>
+
+          <div class="period-card-footer">
+            <a href="/tutor/presence?schedule_id=<%= g.presence_session_id %>" class="btn btn-primary btn-sm period-btn-main"><i class="fas fa-user-check"></i> Kelola Presensi</a>
+            <% if (g.next && g.next.meeting_link) { %>
+            <div class="period-actions">
+              <a href="<%= g.next.meeting_link %>" target="_blank" rel="noopener" class="btn btn-outline btn-sm"><i class="fas fa-video"></i> Join Meeting</a>
+            </div>
+            <% } %>
+          </div>
+        </div>
+        <% }) %>
       </div>
     <% } %>
   </div>
-
-  <!-- Add Schedule Modal -->
-  <div class="modal" id="scheduleModal" style="display:none">
-    <div class="modal-overlay" onclick="toggleModal('scheduleModal')"></div>
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>Tambah Jadwal Baru</h3>
-        <button class="modal-close" onclick="toggleModal('scheduleModal')"><i class="fas fa-times"></i></button>
-      </div>
-      <form action="/tutor/schedule" method="POST" class="modal-form">
-        <div class="form-group">
-          <label class="form-label">Program</label>
-          <select name="program_id" class="form-input" required>
-            <option value="">-- Pilih Program --</option>
-            <% programs.forEach(p => { %><option value="<%= p.id %>"><%= p.name %></option><% }) %>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Judul Sesi</label>
-          <input type="text" name="title" class="form-input" placeholder="Contoh: Sesi Listening TOEFL" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Deskripsi</label>
-          <textarea name="description" class="form-textarea" rows="2" placeholder="Deskripsi sesi..."></textarea>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Tanggal</label>
-            <input type="date" name="date" class="form-input" required>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Mulai</label>
-            <input type="time" name="start_time" class="form-input" required>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Selesai</label>
-            <input type="time" name="end_time" class="form-input" required>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Lokasi</label>
-            <input type="text" name="location" class="form-input" placeholder="Contoh: Online via Zoom">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Link Meeting</label>
-            <input type="url" name="meeting_link" class="form-input" placeholder="https://zoom.us/...">
-          </div>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn btn-outline" onclick="toggleModal('scheduleModal')">Batal</button>
-          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan</button>
-        </div>
-      </form>
-    </div>
-  </div>
 </div>
+
+<script>
+(function () {
+  var container = document.getElementById('periodCards');
+  var buttons = document.querySelectorAll('.schedule-view-toggle button');
+  if (!buttons.length) return;
+  var KEY = 'scheduleView:tutor';
+  function apply(view) {
+    if (container) container.classList.toggle('is-list', view === 'list');
+    buttons.forEach(function (b) { b.classList.toggle('is-active', b.dataset.view === view); });
+    try { localStorage.setItem(KEY, view); } catch (e) {}
+  }
+  buttons.forEach(function (b) { b.addEventListener('click', function () { apply(b.dataset.view); }); });
+  var saved = 'grid';
+  try { saved = localStorage.getItem(KEY) || 'grid'; } catch (e) {}
+  apply(saved);
+})();
+</script>
 
 <%- include('../partials/footer') %>

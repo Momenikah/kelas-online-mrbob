@@ -1,0 +1,188 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'admin' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/admin" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <div class="sub-banner-titles">
+      <h1>Plot Jadwal</h1>
+      <p class="sub-banner-desc">Buat sesi otomatis dari available time tutor.</p>
+    </div>
+    <div class="sub-banner-actions">
+      <a href="/admin/schedule-import" class="btn btn-light"><i class="fas fa-file-csv"></i> Import CSV</a>
+      <a href="/admin/schedule" class="btn btn-light"><i class="fas fa-calendar-days"></i> Kelola Jadwal</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Step 1: pick tutor + period -->
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-filter"></i> Pilih Tutor &amp; Periode</h3>
+      <form method="GET" action="/admin/schedule-plot" class="filter-form" id="pickForm">
+        <select name="tutor_id" class="form-input" onchange="document.getElementById('pickForm').submit()">
+          <option value="">-- Pilih Tutor --</option>
+          <% tutors.forEach(t => { %>
+          <option value="<%= t.id %>" <%= selectedTutorId === t.id ? 'selected' : '' %>><%= t.name %></option>
+          <% }) %>
+        </select>
+        <% if (selectedTutorId) { %>
+        <select name="period" class="form-input" onchange="document.getElementById('pickForm').submit()">
+          <option value="">-- Pilih Periode (Minggu) --</option>
+          <% tutorPeriods.forEach(p => { %>
+          <option value="<%= p.value %>" <%= period === p.value ? 'selected' : '' %>><%= p.label %></option>
+          <% }) %>
+        </select>
+        <% } %>
+      </form>
+      <% if (selectedTutorId && tutorPeriods.length === 0) { %>
+        <p class="field-hint" style="margin-top:10px"><i class="fas fa-circle-info"></i> Tutor ini belum mengisi available time. Minta tutor mengisinya dulu di menu Available Time.</p>
+      <% } %>
+    </div>
+
+    <!-- Step 2: candidates + plot form -->
+    <% if (selectedTutorId && period) { %>
+      <% if (candidates.length === 0) { %>
+        <div class="section-card"><div class="empty-state"><i class="fas fa-calendar-xmark"></i><p>Tidak ada slot available pada periode ini.</p></div></div>
+      <% } else { %>
+      <form method="POST" action="/admin/schedule-plot" class="section-card" id="plotForm">
+        <input type="hidden" name="tutor_id" value="<%= selectedTutorId %>">
+        <input type="hidden" name="period" value="<%= period %>">
+
+        <h3 class="section-title"><i class="fas fa-calendar-plus"></i> Slot Tersedia — <%= selectedTutor ? selectedTutor.name : '' %></h3>
+        <p class="field-hint">Centang slot yang akan dijadikan sesi.</p>
+
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:42px"><input type="checkbox" id="checkAll" title="Pilih semua"></th>
+                <th>Tanggal</th><th>Hari</th><th>Waktu</th><th>Kategori</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% candidates.forEach(c => { %>
+              <tr class="<%= c.exists ? 'is-off' : '' %>">
+                <td>
+                  <input type="checkbox" name="candidates[]" value="<%= c.value %>" class="cand-check" <%= c.exists ? 'disabled' : '' %>>
+                </td>
+                <td><strong><%= formatDate(c.date) %></strong></td>
+                <td><%= c.dayName %></td>
+                <td><%= c.start_time %> - <%= c.end_time %></td>
+                <td>
+                  <span class="cat-badge cat-<%= c.category %>"><%= c.category %></span>
+                  <% if (c.exists) { %><span class="badge-pill badge-completed">sudah dijadwalkan</span><% } %>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="form-row" style="margin-top:16px">
+          <div class="form-group">
+            <label class="form-label">Program <span class="req">*</span></label>
+            <select name="program_id" class="form-input" required>
+              <option value="">-- Pilih Program --</option>
+              <% programs.forEach(p => { %><option value="<%= p.id %>"><%= p.name %></option><% }) %>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Judul Sesi (opsional)</label>
+            <input type="text" name="title_prefix" class="form-input" placeholder="Kosongkan = otomatis dari program + tanggal">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Lokasi (opsional)</label>
+            <input type="text" name="location" class="form-input" placeholder="Contoh: Online via Zoom">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Link Meeting / Zoom (opsional)</label>
+            <input type="url" name="meeting_link" class="form-input" placeholder="https://zoom.us/...">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Peserta (Member)</label>
+          <p class="field-hint">Pilih member yang masuk ke sesi-sesi ini. Bisa dikosongkan dan ditambah nanti.</p>
+          <input type="text" class="form-input" id="memberFilter" placeholder="Cari member..." style="margin-bottom:10px">
+          <% if (members.length === 0) { %>
+            <p class="field-hint">Belum ada member aktif.</p>
+          <% } else { %>
+          <div class="member-pick">
+            <% members.forEach(m => { %>
+            <label class="member-pick-item" data-name="<%= m.name.toLowerCase() %> <%= m.email.toLowerCase() %>">
+              <input type="checkbox" name="member_ids[]" value="<%= m.id %>">
+              <span><strong><%= m.name %></strong><small><%= m.email %></small></span>
+            </label>
+            <% }) %>
+          </div>
+          <% } %>
+        </div>
+
+        <p class="plot-integration-note"><i class="fas fa-circle-info"></i> Setelah generate: sesi dibuat, peserta terhubung + presensi disiapkan, notifikasi &amp; email terkirim, dan tersinkron ke Google Sheet.</p>
+        <div class="form-actions plot-actions">
+          <div class="plot-selection-summary" id="plotSummary">
+            <span><i class="fas fa-square-check"></i> <strong id="slotCount">0</strong> slot</span>
+            <span><i class="fas fa-users"></i> <strong id="memberCount">0</strong> peserta</span>
+          </div>
+          <div class="plot-actions-btns">
+            <a href="/admin/schedule-plot?tutor_id=<%= selectedTutorId %>&period=<%= period %>" class="btn btn-outline">Reset</a>
+            <button type="submit" class="btn btn-primary" id="plotSubmit"><i class="fas fa-bolt"></i> Generate Jadwal</button>
+          </div>
+        </div>
+      </form>
+      <% } %>
+    <% } %>
+  </div>
+</div>
+
+<script>
+(function () {
+  var slotCountEl = document.getElementById('slotCount');
+  var memberCountEl = document.getElementById('memberCount');
+  var submitBtn = document.getElementById('plotSubmit');
+  function refreshCounts() {
+    var slots = document.querySelectorAll('.cand-check:checked').length;
+    if (slotCountEl) slotCountEl.textContent = slots;
+    if (memberCountEl) memberCountEl.textContent = document.querySelectorAll('input[name="member_ids[]"]:checked').length;
+    if (submitBtn) {
+      submitBtn.disabled = slots === 0;
+      submitBtn.classList.toggle('is-disabled', slots === 0);
+    }
+  }
+
+  var checkAll = document.getElementById('checkAll');
+  if (checkAll) {
+    checkAll.addEventListener('change', function () {
+      document.querySelectorAll('.cand-check:not(:disabled)').forEach(function (c) { c.checked = checkAll.checked; });
+      refreshCounts();
+    });
+  }
+  document.querySelectorAll('.cand-check, input[name="member_ids[]"]').forEach(function (c) {
+    c.addEventListener('change', refreshCounts);
+  });
+  refreshCounts();
+
+  var filter = document.getElementById('memberFilter');
+  if (filter) {
+    filter.addEventListener('input', function () {
+      var q = filter.value.trim().toLowerCase();
+      document.querySelectorAll('.member-pick-item').forEach(function (el) {
+        el.style.display = el.dataset.name.indexOf(q) !== -1 ? '' : 'none';
+      });
+    });
+  }
+
+  var plotForm = document.getElementById('plotForm');
+  if (plotForm) {
+    plotForm.addEventListener('submit', function (e) {
+      var any = plotForm.querySelector('.cand-check:checked');
+      if (!any) { e.preventDefault(); alert('Centang minimal satu slot untuk dijadikan sesi.'); }
+    });
+  }
+})();
+</script>
+
+<%- include('../partials/footer') %>

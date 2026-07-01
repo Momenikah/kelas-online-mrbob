@@ -1,40 +1,177 @@
 <%- include('../partials/head') %>
 <%- include('../partials/navbar', { activeNav: 'admin' }) %>
 
+<% const isoDate = (d) => { if (!d) return ''; const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; }; %>
+<% const statusBadge = (s) => s === 'active' ? 'badge-active' : (s === 'expired' ? 'badge-expired' : 'badge-suspended'); %>
+
 <div class="page-wrapper">
   <%- include('../partials/flash') %>
   <div class="sub-banner">
     <a href="/admin" class="back-link"><i class="fas fa-arrow-left"></i></a>
     <h1>Kelola Enrollment</h1>
-    <button class="btn btn-light" onclick="toggleModal('enrollModal')">
+    <button class="btn btn-light" onclick="openCreateEnroll()">
       <i class="fas fa-plus"></i> Tambah Enrollment
     </button>
   </div>
 
   <div class="container">
+    <!-- Summary stats -->
+    <div class="at-stats">
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--brand-600)"><i class="fas fa-id-card"></i></span>
+        <div><strong><%= stats.total %></strong><small>Total enrollment</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--success)"><i class="fas fa-circle-check"></i></span>
+        <div><strong><%= stats.active %></strong><small>Aktif</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:#D97706"><i class="fas fa-pause-circle"></i></span>
+        <div><strong><%= stats.suspended %></strong><small>Suspended</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--danger)"><i class="fas fa-hourglass-end"></i></span>
+        <div><strong><%= stats.expired %></strong><small>Expired</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--info)"><i class="fas fa-user-graduate"></i></span>
+        <div><strong><%= stats.members %></strong><small>Member terdaftar</small></div>
+      </div>
+    </div>
+
     <div class="section-card">
+      <div class="renewal-section-head">
+        <div>
+          <p>Request Renewal</p>
+          <h2>Pengajuan dari Member</h2>
+        </div>
+        <span class="renewal-count"><%= renewalRequests.length %> request aktif</span>
+      </div>
+      <% if (!renewalRequests || renewalRequests.length === 0) { %>
+        <div class="empty-state renewal-empty"><i class="fas fa-inbox"></i><p>Belum ada request renewal yang perlu diproses.</p></div>
+      <% } else { %>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Member</th><th>Program</th><th>Jenis</th><th>Mulai</th><th>Jam</th><th>Kontak</th><th>Bukti</th><th>Status</th><th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% renewalRequests.forEach(r => { %>
+                <tr>
+                  <td><strong><%= r.member_name %></strong><br><small><%= r.email %></small></td>
+                  <td><%= r.program_name %><br><small><%= formatCurrency(r.package_price || 0) %></small></td>
+                  <td><%= r.request_type === 'new_program' ? 'Program baru' : 'Renewal' %></td>
+                  <td><%= formatDate(r.preferred_start_date) %></td>
+                  <td><%= r.study_time || '-' %></td>
+                  <td><%= r.phone || '-' %></td>
+                  <td>
+                    <% if (r.transfer_proof) { %>
+                      <a href="<%= r.transfer_proof %>" target="_blank" rel="noopener" class="btn btn-sm btn-outline">Lihat</a>
+                    <% } else { %>
+                      -
+                    <% } %>
+                  </td>
+                  <td><span class="badge-pill badge-renewal-<%= r.status %>"><%= r.status %></span></td>
+                  <td>
+                    <% if (r.status === 'pending') { %>
+                      <div class="renewal-admin-actions">
+                        <form action="/admin/enrollments/renewal-requests/<%= r.id %>" method="POST" class="renewal-admin-actions"
+                              data-confirm="Setujui request renewal <%= r.member_name %> - <%= r.program_name %>?">
+                          <input type="hidden" name="action" value="approve">
+                          <input type="date" name="start_date" class="form-input" value="<%= isoDate(r.preferred_start_date) %>" title="Tanggal mulai">
+                          <input type="date" name="end_date" class="form-input" title="Tanggal selesai opsional">
+                          <button class="btn btn-sm btn-primary">Approve</button>
+                        </form>
+                        <form action="/admin/enrollments/renewal-requests/<%= r.id %>" method="POST"
+                              data-confirm="Tolak request renewal ini?">
+                          <input type="hidden" name="action" value="rejected">
+                          <button class="btn btn-sm btn-outline">Reject</button>
+                        </form>
+                      </div>
+                    <% } else { %>
+                      <small>Diproses <%= r.processed_at ? formatDate(r.processed_at) : '-' %></small>
+                    <% } %>
+                  </td>
+                </tr>
+                <% if (r.notes) { %>
+                  <tr class="is-note-row">
+                    <td colspan="9"><small><strong>Catatan member:</strong> <%= r.notes %></small></td>
+                  </tr>
+                <% } %>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="section-card">
+      <form method="GET" action="/admin/enrollments" class="filter-form">
+        <input type="text" name="search" class="form-input" placeholder="Cari nama / email member..." value="<%= filters.search || '' %>">
+        <select name="program_id" class="form-input">
+          <option value="">Semua Program</option>
+          <% programs.forEach(p => { %><option value="<%= p.id %>" <%= String(filters.programId) === String(p.id) ? 'selected' : '' %>><%= p.name %></option><% }) %>
+        </select>
+        <select name="status" class="form-input">
+          <option value="">Semua Status</option>
+          <option value="active" <%= filters.status === 'active' ? 'selected' : '' %>>Active</option>
+          <option value="suspended" <%= filters.status === 'suspended' ? 'selected' : '' %>>Suspended</option>
+          <option value="expired" <%= filters.status === 'expired' ? 'selected' : '' %>>Expired</option>
+        </select>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Cari</button>
+        <a href="/admin/enrollments" class="btn btn-outline">Reset</a>
+      </form>
+    </div>
+
+    <div class="section-card">
+      <div class="list-meta"><span><i class="fas fa-list"></i> <%= enrollments.length %> enrollment</span></div>
+      <% if (enrollments.length === 0) { %>
+        <div class="empty-state"><i class="fas fa-id-card"></i><p>Tidak ada enrollment yang cocok.</p></div>
+      <% } else { %>
       <div class="table-wrapper">
         <table class="data-table">
           <thead>
-            <tr><th>Member</th><th>Email</th><th>Program</th><th>Mulai</th><th>Berakhir</th><th>Status</th></tr>
+            <tr><th>Member</th><th>Email</th><th>Program</th><th>Mulai</th><th>Berakhir</th><th>Status</th><th>Aksi</th></tr>
           </thead>
           <tbody>
             <% enrollments.forEach(e => { %>
-            <tr>
-              <td><%= e.member_name %></td>
+            <tr class="<%= e.status === 'active' ? '' : 'is-off' %>">
+              <td><strong><%= e.member_name %></strong></td>
               <td><%= e.email %></td>
               <td><%= e.program_name %></td>
               <td><%= formatDate(e.start_date) %></td>
               <td><%= formatDate(e.end_date) %></td>
-              <td><span class="badge-pill badge-<%= e.status %>"><%= e.status %></span></td>
+              <td><span class="badge-pill <%= statusBadge(e.status) %>"><%= e.status %></span></td>
+              <td>
+                <div class="row-actions">
+                  <button type="button" class="btn-icon btn-edit-icon" title="Edit"
+                    data-edit-enroll
+                    data-id="<%= e.id %>"
+                    data-member="<%= e.member_name %> (<%= e.email %>)"
+                    data-program="<%= e.program_name %>"
+                    data-start="<%= isoDate(e.start_date) %>"
+                    data-end="<%= isoDate(e.end_date) %>"
+                    data-status="<%= e.status %>">
+                    <i class="fas fa-pen"></i>
+                  </button>
+                  <form action="/admin/enrollments/<%= e.id %>/delete" method="POST" style="display:inline"
+                        data-confirm="Hapus enrollment <%= e.member_name %> - <%= e.program_name %>?">
+                    <button class="btn-icon btn-danger-icon" title="Hapus"><i class="fas fa-trash"></i></button>
+                  </form>
+                </div>
+              </td>
             </tr>
             <% }) %>
           </tbody>
         </table>
       </div>
+      <% } %>
     </div>
   </div>
 
+  <!-- Create modal -->
   <div class="modal" id="enrollModal" style="display:none">
     <div class="modal-overlay" onclick="toggleModal('enrollModal')"></div>
     <div class="modal-content">
@@ -67,6 +204,14 @@
             <input type="date" name="end_date" class="form-input" required>
           </div>
         </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-input">
+            <option value="active">Active</option>
+            <option value="suspended">Suspended</option>
+            <option value="expired">Expired</option>
+          </select>
+        </div>
         <div class="form-actions">
           <button type="button" class="btn btn-outline" onclick="toggleModal('enrollModal')">Batal</button>
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan</button>
@@ -74,6 +219,71 @@
       </form>
     </div>
   </div>
+
+  <!-- Edit modal -->
+  <div class="modal" id="editEnrollModal" style="display:none">
+    <div class="modal-overlay" onclick="toggleModal('editEnrollModal')"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Edit Enrollment</h3>
+        <button class="modal-close" onclick="toggleModal('editEnrollModal')"><i class="fas fa-times"></i></button>
+      </div>
+      <form id="editEnrollForm" method="POST" class="modal-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Member</label>
+            <input type="text" class="form-input ff-read-only" id="editEnrollMember" readonly>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Program</label>
+            <input type="text" class="form-input ff-read-only" id="editEnrollProgram" readonly>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Mulai</label>
+            <input type="date" name="start_date" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Berakhir</label>
+            <input type="date" name="end_date" class="form-input" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-input">
+            <option value="active">Active</option>
+            <option value="suspended">Suspended</option>
+            <option value="expired">Expired</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" onclick="toggleModal('editEnrollModal')">Batal</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan Perubahan</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
+
+<script>
+(function () {
+  window.openCreateEnroll = function () { toggleModal('enrollModal'); };
+
+  var form = document.getElementById('editEnrollForm');
+  document.querySelectorAll('[data-edit-enroll]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var d = btn.dataset;
+      form.action = '/admin/enrollments/' + d.id;
+      document.getElementById('editEnrollMember').value = d.member || '';
+      document.getElementById('editEnrollProgram').value = d.program || '';
+      form.querySelector('[name="start_date"]').value = d.start || '';
+      form.querySelector('[name="end_date"]').value = d.end || '';
+      form.querySelector('[name="status"]').value = d.status || 'active';
+      toggleModal('editEnrollModal');
+    });
+  });
+})();
+</script>
 
 <%- include('../partials/footer') %>

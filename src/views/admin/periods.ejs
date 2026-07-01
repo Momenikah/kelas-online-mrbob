@@ -1,0 +1,106 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'admin' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/admin" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Kelola Periode</h1>
+    <button class="btn btn-light" onclick="toggleModal('periodModal')">
+      <i class="fas fa-plus"></i> Tambah Periode
+    </button>
+  </div>
+
+  <div class="container">
+    <!-- Summary stats -->
+    <div class="at-stats">
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--brand-600)"><i class="fas fa-calendar-week"></i></span>
+        <div><strong><%= stats.total %></strong><small>Total periode</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--success)"><i class="fas fa-lock-open"></i></span>
+        <div><strong><%= stats.open %></strong><small>Dibuka</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--info)"><i class="fas fa-forward"></i></span>
+        <div><strong><%= stats.upcoming %></strong><small>Akan datang</small></div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <p class="field-hint" style="margin-top:0"><i class="fas fa-circle-info"></i> Tutor hanya bisa mengisi <strong>Available Time</strong> pada periode yang berstatus <strong>Dibuka</strong>.</p>
+      <% if (periods.length === 0) { %>
+        <div class="empty-state"><i class="fas fa-calendar-week"></i><p>Belum ada periode.</p></div>
+      <% } else { %>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr><th>Periode (Minggu)</th><th>Status</th><th>Tutor Isi</th><th>Slot</th><th>Jadwal</th><th>Aksi</th></tr>
+          </thead>
+          <tbody>
+            <% periods.forEach(p => { %>
+            <tr class="<%= p.is_open ? '' : 'is-off' %>">
+              <td><strong><i class="far fa-calendar"></i> <%= p.label %></strong></td>
+              <td>
+                <span class="badge-pill <%= p.is_open ? 'badge-completed' : 'badge-cancelled' %>">
+                  <%= p.is_open ? 'Dibuka' : 'Ditutup' %>
+                </span>
+              </td>
+              <td><i class="fas fa-chalkboard-teacher"></i> <%= p.tutor_count %></td>
+              <td><%= p.slot_count %></td>
+              <td><%= p.session_count %></td>
+              <td>
+                <div class="row-actions">
+                  <a href="/admin/schedule-plot?period=<%= p.iso %>" class="btn-icon" title="Plot jadwal periode ini"><i class="fas fa-calendar-plus"></i></a>
+                  <form action="/admin/periods/<%= p.id %>/toggle" method="POST" style="display:inline">
+                    <button class="btn-icon" title="<%= p.is_open ? 'Tutup periode' : 'Buka periode' %>">
+                      <i class="fas fa-<%= p.is_open ? 'lock' : 'lock-open' %>"></i>
+                    </button>
+                  </form>
+                  <form action="/admin/periods/<%= p.id %>/delete" method="POST" style="display:inline"
+                        data-confirm="Hapus periode <%= p.label %>? (slot available time yang sudah ada tidak ikut terhapus)">
+                    <button class="btn-icon btn-danger-icon" title="Hapus"><i class="fas fa-trash"></i></button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- Add period modal -->
+  <div class="modal" id="periodModal" style="display:none">
+    <div class="modal-overlay" onclick="toggleModal('periodModal')"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Tambah Periode</h3>
+        <button class="modal-close" onclick="toggleModal('periodModal')"><i class="fas fa-times"></i></button>
+      </div>
+      <form action="/admin/periods" method="POST" class="modal-form">
+        <div class="form-group">
+          <label class="form-label">Tanggal Mulai (akan disesuaikan ke Senin)</label>
+          <input type="date" name="period_start" class="form-input" value="<%= defaultStart %>" required>
+          <p class="field-hint">Periode dihitung per minggu (Senin–Minggu).</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Label (opsional)</label>
+          <input type="text" name="label" class="form-input" placeholder="Kosongkan = otomatis dari tanggal">
+        </div>
+        <div class="form-group">
+          <label class="check-inline"><input type="checkbox" name="is_open" checked> Buka untuk pengisian available time</label>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" onclick="toggleModal('periodModal')">Batal</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,82 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'admin' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/admin" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Presensi Member</h1>
+    <p class="sub-banner-desc">Bukti kehadiran yang dikirim member (hanya lihat).</p>
+  </div>
+
+  <div class="container">
+    <!-- Stats -->
+    <div class="at-stats">
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--brand-600)"><i class="fas fa-camera"></i></span>
+        <div><strong><%= stats.total %></strong><small>Total presensi</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--info)"><i class="fas fa-users"></i></span>
+        <div><strong><%= stats.members %></strong><small>Member mengirim</small></div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <form method="GET" action="/admin/member-presence" class="filter-form">
+        <select name="tutor_id" class="form-input">
+          <option value="">Semua Tutor</option>
+          <% tutors.forEach(t => { %><option value="<%= t.id %>" <%= String(filters.tutorId) === String(t.id) ? 'selected' : '' %>><%= t.name %></option><% }) %>
+        </select>
+        <select name="program_id" class="form-input">
+          <option value="">Semua Program</option>
+          <% programs.forEach(p => { %><option value="<%= p.id %>" <%= String(filters.programId) === String(p.id) ? 'selected' : '' %>><%= p.name %></option><% }) %>
+        </select>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Filter</button>
+        <a href="/admin/member-presence" class="btn btn-outline">Reset</a>
+      </form>
+    </div>
+
+    <div class="section-card">
+      <div class="list-meta"><span><i class="fas fa-list"></i> <%= submissions.length %> presensi</span></div>
+      <% if (submissions.length === 0) { %>
+        <div class="empty-state"><i class="fas fa-user-check"></i><p>Tidak ada presensi yang cocok.</p></div>
+      <% } else { %>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr><th>Dikirim</th><th>Member</th><th>Tutor</th><th>Periode</th><th>Program</th><th>Meeting</th><th>Bukti</th></tr>
+          </thead>
+          <tbody>
+            <% submissions.forEach(s => { %>
+            <tr>
+              <td><%= formatDate(s.created_at) %></td>
+              <td>
+                <div class="member-name-cell">
+                  <% if (s.member_photo) { %><img src="<%= s.member_photo %>" class="table-avatar">
+                  <% } else { %><div class="table-avatar-init"><%= getInitials(s.member_name) %></div><% } %>
+                  <%= s.member_name %>
+                </div>
+              </td>
+              <td><%= s.tutor_name || '-' %></td>
+              <td><%= s.period_label %></td>
+              <td><%= s.program_name || '-' %></td>
+              <td><span class="badge-pill badge-completed">#<%= s.meeting_number %></span></td>
+              <td>
+                <% if (s.screenshot) { %>
+                  <a href="<%= s.screenshot %>" target="_blank" rel="noopener" class="proof-link">
+                    <img src="<%= s.screenshot %>" alt="bukti" class="proof-mini">
+                  </a>
+                <% } else { %>-<% } %>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,67 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'admin' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+
+  <div class="sub-banner">
+    <a href="/admin" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Sertifikat</h1>
+    <p class="sub-banner-desc">Admin hanya melihat sertifikat yang diterbitkan tutor.</p>
+  </div>
+
+  <div class="container">
+    <div class="at-stats">
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:#D97706"><i class="fas fa-award"></i></span>
+        <div><strong><%= stats.total %></strong><small>Total sertifikat</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--success)"><i class="fas fa-check-circle"></i></span>
+        <div><strong><%= stats.active %></strong><small>Aktif</small></div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <form method="GET" action="/admin/certificate" class="filter-form">
+        <input type="text" name="search" class="form-input" placeholder="Cari member / program / nomor sertifikat..." value="<%= filters.search || '' %>">
+        <button class="btn btn-primary"><i class="fas fa-search"></i> Cari</button>
+        <a href="/admin/certificate" class="btn btn-outline">Reset</a>
+      </form>
+    </div>
+
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-award"></i> Sertifikat Diterbitkan</h3>
+      <% if (certificates.length === 0) { %>
+        <div class="empty-state"><i class="fas fa-award"></i><p>Belum ada sertifikat.</p></div>
+      <% } else { %>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead><tr><th>Nomor</th><th>Member</th><th>Program</th><th>Kategori</th><th>Grade</th><th>Tanggal</th><th>Status</th><th>Aksi</th></tr></thead>
+            <tbody>
+              <% certificates.forEach(c => { %>
+                <% const d = c.details || {}; %>
+                <tr>
+                  <td><%= c.certificate_number %></td>
+                  <td><strong><%= c.member_name %></strong></td>
+                  <td><%= c.program_name %></td>
+                  <td><%= d.category || '-' %></td>
+                  <td><%= d.grade || '-' %></td>
+                  <td><%= formatDate(c.issued_date) %></td>
+                  <td><span class="badge-pill badge-<%= c.is_active ? 'completed' : 'cancelled' %>"><%= c.is_active ? 'Aktif' : 'Nonaktif' %></span></td>
+                  <td>
+                    <a class="btn btn-outline btn-sm" href="/admin/certificate/<%= c.id %>/print" target="_blank" rel="noopener">
+                      <i class="fas fa-eye"></i> Lihat
+                    </a>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

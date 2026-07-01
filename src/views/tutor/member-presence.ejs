@@ -1,0 +1,54 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'tutor' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/tutor" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1>Presensi Member</h1>
+    <p class="sub-banner-desc">Bukti kehadiran yang dikirim member ke kelas Anda.</p>
+  </div>
+
+  <div class="container">
+    <div class="section-card">
+      <div class="list-meta"><span><i class="fas fa-list"></i> <%= submissions.length %> presensi</span></div>
+      <% if (submissions.length === 0) { %>
+        <div class="empty-state"><i class="fas fa-user-check"></i><p>Belum ada presensi dari member.</p></div>
+      <% } else { %>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr><th>Dikirim</th><th>Member</th><th>Periode</th><th>Program</th><th>Meeting</th><th>Bukti</th></tr>
+          </thead>
+          <tbody>
+            <% submissions.forEach(s => { %>
+            <tr>
+              <td><%= formatDate(s.created_at) %></td>
+              <td>
+                <div class="member-name-cell">
+                  <% if (s.member_photo) { %><img src="<%= s.member_photo %>" class="table-avatar">
+                  <% } else { %><div class="table-avatar-init"><%= getInitials(s.member_name) %></div><% } %>
+                  <%= s.member_name %>
+                </div>
+              </td>
+              <td><%= s.period_label %></td>
+              <td><%= s.program_name || '-' %></td>
+              <td><span class="badge-pill badge-completed">#<%= s.meeting_number %></span></td>
+              <td>
+                <% if (s.screenshot) { %>
+                  <a href="<%= s.screenshot %>" target="_blank" rel="noopener" class="proof-link">
+                    <img src="<%= s.screenshot %>" alt="bukti" class="proof-mini">
+                  </a>
+                <% } else { %>-<% } %>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

@@ -4,90 +4,159 @@
 <div class="page-wrapper">
   <div class="sub-banner">
     <a href="/member" class="back-link"><i class="fas fa-arrow-left"></i></a>
-    <h1>Edit Profil</h1>
+    <h1>Profile Settings</h1>
   </div>
 
   <div class="container">
     <%- include('../partials/flash') %>
 
-    <div class="profile-form-card">
-      <div class="profile-photo-section">
-        <div class="profile-photo-preview" id="photoPreview">
-          <% if (profile.photo) { %>
-            <img src="<%= profile.photo %>" alt="Foto" class="preview-img" id="previewImg">
-          <% } else { %>
-            <div class="avatar-initials avatar-xl" id="previewInitials"><%= getInitials(profile.name) %></div>
-          <% } %>
-        </div>
-        <label class="btn btn-outline btn-sm photo-upload-btn">
-          <i class="fas fa-camera"></i> Ganti Foto
-          <input type="file" name="photo" accept="image/*" id="photoInput" hidden onchange="previewPhoto(this)">
-        </label>
-      </div>
-
-      <form action="/member/profile" method="POST" enctype="multipart/form-data">
-        <input type="file" name="photo" id="photoInputHidden" hidden>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Nama Lengkap</label>
-            <input type="text" name="name" class="form-input" value="<%= profile.name %>" required>
+    <form action="/member/profile" method="POST" enctype="multipart/form-data" class="settings-layout">
+      <aside class="settings-sidebar">
+        <div class="settings-photo-card">
+          <div class="settings-avatar" id="photoPreview">
+            <% if (profile.photo) { %>
+              <img src="<%= profile.photo %>" alt="Foto profil" class="preview-img">
+            <% } else { %>
+              <span><%= getInitials(profile.name) %></span>
+            <% } %>
           </div>
-          <div class="form-group">
-            <label class="form-label">Email</label>
-            <input type="email" class="form-input" value="<%= profile.email %>" disabled>
-            <small class="form-hint">Email tidak dapat diubah</small>
-          </div>
+          <h2><%= profile.name %></h2>
+          <p><%= profile.email %></p>
+          <span class="settings-role"><%= profile.role %></span>
+
+          <label class="settings-upload-btn">
+            <i class="fas fa-camera"></i>
+            <span>Ganti Foto</span>
+            <input type="file" name="photo" id="photoInput" accept="image/*">
+          </label>
+          <small id="photoFileName">JPG, PNG, GIF, WEBP maks. 5MB</small>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Nomor HP</label>
-            <input type="tel" name="phone" class="form-input" value="<%= profile.phone || '' %>" placeholder="08xxxxxxxxxx">
+        <div class="settings-info-card">
+          <div>
+            <i class="fas fa-shield-alt"></i>
+            <span>Status Akun</span>
+            <strong>Aktif</strong>
           </div>
+          <div>
+            <i class="fas fa-crown"></i>
+            <span>Membership</span>
+            <strong><%= profile.is_luxury ? 'Luxury Class' : (profile.is_vip ? 'VIP' : 'Regular') %></strong>
+          </div>
+        </div>
+      </aside>
+
+      <section class="settings-main">
+        <div class="settings-section">
+          <div class="settings-section-head">
+            <div>
+              <p>Informasi Profil</p>
+              <h2>Data Personal</h2>
+            </div>
+            <i class="fas fa-user"></i>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nama Lengkap</label>
+              <input type="text" name="name" class="form-input" value="<%= profile.name %>" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-input" value="<%= profile.email %>" disabled>
+              <small class="form-hint">Email dipakai sebagai identitas login dan tidak dapat diubah.</small>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nomor WhatsApp</label>
+              <input type="tel" name="phone" class="form-input" value="<%= profile.phone || '' %>" placeholder="08xxxxxxxxxx">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Role</label>
+              <input type="text" class="form-input" value="<%= profile.role %>" disabled>
+            </div>
+          </div>
+
           <div class="form-group">
-            <label class="form-label">Role</label>
-            <input type="text" class="form-input" value="<%= profile.role %>" disabled>
+            <div class="label-row">
+              <label class="form-label">Bio / Tentang Saya</label>
+              <small id="bioCounter">0/280</small>
+            </div>
+            <textarea name="bio" id="bioInput" class="form-textarea" rows="4" maxlength="280" placeholder="Ceritakan sedikit tentang diri Anda..."><%= profile.bio || '' %></textarea>
           </div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Bio / Tentang Saya</label>
-          <textarea name="bio" class="form-textarea" rows="3" placeholder="Ceritakan sedikit tentang diri Anda..."><%= profile.bio || '' %></textarea>
+        <div class="settings-section">
+          <div class="settings-section-head">
+            <div>
+              <p>Keamanan</p>
+              <h2>Ubah Password</h2>
+            </div>
+            <i class="fas fa-lock"></i>
+          </div>
+
+          <div class="security-note">
+            Isi bagian ini hanya jika ingin mengganti password. Biarkan kosong jika tidak ada perubahan.
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Password Lama</label>
+              <input type="password" name="current_password" class="form-input password-setting-input" autocomplete="current-password">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Password Baru</label>
+              <input type="password" name="new_password" id="newPassword" class="form-input password-setting-input" minlength="6" autocomplete="new-password">
+              <small class="form-hint" id="passwordHint">Minimal 6 karakter.</small>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Konfirmasi Password Baru</label>
+            <input type="password" name="confirm_password" class="form-input password-setting-input" minlength="6" autocomplete="new-password">
+          </div>
         </div>
 
-        <div class="form-actions">
+        <div class="settings-actions">
           <a href="/member" class="btn btn-outline">Batal</a>
           <button type="submit" class="btn btn-primary">
-            <i class="fas fa-save"></i> Simpan Perubahan
+            <i class="fas fa-save"></i> Simpan Settings
           </button>
         </div>
-      </form>
-    </div>
+      </section>
+    </form>
   </div>
 </div>
 
 <script>
-function previewPhoto(input) {
-  if (input.files && input.files[0]) {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const preview = document.getElementById('photoPreview');
-      preview.innerHTML = `<img src="${e.target.result}" class="preview-img" alt="Preview">`;
-      document.querySelector('input[name="photo"]').files = input.files;
-    };
-    reader.readAsDataURL(input.files[0]);
-    // Transfer file to actual form input
-    document.querySelector('form input[type="file"][name="photo"]').files = input.files;
-  }
+const photoInput = document.getElementById('photoInput');
+const photoPreview = document.getElementById('photoPreview');
+const photoFileName = document.getElementById('photoFileName');
+const bioInput = document.getElementById('bioInput');
+const bioCounter = document.getElementById('bioCounter');
+const newPassword = document.getElementById('newPassword');
+const passwordHint = document.getElementById('passwordHint');
+
+function updateBioCounter() {
+  bioCounter.textContent = `${bioInput.value.length}/280`;
 }
-// Fix: link the visible upload button to the form's file input
-document.querySelector('.photo-upload-btn input').addEventListener('change', function() {
-  const formInput = document.querySelector('form input[name="photo"]');
-  const dt = new DataTransfer();
-  dt.items.add(this.files[0]);
-  formInput.files = dt.files;
+
+photoInput.addEventListener('change', () => {
+  const file = photoInput.files[0];
+  if (!file) return;
+  photoFileName.textContent = file.name;
+  photoPreview.innerHTML = `<img src="${URL.createObjectURL(file)}" alt="Preview foto" class="preview-img">`;
 });
+
+bioInput.addEventListener('input', updateBioCounter);
+newPassword.addEventListener('input', () => {
+  passwordHint.textContent = newPassword.value && newPassword.value.length < 6
+    ? 'Password masih terlalu pendek.'
+    : 'Minimal 6 karakter.';
+});
+updateBioCounter();
 </script>
 
 <%- include('../partials/footer') %>

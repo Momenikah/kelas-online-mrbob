@@ -1,0 +1,38 @@
+<%- include('../partials/head') %>
+
+<main class="signup-page">
+  <form action="/konfirmasi-transfer" method="POST" class="signup-shell lookup-shell">
+    <header class="signup-header">
+      <a href="/register" class="signup-login-link">
+        <i class="fas fa-arrow-left"></i> Daftar Member
+      </a>
+      <div class="logo-box">
+        <img src="/img/logo-mrbob.webp" alt="Mr.BOB" class="app-logo">
+      </div>
+    </header>
+
+    <section class="thanks-panel">
+      <div class="thanks-hero">
+        <div class="thanks-icon"><i class="fas fa-search"></i></div>
+        <p class="signup-kicker">Konfirmasi Transfer</p>
+        <h1>Cari ID Pendaftaran</h1>
+        <p>Masukkan ID pendaftaran untuk membuka detail pembayaran dan upload bukti transfer.</p>
+      </div>
+
+      <% if (error && error.length > 0) { %>
+        <div class="alert alert-danger signup-alert"><i class="fas fa-exclamation-circle"></i> <%= error[0] %></div>
+      <% } %>
+
+      <div class="signup-section transfer-section">
+        <div class="signup-field">
+          <label>ID Pendaftaran <span>*</span></label>
+          <input type="text" name="registration_code" placeholder="Contoh: REG-MB123-ABCDE" required>
+        </div>
+      </div>
+
+      <button type="submit" class="signup-submit">Lanjut Konfirmasi</button>
+    </section>
+  </form>
+</main>
+
+<%- include('../partials/footer') %>

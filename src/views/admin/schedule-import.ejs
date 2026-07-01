@@ -1,0 +1,241 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'admin' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+
+  <div class="sub-banner">
+    <a href="/admin" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <div class="sub-banner-titles">
+      <h1>Import Schedule CSV</h1>
+    </div>
+    <div class="sub-banner-actions">
+      <a href="/admin/schedule" class="btn btn-light"><i class="fas fa-calendar-days"></i> Kelola Jadwal</a>
+      <a href="/admin/schedule-plot" class="btn btn-light"><i class="fas fa-bolt"></i> Plot Jadwal</a>
+      <a href="<%= sheetUrl %>" target="_blank" class="btn btn-light"><i class="fas fa-table"></i> Google Sheet</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Summary stats -->
+    <div class="at-stats">
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--brand-600)"><i class="fas fa-calendar-days"></i></span>
+        <div><strong><%= stats.total %></strong><small>Total jadwal</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--success)"><i class="fas fa-calendar-day"></i></span>
+        <div><strong><%= stats.upcoming %></strong><small>Jadwal mendatang</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--info)"><i class="fas fa-file-csv"></i></span>
+        <div><strong><%= stats.imports %></strong><small>Riwayat import</small></div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-file-csv"></i> Upload CSV Schedule</h3>
+      <form action="/admin/schedule-import" method="POST" enctype="multipart/form-data" class="modal-form">
+        <div class="form-group">
+          <label class="form-label">File CSV</label>
+          <input type="file" name="schedule_csv" class="form-input" accept=".csv,text/csv" required>
+          <p class="field-hint">Belum punya file? <a href="/admin/schedule-import/template.csv">Download template CSV</a> lalu isi sesuai contoh.</p>
+        </div>
+        <div class="form-actions">
+          <a href="/admin/schedule-import/template.csv" class="btn btn-outline">
+            <i class="fas fa-file-arrow-down"></i> Template CSV
+          </a>
+          <a href="/admin/available-times/export.csv" class="btn btn-outline">
+            <i class="fas fa-download"></i> Export Available Time
+          </a>
+          <a href="/admin/presences/export.csv" class="btn btn-outline">
+            <i class="fas fa-download"></i> Export Presensi
+          </a>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-upload"></i> Import Schedule
+          </button>
+        </div>
+      </form>
+      <div class="csv-schema-box">
+        <strong>Header CSV:</strong>
+        <code><%= expectedHeaders.join(',') %></code>
+      </div>
+    </div>
+
+    <% if (result) { %>
+      <div class="stats-row stats-row-4">
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-total"><i class="fas fa-list"></i></div>
+          <div class="stat-info"><span class="stat-value"><%= result.totalRows %></span><span class="stat-label">Total Baris</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-present"><i class="fas fa-check"></i></div>
+          <div class="stat-info"><span class="stat-value"><%= result.successCount %></span><span class="stat-label">Berhasil</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-rate"><i class="fas fa-forward"></i></div>
+          <div class="stat-info"><span class="stat-value"><%= result.skippedCount %></span><span class="stat-label">Duplikat</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-absent"><i class="fas fa-triangle-exclamation"></i></div>
+          <div class="stat-info"><span class="stat-value"><%= result.errorCount %></span><span class="stat-label">Gagal</span></div>
+        </div>
+      </div>
+
+      <div class="form-actions import-result-actions">
+        <% if (result.successCount > 0) { %>
+          <a href="#schedule-list" class="btn btn-primary"><i class="fas fa-calendar-check"></i> Lihat <%= result.successCount %> jadwal dibuat</a>
+        <% } %>
+        <% if (errorReportId && result.errorCount > 0) { %>
+          <a href="/admin/schedule-import/<%= errorReportId %>/errors.csv" class="btn btn-outline">
+            <i class="fas fa-file-arrow-down"></i> Download Error Report
+          </a>
+        <% } %>
+      </div>
+      <% if (result.successCount > 0) { %>
+        <p class="import-result-note"><i class="fas fa-circle-check"></i> Jadwal berhasil dibuat, peserta terhubung, notifikasi &amp; email terkirim, dan tersinkron ke Google Sheet. Sesi langsung muncul di jadwal member &amp; tutor.</p>
+      <% } %>
+    <% } %>
+
+    <% if (previewRows.length) { %>
+      <div class="section-card">
+        <h3 class="section-title"><i class="fas fa-eye"></i> Preview 10 Baris Pertama</h3>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr><th>Row</th><th>Member</th><th>Tutor</th><th>Program</th><th>Judul</th><th>Tanggal</th><th>Jam</th></tr>
+            </thead>
+            <tbody>
+              <% previewRows.forEach(r => { %>
+                <tr>
+                  <td><%= r.__rowNumber %></td>
+                  <td><%= r.member_email %></td>
+                  <td><%= r.tutor_email %></td>
+                  <td><%= r.program_name %></td>
+                  <td><%= r.title %></td>
+                  <td><%= r.date %></td>
+                  <td><%= r.start_time %> - <%= r.end_time %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% } %>
+
+    <% if (result && result.details.length) { %>
+      <div class="section-card">
+        <h3 class="section-title"><i class="fas fa-clipboard-check"></i> Detail Validasi</h3>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr><th>Row</th><th>Judul</th><th>Member</th><th>Tutor</th><th>Waktu</th><th>Validasi</th></tr>
+            </thead>
+            <tbody>
+              <% result.details.forEach(d => { %>
+                <tr>
+                  <td><%= d.rowNumber %></td>
+                  <td><%= d.title || '-' %></td>
+                  <td><%= d.member_email || '-' %></td>
+                  <td><%= d.tutor_email || '-' %></td>
+                  <td><%= d.date %> <%= d.start_time %> - <%= d.end_time %></td>
+                  <td>
+                    <% if (d.errors.length) { %>
+                      <span class="badge-pill badge-cancelled">Error</span>
+                      <div class="validation-text validation-error"><%= d.errors.join(' | ') %></div>
+                    <% } else { %>
+                      <span class="badge-pill badge-completed">OK</span>
+                    <% } %>
+                    <% if (d.warnings.length) { %>
+                      <div class="validation-text validation-warning"><%= d.warnings.join(' | ') %></div>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% } %>
+
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-history"></i> Import History</h3>
+      <% if (!imports.length) { %>
+        <div class="empty-state"><i class="fas fa-file-circle-question"></i><p>Belum ada import schedule.</p></div>
+      <% } else { %>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr><th>File</th><th>Status</th><th>Total</th><th>Berhasil</th><th>Gagal</th><th>Oleh</th><th>Tanggal</th><th>Report</th></tr>
+            </thead>
+            <tbody>
+              <% imports.forEach(i => { %>
+                <tr>
+                  <td><%= i.filename || '-' %></td>
+                  <td><span class="badge-pill badge-<%= i.status === 'failed' ? 'cancelled' : i.status === 'partial' ? 'upcoming' : 'completed' %>"><%= i.status %></span></td>
+                  <td><%= i.total_rows %></td>
+                  <td><%= i.success_count %></td>
+                  <td><%= i.error_count %></td>
+                  <td><%= i.created_by_name || '-' %></td>
+                  <td><%= formatDate(i.created_at) %></td>
+                  <td><a href="/admin/schedule-import/<%= i.id %>/errors.csv" class="btn btn-sm btn-outline">CSV</a></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="section-card" id="schedule-list">
+      <div class="schedule-card-head">
+        <h3 class="section-title"><i class="fas fa-calendar-days"></i> Schedule Terbaru</h3>
+        <form method="GET" action="/admin/schedule-import" class="schedule-filter schedule-filter-inline">
+          <div class="schedule-filter-field">
+            <label><i class="far fa-calendar-alt"></i> Periode</label>
+            <select name="period" class="form-input" onchange="this.form.submit()">
+              <option value="">Semua Periode</option>
+              <% periods.forEach(p => { %>
+                <option value="<%= p.value %>" <%= filters.period === p.value ? 'selected' : '' %>><%= p.label %></option>
+              <% }) %>
+            </select>
+          </div>
+          <% if (filters.period) { %>
+            <a href="/admin/schedule-import" class="btn btn-outline schedule-filter-reset"><i class="fas fa-rotate-left"></i> Reset</a>
+          <% } %>
+        </form>
+      </div>
+      <% if (!schedules.length) { %>
+        <div class="empty-state"><i class="fas fa-calendar-times"></i><p><%= filters.period ? 'Tidak ada schedule pada periode ini.' : 'Belum ada schedule.' %></p></div>
+      <% } else { %>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr><th>Tanggal</th><th>Judul</th><th>Program</th><th>Tutor</th><th>Member</th><th>Status</th><th>Aksi</th></tr>
+            </thead>
+            <tbody>
+              <% schedules.forEach(s => { %>
+                <tr>
+                  <td><%= formatDate(s.date) %><div class="table-subtext"><%= formatTime(s.start_time) %> - <%= formatTime(s.end_time) %></div></td>
+                  <td><strong><%= s.title %></strong></td>
+                  <td><%= s.program_name %></td>
+                  <td><%= s.tutor_name %></td>
+                  <td><%= s.member_count %> peserta<div class="table-subtext"><%= s.member_names || '-' %></div></td>
+                  <td><span class="badge-pill badge-<%= s.status %>"><%= s.status %></span></td>
+                  <td>
+                    <form action="/admin/schedule-import/schedule/<%= s.id %>/delete" method="POST" style="display:inline"
+                          data-confirm="Hapus jadwal &quot;<%= s.title %>&quot; beserta peserta &amp; presensinya?">
+                      <button class="btn-icon btn-danger-icon" title="Hapus jadwal"><i class="fas fa-trash"></i></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

@@ -1,51 +1,697 @@
 <%- include('../partials/head') %>
 
-<div class="auth-wrapper">
-  <div class="auth-card">
-    <div class="auth-logo">
-      <div class="logo-box logo-lg">
-        <span class="logo-super">Super</span>
-        <span class="logo-seru">Seru!</span>
-      </div>
-      <p class="auth-subtitle">Learning Management Platform</p>
+<div class="register-split">
+
+  <!-- ============ LEFT: INTERACTIVE SHOWCASE ============ -->
+  <aside class="login-showcase register-showcase" id="regShowcase">
+    <div class="showcase-blobs" aria-hidden="true">
+      <span class="blob blob-1"></span>
+      <span class="blob blob-2"></span>
+      <span class="blob blob-3"></span>
     </div>
 
-    <% if (error && error.length > 0) { %>
-      <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <%= error[0] %></div>
-    <% } %>
+    <div class="showcase-inner">
+      <div class="showcase-brand">
+        <span class="showcase-logo"><img src="/img/logo-mrbob.webp" alt="Mr.BOB"></span>
+        <span class="showcase-brand-name">Super&nbsp;Seru</span>
+      </div>
 
-    <h2 class="auth-title">Buat Akun Baru</h2>
+      <h1 class="showcase-headline">Satu langkah lagi<br>menuju <span>kelas impianmu.</span></h1>
+      <p class="showcase-sub">Pilih program, tentukan jadwal, dan mulai belajar bareng tutor terbaik.</p>
 
-    <form action="/register" method="POST" class="auth-form">
-      <div class="form-group">
-        <label class="form-label"><i class="fas fa-user"></i> Nama Lengkap</label>
-        <input type="text" name="name" class="form-input" placeholder="Nama lengkap Anda" required>
+      <!-- interactive mockup: registration steps -->
+      <div class="mock-scene" id="regMockScene">
+        <div class="mock-card mock-main" data-depth="0.18">
+          <div class="mock-head">
+            <span class="mock-avatar"><i class="fas fa-clipboard-check"></i></span>
+            <div>
+              <p class="mock-name">Pendaftaran Member</p>
+              <p class="mock-role">Hampir selesai!</p>
+            </div>
+          </div>
+          <div class="mock-steps">
+            <span class="mock-step done"><i class="fas fa-check"></i> Data Diri</span>
+            <span class="mock-step done"><i class="fas fa-check"></i> Profil Belajar</span>
+            <span class="mock-step active"><i class="fas fa-circle-notch"></i> Pilih Program</span>
+          </div>
+          <div class="mock-progress-row">
+            <div class="mock-progress-label"><span>Kelengkapan</span><span class="mock-pct" data-count="85">0%</span></div>
+            <div class="mock-bar"><i style="--w:85%"></i></div>
+          </div>
+        </div>
+
+        <div class="mock-card mock-stat" data-depth="0.34">
+          <span class="mock-stat-icon"><i class="fas fa-tags"></i></span>
+          <div>
+            <p class="mock-stat-num" data-count="14">0</p>
+            <p class="mock-stat-cap">Pilihan Program</p>
+          </div>
+        </div>
+
+        <div class="mock-card mock-schedule" data-depth="0.28">
+          <span class="mock-sched-icon"><i class="fas fa-user-tie"></i></span>
+          <div class="mock-sched-body">
+            <p class="mock-sched-title">Tutor Grade A</p>
+            <p class="mock-sched-time"><i class="fas fa-star"></i> Benefit Luxury Class</p>
+          </div>
+          <span class="mock-live mock-live-ok">SIAP</span>
+        </div>
+
+        <div class="mock-badge" data-depth="0.5">
+          <i class="fas fa-certificate"></i>
+          <span>Sertifikat <b>resmi</b></span>
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label"><i class="fas fa-envelope"></i> Email</label>
-        <input type="email" name="email" class="form-input" placeholder="Alamat email Anda" required>
+
+      <ul class="showcase-features">
+        <li><i class="fas fa-shield-halved"></i> Pembayaran aman</li>
+        <li><i class="fas fa-clock"></i> Jadwal fleksibel</li>
+        <li><i class="fas fa-headset"></i> Support penuh</li>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- ============ RIGHT: REGISTRATION FORM ============ -->
+  <main class="signup-page register-formside">
+    <form action="/register" method="POST" class="signup-shell" id="memberRegisterForm">
+    <input type="hidden" name="password" value="member123">
+    <input type="hidden" name="confirm_password" value="member123">
+    <input type="hidden" name="package_name" id="packageName">
+    <input type="hidden" name="package_group" id="packageGroupValue">
+    <input type="hidden" name="package_price" id="packagePrice">
+    <input type="hidden" name="package_note" id="packageNote">
+
+    <header class="signup-header">
+      <a href="/login" class="signup-logo" aria-label="Mr.BOB login">
+        <div class="logo-box">
+          <img src="/img/logo-mrbob.webp" alt="Mr.BOB" class="app-logo">
+        </div>
+      </a>
+      <a href="/login" class="signup-login-link">Sudah punya akun? Masuk</a>
+    </header>
+
+    <section class="signup-panel">
+      <div class="signup-intro">
+        <div>
+          <p class="signup-kicker">Pendaftaran Member</p>
+          <h1>Daftar Kelas Online</h1>
+        </div>
+        <span class="signup-badge">Member Baru</span>
       </div>
-      <div class="form-group">
-        <label class="form-label"><i class="fas fa-phone"></i> Nomor HP</label>
-        <input type="tel" name="phone" class="form-input" placeholder="08xxxxxxxxxx">
+
+      <% if (typeof error !== 'undefined' && error && error.length > 0) { %>
+        <div class="alert alert-danger signup-alert"><i class="fas fa-exclamation-circle"></i> <%= error[0] %></div>
+      <% } %>
+
+      <div class="signup-section">
+        <div class="signup-section-title">
+          <i class="fas fa-user"></i>
+          <h2>Data Diri</h2>
+        </div>
+        <div class="signup-grid">
+          <div class="signup-field">
+            <label>Nama Lengkap <span>*</span></label>
+            <input type="text" name="name" autocomplete="name" required>
+          </div>
+          <div class="signup-field">
+            <label>No. WhatsApp <span>*</span></label>
+            <input type="tel" name="phone" placeholder="0812-345-678" autocomplete="tel" required>
+          </div>
+          <div class="signup-field">
+            <label>Email <span>*</span></label>
+            <input type="email" name="email" autocomplete="email" required>
+          </div>
+          <div class="signup-field">
+            <label>Asal Kota <span>*</span></label>
+            <input type="text" name="city" required>
+          </div>
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label"><i class="fas fa-lock"></i> Password</label>
-        <input type="password" name="password" class="form-input" placeholder="Minimal 6 karakter" required minlength="6">
+
+      <div class="signup-section">
+        <div class="signup-section-title">
+          <i class="fas fa-graduation-cap"></i>
+          <h2>Profil Belajar</h2>
+        </div>
+        <div class="signup-grid">
+          <div class="signup-field">
+            <label>Background Pendidikan <span>*</span></label>
+            <input type="text" name="education_background" required>
+          </div>
+          <div class="signup-field">
+            <label>Jenjang Pendidikan <span>*</span></label>
+            <select name="education_level" required>
+              <option value="">Pilih jenjang</option>
+              <option>SD</option>
+              <option>SMP</option>
+              <option>SMA</option>
+              <option>D1</option>
+              <option>D2</option>
+              <option>D3</option>
+              <option>S1</option>
+              <option>S2</option>
+              <option>Bekerja</option>
+              <option>Lainnya</option>
+            </select>
+          </div>
+          <div class="signup-field">
+            <label>Profesi Sekarang <span>*</span></label>
+            <input type="text" name="occupation" required>
+          </div>
+          <div class="signup-field signup-inline-grid">
+            <div>
+              <label>Usia <span>*</span></label>
+              <input type="number" name="age" min="5" max="80" required>
+            </div>
+            <div>
+              <label>3 Digit HP <span>*</span></label>
+              <input type="text" name="phone_last_three" maxlength="3" pattern="[0-9]{3}" required>
+            </div>
+          </div>
+          <div class="signup-field signup-wide">
+            <label>Akun Instagram <span>*</span></label>
+            <input type="text" name="instagram" placeholder="@username" required>
+          </div>
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label"><i class="fas fa-lock"></i> Konfirmasi Password</label>
-        <input type="password" name="confirm_password" class="form-input" placeholder="Ulangi password" required>
+
+      <div class="signup-section">
+        <div class="signup-section-title">
+          <i class="fas fa-layer-group"></i>
+          <h2>Pilih Program</h2>
+        </div>
+
+        <div class="signup-program-tabs" role="group" aria-label="Pilih program">
+          <label>
+            <input type="radio" name="program_type" value="adult" required>
+            <span>Adult</span>
+          </label>
+          <label>
+            <input type="radio" name="program_type" value="kids" required>
+            <span>Kids &amp; Teen</span>
+          </label>
+        </div>
+
+        <div class="program-detail-panel signup-program-detail" id="programDetailPanel" hidden>
+          <div class="signup-field signup-wide">
+            <label id="classGroupLabel">Kelas <span>*</span></label>
+            <div class="signup-class-chips" id="classOptions"></div>
+          </div>
+
+          <div class="signup-grid three-col">
+            <div class="signup-field">
+              <label>Tipe Paket <span>*</span></label>
+              <select name="package_filter" id="packageGroup">
+                <option value="">Pilih tipe</option>
+              </select>
+            </div>
+            <div class="signup-field">
+              <label>Durasi Belajar <span>*</span></label>
+              <select name="duration" id="duration">
+                <option value="">Pilih durasi</option>
+              </select>
+            </div>
+            <div class="signup-field">
+              <label>Paket Kelas <span>*</span></label>
+              <select name="package_type" id="packageType">
+                <option value="">Pilih paket</option>
+              </select>
+            </div>
+            <div class="signup-field">
+              <label>Jumlah Pertemuan</label>
+              <input type="text" name="meeting_count" id="meetingCount" readonly>
+            </div>
+          </div>
+
+          <div class="signup-grid">
+            <div class="signup-field">
+              <label>Pilihan Jam Belajar <span>*</span></label>
+              <select name="study_time" id="studyTime">
+                <option value="">Pilih jam</option>
+                <% studyTimeSlots.forEach(function (slot) { %><option><%= slot %></option><% }) %>
+              </select>
+            </div>
+            <div class="signup-field">
+              <label>Pilih Mulai Belajar <span>*</span></label>
+              <select name="start_date" id="startDate">
+                <option value="">Pilih tanggal</option>
+                <option>01 Juni 2026</option>
+                <option>08 Juni 2026</option>
+                <option>15 Juni 2026</option>
+                <option>22 Juni 2026</option>
+                <option>29 Juni 2026</option>
+                <option>06 Juli 2026</option>
+                <option>13 Juli 2026</option>
+                <option>20 Juli 2026</option>
+                <option>27 Juli 2026</option>
+                <option>03 Agustus 2026</option>
+                <option>10 Agustus 2026</option>
+                <option>17 Agustus 2026</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="signup-field signup-wide" id="luxuryTutorField" hidden>
+            <label>Tutor Pilihan</label>
+            <% if ((gradeATutors || []).length > 0) { %>
+              <div class="luxury-tutor-grid">
+                <% (gradeATutors || []).forEach(function (tutor, index) { %>
+                  <% const tutorGrade = tutor.tutor_grade || 'B'; %>
+                  <label class="luxury-tutor-card">
+                    <input type="radio" name="preferred_tutor_id" value="<%= tutor.id %>" <%= index === 0 ? 'checked' : '' %>>
+                    <span class="luxury-tutor-shell">
+                      <span class="luxury-tutor-avatar">
+                        <% if (tutor.photo) { %>
+                          <img src="<%= tutor.photo %>" alt="<%= tutor.name %>">
+                        <% } else { %>
+                          <b><%= getInitials(tutor.name) %></b>
+                        <% } %>
+                      </span>
+                      <span class="luxury-tutor-info">
+                        <strong><%= tutor.name %></strong>
+                        <small>Grade <%= tutorGrade %> Tutor</small>
+                      </span>
+                      <button type="button" class="luxury-tutor-detail"
+                        data-tutor-detail
+                        data-name="<%= tutor.name %>"
+                        data-grade="<%= tutorGrade %>"
+                        data-photo="<%= tutor.photo || '' %>"
+                        data-initials="<%= getInitials(tutor.name) %>"
+                        data-desc="<%= tutor.bio || 'Belum ada deskripsi tutor.' %>">
+                        <i class="fas fa-circle-info"></i>
+                      </button>
+                    </span>
+                  </label>
+                <% }) %>
+              </div>
+            <% } else { %>
+              <div class="luxury-tutor-empty">
+                Belum ada tutor Grade A yang aktif. Admin akan membantu memilihkan tutor terbaik.
+              </div>
+            <% } %>
+            <small>Benefit Luxury Class hanya menampilkan tutor Grade A yang sudah ditentukan admin.</small>
+          </div>
+
+          <div class="signup-field signup-wide signup-friend-field" id="friendField" hidden>
+            <label>Nama Teman <span>*</span></label>
+            <input type="text" name="friend_name" id="friendName" placeholder="Nama teman yang ikut mendaftar">
+          </div>
+
+          <div class="signup-code-grid">
+            <div class="signup-field">
+              <label>Kupon Diskon</label>
+              <div class="signup-action-field">
+                <input type="text" name="coupon_code">
+                <button type="button">Apply</button>
+              </div>
+            </div>
+            <div class="signup-field">
+              <label>Kode Referral</label>
+              <div class="signup-action-field">
+                <input type="text" name="referral_code">
+                <button type="button">Terapkan</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="signup-summary" id="paymentSummary">
+            <div class="summary-empty">Pilih program dan kelas untuk melihat estimasi biaya.</div>
+          </div>
+        </div>
       </div>
-      <button type="submit" class="btn btn-primary btn-full">
-        <i class="fas fa-user-plus"></i> Daftar Sekarang
+
+      <div class="signup-agreement">
+        <label>
+          <input type="checkbox" required>
+          <span>Saya menyetujui bahwa pembayaran bersifat non-refundable dan data yang diisi sudah benar.</span>
+        </label>
+        <label>
+          <input type="checkbox" required>
+          <span>Saya siap mengikuti jadwal belajar yang dipilih dan memahami pendaftaran dapat batal jika konfirmasi tidak dilakukan dalam 1x24 jam.</span>
+        </label>
+      </div>
+
+      <button type="submit" class="signup-submit">Daftar Sekarang</button>
+    </section>
+  </form>
+
+  <div class="signup-tutor-modal" id="tutorDetailModal" hidden>
+    <div class="signup-tutor-modal-overlay" data-close-tutor-modal></div>
+    <div class="signup-tutor-modal-panel" role="dialog" aria-modal="true" aria-labelledby="tutorModalName">
+      <button type="button" class="signup-tutor-modal-close" data-close-tutor-modal aria-label="Tutup detail tutor">
+        <i class="fas fa-times"></i>
       </button>
-    </form>
-
-    <div class="auth-footer">
-      <p>Sudah punya akun? <a href="/login" class="auth-link">Masuk di sini</a></p>
+      <div class="signup-tutor-modal-avatar" id="tutorModalAvatar"></div>
+      <p id="tutorModalGrade">Grade Tutor</p>
+      <h3 id="tutorModalName">Detail Tutor</h3>
+      <div class="signup-tutor-modal-desc" id="tutorModalDesc"></div>
     </div>
   </div>
+  </main>
+
 </div>
+
+<script>
+const programRadios = document.querySelectorAll('input[name="program_type"]');
+const programDetailPanel = document.getElementById('programDetailPanel');
+const classOptions = document.getElementById('classOptions');
+const classGroupLabel = document.getElementById('classGroupLabel');
+const packageGroup = document.getElementById('packageGroup');
+const packageType = document.getElementById('packageType');
+const duration = document.getElementById('duration');
+const meetingCount = document.getElementById('meetingCount');
+const studyTime = document.getElementById('studyTime');
+const startDate = document.getElementById('startDate');
+const friendField = document.getElementById('friendField');
+const friendName = document.getElementById('friendName');
+const luxuryTutorField = document.getElementById('luxuryTutorField');
+const preferredTutorRadios = document.querySelectorAll('input[name="preferred_tutor_id"]');
+const tutorDetailModal = document.getElementById('tutorDetailModal');
+const tutorModalAvatar = document.getElementById('tutorModalAvatar');
+const tutorModalName = document.getElementById('tutorModalName');
+const tutorModalGrade = document.getElementById('tutorModalGrade');
+const tutorModalDesc = document.getElementById('tutorModalDesc');
+const paymentSummary = document.getElementById('paymentSummary');
+const packageName = document.getElementById('packageName');
+const packageGroupValue = document.getElementById('packageGroupValue');
+const packagePrice = document.getElementById('packagePrice');
+const packageNote = document.getElementById('packageNote');
+
+// Sumber tunggal dari server (utils/catalog.js) — sama dengan available time & plot jadwal.
+const defaultStudyTimes = <%- JSON.stringify(studyTimeSlots) %>;
+
+const vipPackages = [
+  { name: 'VIP', price: 980000, duration: '2 MINGGU', meetings: 10 },
+  { name: 'VIP FLEXIBLE', price: 1500000, duration: '2 MINGGU', meetings: 10, note: 'JAM BELAJAR DITENTUKAN H-1 KELAS' },
+  { name: 'VIP GOLD', price: 1450000, duration: '2 MINGGU', meetings: 10, note: 'DURASI WAKTU PER KELAS 90 MENIT' },
+  { name: 'VIP PLATINUM', price: 1750000, duration: '2 MINGGU', meetings: 10, note: 'DURASI WAKTU PER KELAS 120 MENIT' },
+  { name: '1 BULAN - VIP', price: 1800000, duration: '1 BULAN', meetings: 20 },
+  { name: '2 BULAN - VIP', price: 3500000, duration: '2 BULAN', meetings: 40 },
+  { name: '3X - VIP', price: 1150000, duration: '1 BULAN', meetings: 12 },
+  { name: '2X - VIP WEEKEND', price: 950000, duration: '1 BULAN', meetings: 8 },
+  { name: '2X - VIP WEEKDAY', price: 850000, duration: '1 BULAN', meetings: 8 }
+];
+
+const luxuryPackage = {
+  name: 'LUXURY CLASS',
+  price: 1500000,
+  duration: '2 MINGGU',
+  meetings: 10,
+  note: 'Benefit: pilih tutor grade A, Video Premium, dan Test TOEFL gratis.'
+};
+
+const privatePackages = [
+  { name: 'PRIVATE', price: 695000, duration: '2 MINGGU', meetings: 10 },
+  { name: '3X - PRIVATE', price: 800000, duration: '1 BULAN', meetings: 12, note: 'HARUS MENDAFTAR DENGAN TEMAN (2-3 ORANG)' },
+  { name: '2X - PRIVATE WEEKEND', price: 675000, duration: '1 BULAN', meetings: 8, note: 'HARUS MENDAFTAR DENGAN TEMAN (2-3 ORANG)' },
+  { name: '2X - PRIVATE WEEKDAY', price: 575000, duration: '1 BULAN', meetings: 8, note: 'HARUS MENDAFTAR DENGAN TEMAN (2-3 ORANG)' },
+  { name: 'BTS', price: 880000, duration: '2 MINGGU', meetings: 10, note: 'HARUS MENDAFTAR 2 ORANG' }
+];
+
+const fullPrivatePackages = [
+  { name: 'PRIVATE', price: 695000, duration: '2 MINGGU', meetings: 10 },
+  { name: '1 BULAN - PRIVATE', price: 1250000, duration: '1 BULAN', meetings: 20 },
+  ...privatePackages.slice(1)
+];
+
+const kidsPackages = [
+  ...vipPackages.map((item) => item.name === 'VIP FLEXIBLE' ? { ...item, name: 'VIP FLEKSIBLE' } : item),
+  { name: 'PRIVATE', price: 695000, duration: '2 MINGGU', meetings: 10, note: 'HANYA LEVEL 1-2' },
+  { name: '1 BULAN - PRIVATE', price: 1250000, duration: '1 BULAN', meetings: 20, note: 'HANYA LEVEL 1-2' },
+  { name: '3X - PRIVATE', price: 800000, duration: '1 BULAN', meetings: 12, note: 'HARUS MENDAFTAR DENGAN TEMAN (2-3 ORANG)' },
+  { name: '2X - PRIVATE WEEKEND', price: 675000, duration: '1 BULAN', meetings: 8, note: 'HARUS MENDAFTAR DENGAN TEMAN (2-3 ORANG)' },
+  { name: '2X - PRIVATE WEEKDAY', price: 575000, duration: '1 BULAN', meetings: 8, note: 'HARUS MENDAFTAR DENGAN TEMAN (2-3 ORANG)' },
+  { name: '2X - SEMI PRIVATE WEEKDAY', price: 350000, duration: '1 BULAN', meetings: 8, note: 'HARUS MENDAFTAR DENGAN TEMAN (4-6 ORANG)' },
+  { name: 'BTS', price: 880000, duration: '2 MINGGU', meetings: 10, note: 'HARUS MENDAFTAR 2 ORANG' }
+];
+
+const priceList = {
+  'WALKY TALKY': [luxuryPackage, ...vipPackages],
+  'SPEAK UP 1': [luxuryPackage, ...vipPackages, ...fullPrivatePackages, { name: 'SEMI - PRIVATE', price: 395000, duration: '2 MINGGU', meetings: 10, note: 'HANYA JAM 19.00 WIB' }],
+  'SPEAK UP 2': [luxuryPackage, ...vipPackages, ...privatePackages],
+  'SPEAK UP 3': [luxuryPackage, ...vipPackages],
+  'SPEAK UP 100': [luxuryPackage, ...vipPackages.map((item) => item.name === 'VIP FLEXIBLE' ? { ...item, name: 'VIP FLEKSIBLE' } : item)],
+  'GRAND SPEAKING': [luxuryPackage, ...vipPackages],
+  'SPEAKING FOR SPECIFIC PURPOSES': [luxuryPackage, ...vipPackages],
+  'CAREER CLINIC': [luxuryPackage, ...vipPackages],
+  'GRAMMAR': [luxuryPackage, ...vipPackages, ...privatePackages],
+  'TOEFL': [luxuryPackage, ...vipPackages],
+  'IELTS': [
+    luxuryPackage,
+    { name: 'IELTS', price: 1100000, duration: '2 MINGGU', meetings: 10 },
+    { name: 'IELTS FLEKSIBLE', price: 1650000, duration: '2 MINGGU', meetings: 10, note: 'JAM BELAJAR DITENTUKAN H-1 KELAS' },
+    { name: 'IELTS 3X', price: 1700000, duration: '1 BULAN', meetings: 12 },
+    { name: 'IELTS 2X WEEKDAY', price: 1200000, duration: '1 BULAN', meetings: 8 },
+    { name: 'IELTS 2X WEEKEND', price: 1300000, duration: '1 BULAN', meetings: 8 },
+    { name: 'IELTS 1 BULAN', price: 2750000, duration: '1 BULAN', meetings: 20 },
+    { name: 'IELTS 2 BULAN', price: 4750000, duration: '2 BULAN', meetings: 40 },
+    { name: 'IELTS 3 BULAN', price: 6750000, duration: '3 BULAN', meetings: 60 }
+  ],
+  'SMART KIDS': [luxuryPackage, ...kidsPackages],
+  'SUPER KIDS': [luxuryPackage, ...kidsPackages],
+  'GENIUS TEEN': [luxuryPackage, ...kidsPackages]
+};
+
+// Sumber tunggal dari server (utils/catalog.js) — sama dengan tabel programs & plot jadwal.
+const programOptions = <%- JSON.stringify(programCatalog) %>;
+
+function rupiah(value) {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0
+  }).format(value);
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  }[char]));
+}
+
+function getSelectedProgramType() {
+  const selected = document.querySelector('input[name="program_type"]:checked');
+  return selected ? selected.value : '';
+}
+
+function renderClassOptions(type) {
+  const config = programOptions[type];
+  classOptions.innerHTML = '';
+  if (!config) return;
+
+  classGroupLabel.innerHTML = `${config.label} <span>*</span>`;
+  config.items.forEach((item, index) => {
+    classOptions.insertAdjacentHTML('beforeend', `
+      <label>
+        <input type="radio" name="selected_class" value="${item}" ${index === 0 ? 'checked' : ''}>
+        <span>${item}</span>
+      </label>
+    `);
+  });
+}
+
+function getSelectedProgramName() {
+  const selectedProgram = document.querySelector('input[name="selected_class"]:checked');
+  return selectedProgram ? selectedProgram.value : '';
+}
+
+function getSelectedPackage() {
+  const packages = priceList[getSelectedProgramName()] || [];
+  return packages[Number(packageType.value)] || null;
+}
+
+function getPackageGroup(item) {
+  if (item.name.includes('LUXURY')) return 'Luxury';
+  if (item.name.includes('IELTS')) return 'IELTS';
+  if (item.name === 'BTS') return 'BTS';
+  if (item.name.includes('SEMI')) return 'Semi Private';
+  if (item.name.includes('PRIVATE')) return 'Private';
+  return 'VIP';
+}
+
+function getPackageGroups() {
+  const packages = priceList[getSelectedProgramName()] || [];
+  return [...new Set(packages.map(getPackageGroup))];
+}
+
+function getFilteredPackages() {
+  const packages = priceList[getSelectedProgramName()] || [];
+  const selectedGroup = packageGroup.value;
+  const selectedDuration = duration.value;
+
+  return packages
+    .map((item, index) => ({ ...item, index }))
+    .filter((item) => !selectedGroup || getPackageGroup(item) === selectedGroup)
+    .filter((item) => !selectedDuration || item.duration === selectedDuration);
+}
+
+function renderPackageGroups() {
+  const groups = getPackageGroups();
+  packageGroup.innerHTML = '<option value="">Pilih tipe</option>';
+  groups.forEach((group) => {
+    packageGroup.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(group)}">${escapeHtml(group)}</option>`);
+  });
+  if (groups.length) packageGroup.value = groups.includes('VIP') ? 'VIP' : groups[0];
+  renderDurationOptions();
+}
+
+function renderDurationOptions() {
+  const packages = priceList[getSelectedProgramName()] || [];
+  const selectedGroup = packageGroup.value;
+  const durations = [...new Set(
+    packages
+      .filter((item) => !selectedGroup || getPackageGroup(item) === selectedGroup)
+      .map((item) => item.duration)
+  )];
+
+  duration.innerHTML = '<option value="">Pilih durasi</option>';
+  durations.forEach((item) => {
+    duration.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`);
+  });
+  if (durations.length) duration.value = durations[0];
+  renderPackageOptions();
+}
+
+function renderPackageOptions() {
+  const packages = getFilteredPackages();
+  packageType.innerHTML = '<option value="">Pilih paket</option>';
+  packages.forEach((item) => {
+    packageType.insertAdjacentHTML('beforeend', `<option value="${item.index}">${escapeHtml(item.name)} - ${rupiah(item.price)}</option>`);
+  });
+  if (packageType.options.length > 1) packageType.selectedIndex = 1;
+  updatePayment();
+}
+
+function setProgramDetailRequired(isRequired) {
+  [packageGroup, packageType, duration, studyTime, startDate].forEach((field) => {
+    field.required = isRequired;
+  });
+}
+
+function renderStudyTimes() {
+  studyTime.innerHTML = '<option value="">Pilih jam</option>';
+  defaultStudyTimes.forEach((time) => {
+    studyTime.insertAdjacentHTML('beforeend', `<option>${escapeHtml(time)}</option>`);
+  });
+}
+
+function updateFriendRequirement(selectedPackage) {
+  const needsFriend = (selectedPackage.note || '').includes('HARUS MENDAFTAR 2 ORANG');
+  friendField.hidden = !needsFriend;
+  friendName.required = needsFriend;
+  if (!needsFriend) friendName.value = '';
+}
+
+function updateLuxuryTutorRequirement(selectedPackage) {
+  const isLuxury = selectedPackage && getPackageGroup(selectedPackage) === 'Luxury';
+  luxuryTutorField.hidden = !isLuxury;
+  preferredTutorRadios.forEach(function (radio, index) {
+    radio.required = isLuxury && preferredTutorRadios.length > 0;
+    if (isLuxury && index === 0 && !document.querySelector('input[name="preferred_tutor_id"]:checked')) radio.checked = true;
+    if (!isLuxury) radio.checked = false;
+  });
+}
+
+function updatePayment() {
+  const selectedProgram = getSelectedProgramName();
+  const selectedPackage = getSelectedPackage();
+
+  if (!getSelectedProgramType() || !selectedProgram || !selectedPackage) {
+    duration.value = '';
+    meetingCount.value = '';
+    packageName.value = '';
+    packageGroupValue.value = '';
+    packagePrice.value = '';
+    packageNote.value = '';
+    renderStudyTimes();
+    updateFriendRequirement({ note: '' });
+    updateLuxuryTutorRequirement(null);
+    paymentSummary.innerHTML = '<div class="summary-empty">Pilih program dan paket untuk melihat estimasi biaya.</div>';
+    return;
+  }
+
+  const selectedGroup = getPackageGroup(selectedPackage);
+  duration.value = selectedPackage.duration;
+  meetingCount.value = `${selectedPackage.meetings} pertemuan`;
+  packageName.value = selectedPackage.name;
+  packageGroupValue.value = selectedGroup;
+  packagePrice.value = selectedPackage.price;
+  packageNote.value = selectedPackage.note || '';
+  renderStudyTimes();
+  updateFriendRequirement(selectedPackage);
+  updateLuxuryTutorRequirement(selectedPackage);
+
+  paymentSummary.innerHTML = `
+    <div class="summary-heading">
+      <div>
+        <span>Program Dipilih</span>
+        <strong>${escapeHtml(selectedProgram)}</strong>
+      </div>
+      <b>${escapeHtml(selectedPackage.name)}</b>
+    </div>
+    <div class="summary-meta">
+      <span><i class="fas fa-layer-group"></i>${escapeHtml(selectedGroup)}</span>
+      <span><i class="fas fa-clock"></i>${escapeHtml(selectedPackage.duration)}</span>
+      <span><i class="fas fa-calendar-check"></i>${selectedPackage.meetings} pertemuan</span>
+    </div>
+    ${selectedPackage.note ? `<div class="summary-note">${escapeHtml(selectedPackage.note)}</div>` : ''}
+    <div class="summary-total">
+      <span>Total</span>
+      <strong>${rupiah(selectedPackage.price)}</strong>
+    </div>
+  `;
+}
+
+programRadios.forEach((radio) => {
+  radio.addEventListener('change', () => {
+    programDetailPanel.hidden = false;
+    setProgramDetailRequired(true);
+    renderClassOptions(radio.value);
+    renderPackageGroups();
+  });
+});
+
+classOptions.addEventListener('change', renderPackageGroups);
+packageGroup.addEventListener('change', renderDurationOptions);
+duration.addEventListener('change', renderPackageOptions);
+packageType.addEventListener('change', updatePayment);
+
+function openTutorModal(button) {
+  const name = button.dataset.name || 'Detail Tutor';
+  const grade = button.dataset.grade || '-';
+  const photo = button.dataset.photo || '';
+  const initials = button.dataset.initials || '';
+  const desc = button.dataset.desc || 'Belum ada deskripsi tutor.';
+  tutorModalName.textContent = name;
+  tutorModalGrade.textContent = `Grade ${grade} Tutor`;
+  tutorModalDesc.textContent = desc;
+  tutorModalAvatar.innerHTML = photo
+    ? `<img src="${escapeHtml(photo)}" alt="${escapeHtml(name)}">`
+    : `<span>${escapeHtml(initials)}</span>`;
+  tutorDetailModal.hidden = false;
+}
+
+function closeTutorModal() {
+  tutorDetailModal.hidden = true;
+}
+
+document.querySelectorAll('[data-tutor-detail]').forEach(function (button) {
+  button.addEventListener('click', function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    openTutorModal(button);
+  });
+});
+document.querySelectorAll('[data-close-tutor-modal]').forEach(function (button) {
+  button.addEventListener('click', closeTutorModal);
+});
+document.addEventListener('keydown', function (event) {
+  if (event.key === 'Escape' && !tutorDetailModal.hidden) closeTutorModal();
+});
+</script>
 
 <%- include('../partials/footer') %>

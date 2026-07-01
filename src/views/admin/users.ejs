@@ -12,25 +12,66 @@
   </div>
 
   <div class="container">
+    <!-- Summary stats -->
+    <div class="at-stats">
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--brand-600)"><i class="fas fa-users"></i></span>
+        <div><strong><%= stats.total %></strong><small>Total pengguna</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--info)"><i class="fas fa-user-graduate"></i></span>
+        <div><strong><%= stats.members %></strong><small>Member</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:#0EA5E9"><i class="fas fa-chalkboard-teacher"></i></span>
+        <div><strong><%= stats.tutors %></strong><small>Tutor</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--success)"><i class="fas fa-circle-check"></i></span>
+        <div><strong><%= stats.active %></strong><small>Aktif</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:#D97706"><i class="fas fa-star"></i></span>
+        <div><strong><%= stats.vip %></strong><small>VIP</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:#7C3AED"><i class="fas fa-gem"></i></span>
+        <div><strong><%= stats.luxury || 0 %></strong><small>Luxury</small></div>
+      </div>
+    </div>
+
     <div class="section-card">
       <form method="GET" action="/admin/users" class="filter-form">
-        <input type="text" name="search" class="form-input" placeholder="Cari nama atau email..." value="<%= filters.search || '' %>">
+        <input type="text" name="search" class="form-input" placeholder="Cari nama, email, atau no. HP..." value="<%= filters.search || '' %>">
         <select name="role" class="form-input">
           <option value="">Semua Role</option>
           <option value="admin" <%= filters.role === 'admin' ? 'selected' : '' %>>Admin</option>
           <option value="tutor" <%= filters.role === 'tutor' ? 'selected' : '' %>>Tutor</option>
           <option value="member" <%= filters.role === 'member' ? 'selected' : '' %>>Member</option>
         </select>
+        <select name="status" class="form-input">
+          <option value="">Semua Status</option>
+          <option value="active" <%= filters.status === 'active' ? 'selected' : '' %>>Aktif</option>
+          <option value="inactive" <%= filters.status === 'inactive' ? 'selected' : '' %>>Non-aktif</option>
+        </select>
         <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Cari</button>
         <a href="/admin/users" class="btn btn-outline">Reset</a>
+        <a href="/admin/users/export.csv?<%= new URLSearchParams({ role: filters.role || '', search: filters.search || '', status: filters.status || '' }).toString() %>" class="btn btn-outline"><i class="fas fa-download"></i> Export CSV</a>
       </form>
     </div>
 
     <div class="section-card">
+      <div class="list-meta">
+        <span><i class="fas fa-list"></i> <%= pagination.total %> pengguna<%= filters.role || filters.search || filters.status ? ' (terfilter)' : '' %></span>
+        <% if (pagination.totalPages > 1) { %><span>Halaman <%= pagination.page %> / <%= pagination.totalPages %></span><% } %>
+      </div>
+      <% if (users.length === 0) { %>
+        <div class="empty-state"><i class="fas fa-user-slash"></i><p>Tidak ada pengguna yang cocok dengan filter.</p></div>
+      <% } else { %>
       <div class="table-wrapper">
         <table class="data-table">
           <thead>
-            <tr><th>Nama</th><th>Email</th><th>Phone</th><th>Role</th><th>VIP</th><th>Status</th><th>Aksi</th></tr>
+            <tr><th>Nama</th><th>Email</th><th>Phone</th><th>Role</th><th>Akses</th><th>Grade</th><th>Status</th><th>Bergabung</th><th>Aksi</th></tr>
           </thead>
           <tbody>
             <% users.forEach(u => { %>
@@ -50,8 +91,20 @@
               <td><span class="badge-pill badge-<%= u.role %>"><%= u.role %></span></td>
               <td>
                 <form action="/admin/users/<%= u.id %>/toggle-vip" method="POST" style="display:inline">
-                  <button class="btn-icon"><%= u.is_vip ? '⭐' : '☆' %></button>
+                  <button class="btn-icon" title="Toggle VIP"><%= u.is_vip ? 'VIP' : 'VIP?' %></button>
                 </form>
+                <% if (u.role === 'member') { %>
+                <form action="/admin/users/<%= u.id %>/toggle-luxury" method="POST" style="display:inline">
+                  <button class="btn-icon" title="Toggle Luxury"><%= u.is_luxury ? 'Luxury' : 'Luxury?' %></button>
+                </form>
+                <% } %>
+              </td>
+              <td>
+                <% if (u.role === 'tutor') { %>
+                  <span class="badge-pill badge-active">Grade <%= u.tutor_grade || 'B' %></span>
+                <% } else { %>
+                  -
+                <% } %>
               </td>
               <td>
                 <% if (u.is_active) { %>
@@ -60,18 +113,56 @@
                   <span class="badge-pill badge-cancelled">Non-aktif</span>
                 <% } %>
               </td>
+              <td><%= formatDate(u.created_at) %></td>
               <td>
-                <form action="/admin/users/<%= u.id %>/toggle-status" method="POST" style="display:inline">
-                  <button class="btn btn-sm btn-outline" title="Toggle status">
-                    <i class="fas fa-power-off"></i>
+                <div class="row-actions">
+                  <a href="/admin/users/<%= u.id %>" class="btn-icon" title="Detail lengkap"><i class="fas fa-eye"></i></a>
+                  <button type="button" class="btn-icon btn-edit-icon" title="Edit"
+                    data-edit-user
+                    data-id="<%= u.id %>"
+                    data-name="<%= u.name %>"
+                    data-email="<%= u.email %>"
+                    data-phone="<%= u.phone || '' %>"
+                    data-role="<%= u.role %>"
+                    data-vip="<%= u.is_vip %>"
+                    data-luxury="<%= u.is_luxury %>"
+                    data-grade="<%= u.tutor_grade || 'B' %>"
+                    data-active="<%= u.is_active %>"
+                    data-bio="<%= u.bio || '' %>">
+                    <i class="fas fa-pen"></i>
                   </button>
-                </form>
+                  <form action="/admin/users/<%= u.id %>/toggle-status" method="POST" style="display:inline">
+                    <button class="btn-icon" title="<%= u.is_active ? 'Nonaktifkan' : 'Aktifkan' %>" <%= u.id === user.id ? 'disabled' : '' %>>
+                      <i class="fas fa-power-off"></i>
+                    </button>
+                  </form>
+                  <form action="/admin/users/<%= u.id %>/delete" method="POST" style="display:inline"
+                        data-confirm="Hapus pengguna <%= u.name %>? Tindakan ini permanen.">
+                    <button class="btn-icon btn-danger-icon" title="Hapus" <%= u.id === user.id ? 'disabled' : '' %>>
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </form>
+                </div>
               </td>
             </tr>
             <% }) %>
           </tbody>
         </table>
       </div>
+
+      <% if (pagination.totalPages > 1) {
+           const qs = (p) => new URLSearchParams({ role: filters.role || '', search: filters.search || '', status: filters.status || '', page: p }).toString(); %>
+        <div class="pagination">
+          <% if (pagination.page > 1) { %>
+            <a href="/admin/users?<%= qs(pagination.page - 1) %>" class="btn btn-sm btn-outline"><i class="fas fa-chevron-left"></i> Sebelumnya</a>
+          <% } %>
+          <span class="pagination-info">Halaman <%= pagination.page %> dari <%= pagination.totalPages %></span>
+          <% if (pagination.page < pagination.totalPages) { %>
+            <a href="/admin/users?<%= qs(pagination.page + 1) %>" class="btn btn-sm btn-outline">Berikutnya <i class="fas fa-chevron-right"></i></a>
+          <% } %>
+        </div>
+      <% } %>
+      <% } %>
     </div>
   </div>
 
@@ -82,7 +173,7 @@
         <h3>Tambah Pengguna</h3>
         <button class="modal-close" onclick="toggleModal('userModal')"><i class="fas fa-times"></i></button>
       </div>
-      <form action="/admin/users" method="POST" class="modal-form">
+      <form action="/admin/users" method="POST" class="modal-form" data-user-form>
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Nama</label>
@@ -97,6 +188,7 @@
           <div class="form-group">
             <label class="form-label">Password</label>
             <input type="password" name="password" class="form-input" required minlength="6">
+            <p class="field-hint">Minimal 6 karakter.</p>
           </div>
           <div class="form-group">
             <label class="form-label">Phone</label>
@@ -106,17 +198,33 @@
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Role</label>
-            <select name="role" class="form-input" required>
+            <select name="role" class="form-input" data-role-select required>
               <option value="member">Member</option>
               <option value="tutor">Tutor</option>
               <option value="admin">Admin</option>
             </select>
           </div>
-          <div class="form-group">
-            <label class="form-label" style="display:flex;align-items:center;gap:8px;margin-top:30px">
-              <input type="checkbox" name="is_vip"> Member VIP
-            </label>
+          <div class="form-group" data-role-only="member">
+            <label class="form-label">Keanggotaan</label>
+            <div class="check-row" style="margin-top:8px">
+              <label class="check-inline"><input type="checkbox" name="is_vip"> Member VIP</label>
+              <label class="check-inline"><input type="checkbox" name="is_luxury"> Luxury Class</label>
+            </div>
           </div>
+        </div>
+        <div class="form-group" data-role-only="tutor">
+          <label class="form-label">Grade Tutor</label>
+          <select name="tutor_grade" class="form-input">
+            <option value="A">Grade A</option>
+            <option value="B" selected>Grade B</option>
+            <option value="C">Grade C</option>
+          </select>
+          <p class="field-hint">Grade A dapat dipilih oleh member Luxury Class.</p>
+        </div>
+        <div class="form-group" data-role-only="tutor">
+          <label class="form-label">Bio Pengajar</label>
+          <textarea name="bio" class="form-textarea" rows="3" maxlength="420" placeholder="Pengalaman mengajar, keahlian, dan gaya mengajar..."></textarea>
+          <p class="field-hint">Tampil di profil tutor.</p>
         </div>
         <div class="form-actions">
           <button type="button" class="btn btn-outline" onclick="toggleModal('userModal')">Batal</button>
@@ -125,6 +233,116 @@
       </form>
     </div>
   </div>
+
+  <!-- Edit user modal -->
+  <div class="modal" id="editUserModal" style="display:none">
+    <div class="modal-overlay" onclick="toggleModal('editUserModal')"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Edit Pengguna</h3>
+        <button class="modal-close" onclick="toggleModal('editUserModal')"><i class="fas fa-times"></i></button>
+      </div>
+      <form id="editUserForm" method="POST" class="modal-form" data-user-form>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Nama</label>
+            <input type="text" name="name" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" name="email" class="form-input" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Password Baru</label>
+            <input type="password" name="password" class="form-input" minlength="6" placeholder="Kosongkan jika tidak diubah">
+            <p class="field-hint">Isi hanya jika ingin mengganti password.</p>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone</label>
+            <input type="tel" name="phone" class="form-input">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Role</label>
+            <select name="role" class="form-input" data-role-select required>
+              <option value="member">Member</option>
+              <option value="tutor">Tutor</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="margin-bottom:8px">Status</label>
+            <div class="check-row">
+              <label class="check-inline" data-role-only="member"><input type="checkbox" name="is_vip"> Member VIP</label>
+              <label class="check-inline" data-role-only="member"><input type="checkbox" name="is_luxury"> Luxury Class</label>
+              <label class="check-inline"><input type="checkbox" name="is_active"> Aktif</label>
+            </div>
+          </div>
+        </div>
+        <div class="form-group" data-role-only="tutor">
+          <label class="form-label">Grade Tutor</label>
+          <select name="tutor_grade" class="form-input">
+            <option value="A">Grade A</option>
+            <option value="B">Grade B</option>
+            <option value="C">Grade C</option>
+          </select>
+          <p class="field-hint">Grade A dapat dipilih oleh member Luxury Class.</p>
+        </div>
+        <div class="form-group" data-role-only="tutor">
+          <label class="form-label">Bio Pengajar</label>
+          <textarea name="bio" class="form-textarea" rows="3" maxlength="420" placeholder="Pengalaman mengajar, keahlian, dan gaya mengajar..."></textarea>
+          <p class="field-hint">Tampil di profil tutor.</p>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" onclick="toggleModal('editUserModal')">Batal</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan Perubahan</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
+
+<script>
+(function () {
+  // Show/hide role-specific fields (membership for member, grade/bio for tutor).
+  function syncRoleFields(form) {
+    var select = form.querySelector('[data-role-select]');
+    if (!select) return;
+    var role = select.value;
+    form.querySelectorAll('[data-role-only]').forEach(function (el) {
+      el.style.display = el.dataset.roleOnly.split(',').indexOf(role) !== -1 ? '' : 'none';
+    });
+  }
+
+  document.querySelectorAll('[data-user-form]').forEach(function (form) {
+    var select = form.querySelector('[data-role-select]');
+    if (select) select.addEventListener('change', function () { syncRoleFields(form); });
+    syncRoleFields(form);
+  });
+
+  var form = document.getElementById('editUserForm');
+  document.querySelectorAll('[data-edit-user]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var d = btn.dataset;
+      form.action = '/admin/users/' + d.id;
+      form.querySelector('[name="name"]').value = d.name || '';
+      form.querySelector('[name="email"]').value = d.email || '';
+      form.querySelector('[name="phone"]').value = d.phone || '';
+      form.querySelector('[name="role"]').value = d.role || 'member';
+      form.querySelector('[name="password"]').value = '';
+      form.querySelector('[name="is_vip"]').checked = d.vip === 'true';
+      form.querySelector('[name="is_luxury"]').checked = d.luxury === 'true';
+      form.querySelector('[name="tutor_grade"]').value = d.grade || 'B';
+      form.querySelector('[name="is_active"]').checked = d.active === 'true';
+      form.querySelector('[name="bio"]').value = d.bio || '';
+      syncRoleFields(form);
+      toggleModal('editUserModal');
+    });
+  });
+})();
+</script>
 
 <%- include('../partials/footer') %>

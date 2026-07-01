@@ -15,7 +15,11 @@
       <% } %>
     </div>
     <h2 class="banner-name"><%= user.name %></h2>
-    <% if (user.is_vip) { %><div><span class="vip-badge-banner"><i class="fas fa-crown"></i> VIP Member</span></div><% } %>
+    <% if (user.is_luxury) { %>
+      <div><span class="vip-badge-banner"><i class="fas fa-gem"></i> Luxury Class</span></div>
+    <% } else if (user.is_vip) { %>
+      <div><span class="vip-badge-banner"><i class="fas fa-crown"></i> VIP Member</span></div>
+    <% } %>
     <a href="/member/profile" class="btn-edit-profile">
       <i class="fas fa-pen-to-square"></i> EDIT PROFILE
     </a>
@@ -47,6 +51,85 @@
   </div>
   <% } %>
 
+  <!-- Stats -->
+  <div class="container">
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-icon"><i class="fas fa-graduation-cap"></i></div>
+        <div class="stat-info"><span class="stat-value"><%= stats.programs %></span><span class="stat-label">Program Aktif</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-rate"><i class="fas fa-calendar-check"></i></div>
+        <div class="stat-info"><span class="stat-value"><%= stats.sessions %></span><span class="stat-label">Total Sesi</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-present"><i class="fas fa-user-check"></i></div>
+        <div class="stat-info"><span class="stat-value"><%= stats.attendanceRate %>%</span><span class="stat-label">Kehadiran</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-total"><i class="fas fa-award"></i></div>
+        <div class="stat-info"><span class="stat-value"><%= stats.certificates %></span><span class="stat-label">Sertifikat</span></div>
+      </div>
+    </div>
+  </div>
+
+  <% if (user.is_luxury) { %>
+  <div class="container">
+    <div class="section-card luxury-member-panel">
+      <div class="luxury-member-head">
+        <div>
+          <p>Luxury Class</p>
+          <h3>Benefit Aktif</h3>
+        </div>
+        <span><i class="fas fa-gem"></i> Active</span>
+      </div>
+      <div class="luxury-member-grid">
+        <div class="luxury-member-benefit">
+          <i class="fas fa-user-tie"></i>
+          <div>
+            <strong>Tutor Pilihan</strong>
+            <small><%= luxuryAccess && luxuryAccess.preferred_tutor ? luxuryAccess.preferred_tutor : 'Admin akan konfirmasi tutor Grade A.' %></small>
+          </div>
+        </div>
+        <a href="/member/video" class="luxury-member-benefit">
+          <i class="fas fa-play-circle"></i>
+          <div>
+            <strong>Video Premium</strong>
+            <small>Akses materi video premium.</small>
+          </div>
+        </a>
+        <a href="/member/toefl" class="luxury-member-benefit">
+          <i class="fas fa-trophy"></i>
+          <div>
+            <strong>Test TOEFL Gratis</strong>
+            <small>Latihan dan simulasi TOEFL.</small>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- Pending questionnaires -->
+  <% if (pendingQuiz && pendingQuiz.length > 0) { %>
+  <div class="container">
+    <div class="section-card alert-panel">
+      <h3 class="section-title"><i class="fas fa-clipboard-question"></i> Kuesioner Belum Dikerjakan <span class="count-badge"><%= pendingQuiz.length %></span></h3>
+      <div class="quiz-pending-list">
+        <% pendingQuiz.forEach(q => { %>
+        <div class="quiz-pending-item">
+          <div>
+            <strong><%= q.title %></strong>
+            <span class="table-subtext"><%= q.program_name %><% if (q.due_date) { %> &middot; deadline <%= formatDate(q.due_date) %><% } %></span>
+          </div>
+          <a href="/member/questionnaire/<%= q.id %>" class="btn btn-sm btn-primary"><i class="fas fa-pen"></i> Kerjakan</a>
+        </div>
+        <% }) %>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
   <!-- Menu Grid -->
   <div class="container">
     <div class="menu-grid">
@@ -69,7 +152,7 @@
         <div class="menu-icon-wrap">
           <div class="menu-icon"><i class="fas fa-user-check"></i></div>
         </div>
-        <span class="menu-label">Presence</span>
+        <span class="menu-label">Presensi</span>
       </div>
 
       <div class="menu-card" onclick="window.location='/member/questionnaire'">
@@ -93,17 +176,17 @@
         <span class="menu-label">E-Certificate</span>
       </div>
 
-      <div class="menu-card <%= !user.is_vip ? 'menu-card-locked' : '' %>" onclick="window.location='/member/toefl'">
+      <div class="menu-card <%= !user.is_luxury ? 'menu-card-locked' : '' %>" onclick="window.location='/member/toefl'">
         <div class="menu-icon-wrap">
-          <span class="card-badge badge-vip">VIP Only</span>
+          <span class="card-badge badge-vip">Luxury Class</span>
           <div class="menu-icon menu-icon-vip"><i class="fas fa-trophy"></i></div>
         </div>
         <span class="menu-label">TOEFL Simulation</span>
       </div>
 
-      <div class="menu-card" onclick="window.location='/member/video'">
+      <div class="menu-card <%= !user.is_luxury ? 'menu-card-locked' : '' %>" onclick="window.location='/member/video'">
         <div class="menu-icon-wrap">
-          <span class="card-badge badge-bonus">Bonus</span>
+          <span class="card-badge badge-bonus">Luxury Class</span>
           <div class="menu-icon menu-icon-bonus"><i class="fas fa-gift"></i></div>
         </div>
         <span class="menu-label">Video Premium</span>
@@ -114,6 +197,13 @@
           <div class="menu-icon"><i class="fas fa-arrows-rotate"></i></div>
         </div>
         <span class="menu-label">Renewal Program</span>
+      </div>
+
+      <div class="menu-card" onclick="window.location='/member/help-support'">
+        <div class="menu-icon-wrap">
+          <div class="menu-icon"><i class="fas fa-headset"></i></div>
+        </div>
+        <span class="menu-label">Help & Support</span>
       </div>
 
       <div class="menu-card menu-card-logout" onclick="if(confirm('Keluar dari akun?')) window.location='/logout'">

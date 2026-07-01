@@ -1,0 +1,98 @@
+<%- include('../partials/head') %>
+
+<main class="signup-page">
+  <div class="signup-shell">
+    <header class="signup-header">
+      <a href="/login" class="signup-logo" aria-label="Mr.BOB login">
+        <div class="logo-box">
+          <img src="/img/logo-mrbob.webp" alt="Mr.BOB" class="app-logo">
+        </div>
+      </a>
+      <a href="/login" class="signup-login-link">Masuk</a>
+    </header>
+
+    <section class="thanks-panel">
+      <div class="thanks-hero">
+        <p>
+          <img
+            class="thanks-hero-image"
+            src="https://app.kelasonlinemrbob.com/wp-content/uploads/2024/08/campur-1-300x228.webp"
+            alt="Kelas Online Mr.BOB"
+            width="300"
+            height="228"
+          >
+        </p>
+        <p class="signup-kicker">Pendaftaran Berhasil</p>
+        <h1>Terimakasih sudah mendaftar di <strong>Kelas Online Mr.BOB</strong></h1>
+        <p>Untuk selanjutnya, silahkan cek email dari kami di <strong><%= registration.email %></strong></p>
+        <div class="registration-code"><%= registration.registration_code %></div>
+      </div>
+
+      <% if (success && success.length > 0) { %>
+        <div class="alert alert-success signup-alert"><i class="fas fa-check-circle"></i> <%= success[0] %></div>
+      <% } %>
+      <% if (error && error.length > 0) { %>
+        <div class="alert alert-danger signup-alert"><i class="fas fa-exclamation-circle"></i> <%= error[0] %></div>
+      <% } %>
+
+      <div class="thanks-grid">
+        <div class="thanks-card">
+          <h2><i class="fas fa-user"></i> Data Member</h2>
+          <dl class="detail-list">
+            <div><dt>Nama</dt><dd><%= registration.name %></dd></div>
+            <div><dt>Email</dt><dd><%= registration.email %></dd></div>
+            <div><dt>WhatsApp</dt><dd><%= registration.phone || '-' %></dd></div>
+            <div><dt>Kota</dt><dd><%= registration.city || '-' %></dd></div>
+          </dl>
+        </div>
+
+        <div class="thanks-card">
+          <h2><i class="fas fa-layer-group"></i> Paket Belajar</h2>
+          <dl class="detail-list">
+            <div><dt>Program</dt><dd><%= registration.selected_class || '-' %></dd></div>
+            <div><dt>Tipe Paket</dt><dd><%= registration.package_group || '-' %></dd></div>
+            <div><dt>Paket</dt><dd><%= registration.package_name || '-' %></dd></div>
+            <div><dt>Durasi</dt><dd><%= registration.duration || '-' %></dd></div>
+            <div><dt>Pertemuan</dt><dd><%= registration.meeting_count || '-' %></dd></div>
+            <div><dt>Jam Belajar</dt><dd><%= registration.study_time || '-' %></dd></div>
+            <div><dt>Mulai Belajar</dt><dd><%= registration.start_date || '-' %></dd></div>
+            <% if (registration.preferred_tutor) { %>
+              <div><dt>Tutor Pilihan</dt><dd><%= registration.preferred_tutor %></dd></div>
+            <% } %>
+            <% if (registration.friend_name) { %>
+              <div><dt>Nama Teman</dt><dd><%= registration.friend_name %></dd></div>
+            <% } %>
+          </dl>
+        </div>
+      </div>
+
+      <div class="payment-box">
+        <div>
+          <span>Total Pembayaran</span>
+          <strong><%= formatCurrency(registration.package_price) %></strong>
+        </div>
+        <p>Status: <b><%= registration.status === 'confirmed' ? 'Bukti transfer sudah dikirim' : 'Menunggu bukti transfer' %></b></p>
+      </div>
+
+      <% if (registration.status !== 'confirmed') { %>
+        <%- include('../partials/payment-methods') %>
+      <% } %>
+
+      <% if (registration.package_note) { %>
+        <div class="summary-note"><%= registration.package_note %></div>
+      <% } %>
+
+      <div class="thanks-actions">
+        <% if (registration.status === 'confirmed') { %>
+          <a href="/login" class="btn btn-primary btn-full">Masuk ke Member Area</a>
+        <% } else { %>
+          <a href="/konfirmasi-transfer/<%= registration.registration_code %>" class="btn btn-primary btn-full">
+            <i class="fas fa-upload"></i> Konfirmasi Bukti Transfer
+          </a>
+        <% } %>
+      </div>
+    </section>
+  </div>
+</main>
+
+<%- include('../partials/footer') %>
