@@ -4,6 +4,11 @@ const crypto = require('crypto');
 const at = require('../utils/availableTime');
 const { parseCsv, rowsToObjects, toCsv } = require('../utils/csv');
 const { syncSchedule } = require('../utils/spreadsheetSync');
+const {
+  syncSchedulesFromSheet,
+  getLastSyncRun,
+  isScheduleSyncConfigured,
+} = require('../utils/scheduleSheetSync');
 const { sendScheduleNotificationEmails } = require('../utils/scheduleEmail');
 const { normalizeReportDays, ensureMemberReportsTable } = require('../utils/memberReports');
 const { ensureCertificateDetailsColumn } = require('../utils/certificates');
@@ -1015,8 +1020,9 @@ exports.scheduleImport = async (req, res) => {
       value: at.toISODate(r.period_start),
       label: at.formatPeriodRange(at.toISODate(r.period_start)),
     }));
+    const lastSync = await getLastSyncRun();
     res.render('admin/schedule-import', {
-      title: 'Import Schedule CSV',
+      title: 'Sync Jadwal',
       user: req.session.user,
       sheetUrl: scheduleSheetUrl,
       expectedHeaders: scheduleHeaders,
@@ -1025,6 +1031,8 @@ exports.scheduleImport = async (req, res) => {
       periods,
       filters: { period },
       stats,
+      syncConfigured: isScheduleSyncConfigured(),
+      lastSync,
       previewRows: [],
       result: null,
       errorReportId: null,
@@ -1035,6 +1043,26 @@ exports.scheduleImport = async (req, res) => {
     console.error(err);
     res.render('error', { title: 'Error', message: err.message, user: req.session.user });
   }
+};
+
+// Manual "Sync Sekarang" — pull the master sheet and reconcile schedules.
+exports.scheduleSyncNow = async (req, res) => {
+  try {
+    if (!isScheduleSyncConfigured()) {
+      req.flash('error', 'Sumber Google Sheet belum dikonfigurasi (SCHEDULE_SOURCE_URL kosong).');
+      return res.redirect('/admin/schedule-import');
+    }
+    const s = await syncSchedulesFromSheet({ triggeredBy: `admin:${req.session.user.id}` });
+    if (s.ok) {
+      req.flash('success', `Sync jadwal selesai — ${s.message}.`);
+    } else {
+      req.flash('error', `Sync jadwal gagal: ${s.message}`);
+    }
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal menjalankan sync jadwal.');
+  }
+  return res.redirect('/admin/schedule-import');
 };
 
 exports.importScheduleCsv = async (req, res) => {

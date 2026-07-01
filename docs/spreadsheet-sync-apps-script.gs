@@ -61,9 +61,55 @@ function doPost(e) {
   }
 }
 
-// Health check ketika URL dibuka di browser (GET).
-function doGet() {
-  return jsonOutput({ ok: true, service: 'Kelas Online Spreadsheet Sync' });
+// ---- INBOUND: app menarik master jadwal (Sheet = sumber kebenaran) ----
+// Aplikasi memanggil GET URL ini (SCHEDULE_SOURCE_URL) dan menerima seluruh baris
+// tab "Master Jadwal" sebagai JSON. Kolom header (baris 1):
+//   id, tutor_email, program_name, title, date, start_time, end_time,
+//   location, meeting_link, notes, member_emails
+var MASTER_SHEET_NAME = 'Master Jadwal';
+
+function doGet(e) {
+  if (e && e.parameter && e.parameter.ping) {
+    return jsonOutput({ ok: true, service: 'Kelas Online Spreadsheet Sync' });
+  }
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(MASTER_SHEET_NAME);
+    if (!sheet) return jsonOutput({ ok: true, rows: [] });
+    var values = sheet.getDataRange().getValues();
+    if (values.length < 2) return jsonOutput({ ok: true, rows: [] });
+
+    var tz = ss.getSpreadsheetTimeZone();
+    var headers = values[0].map(function (h) {
+      return String(h).trim().toLowerCase().replace(/\s+/g, '_');
+    });
+
+    var rows = [];
+    for (var i = 1; i < values.length; i++) {
+      var raw = values[i];
+      var allBlank = raw.every(function (c) { return String(c).trim() === ''; });
+      if (allBlank) continue;
+      var obj = {};
+      for (var j = 0; j < headers.length; j++) {
+        obj[headers[j]] = formatMasterCell(headers[j], raw[j], tz);
+      }
+      if (String(obj.id || '').trim() === '') continue; // baris tanpa ID diabaikan
+      rows.push(obj);
+    }
+    return jsonOutput({ ok: true, rows: rows });
+  } catch (err) {
+    return jsonOutput({ ok: false, error: String(err) });
+  }
+}
+
+// Ubah cell Date/waktu menjadi string yang stabil (hindari ambiguitas timezone).
+function formatMasterCell(header, value, tz) {
+  if (Object.prototype.toString.call(value) === '[object Date]') {
+    if (header === 'date') return Utilities.formatDate(value, tz, 'yyyy-MM-dd');
+    if (header === 'start_time' || header === 'end_time') return Utilities.formatDate(value, tz, 'HH:mm');
+    return Utilities.formatDate(value, tz, 'yyyy-MM-dd');
+  }
+  return value;
 }
 
 // ---- Pendaftaran: 1 baris per registration_code (upsert) ----

@@ -378,6 +378,23 @@ h1, h2, h3, h4, h5, h6 { line-height: 1.3; color: var(--gray-900); font-weight: 
 .plot-actions-btns { display: flex; gap: 10px; }
 .btn:disabled, .btn.is-disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; transform: none; }
 
+/* Admin: Sync Jadwal status */
+.sync-status {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 99px;
+}
+.sync-status.is-on { background: #eafaf0; color: #17663a; border: 1px solid #bff0d0; }
+.sync-status.is-off { background: #fff5f5; color: var(--danger); border: 1px solid #ffdcdc; }
+.sync-last {
+  display: flex; align-items: center; gap: 11px;
+  margin-top: 14px; padding: 11px 14px; border-radius: 12px;
+  background: var(--gray-50, #f8fafc); border: 1px solid var(--gray-100);
+}
+.sync-last.ok i { color: var(--success, #10b981); font-size: 18px; }
+.sync-last.fail i { color: var(--danger); font-size: 18px; }
+.sync-last strong { display: block; font-size: 13px; color: var(--gray-900); }
+.sync-last small { color: var(--gray-500); font-size: 12px; }
+
 /* Admin: Kelola Jadwal filter bar */
 .schedule-manage-filter {
   display: grid;

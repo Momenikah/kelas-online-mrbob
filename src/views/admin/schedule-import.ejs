@@ -7,7 +7,8 @@
   <div class="sub-banner">
     <a href="/admin" class="back-link"><i class="fas fa-arrow-left"></i></a>
     <div class="sub-banner-titles">
-      <h1>Import Schedule CSV</h1>
+      <h1>Sync Jadwal</h1>
+      <p class="sub-banner-desc">Google Sheet = master. Perubahan di sheet otomatis mengikuti ke jadwal aplikasi.</p>
     </div>
     <div class="sub-banner-actions">
       <a href="/admin/schedule" class="btn btn-light"><i class="fas fa-calendar-days"></i> Kelola Jadwal</a>
@@ -33,33 +34,42 @@
       </div>
     </div>
 
+    <%
+      const _cfg = (typeof syncConfigured !== 'undefined') ? syncConfigured : false;
+      const _last = (typeof lastSync !== 'undefined') ? lastSync : null;
+    %>
     <div class="section-card">
-      <h3 class="section-title"><i class="fas fa-file-csv"></i> Upload CSV Schedule</h3>
-      <form action="/admin/schedule-import" method="POST" enctype="multipart/form-data" class="modal-form">
-        <div class="form-group">
-          <label class="form-label">File CSV</label>
-          <input type="file" name="schedule_csv" class="form-input" accept=".csv,text/csv" required>
-          <p class="field-hint">Belum punya file? <a href="/admin/schedule-import/template.csv">Download template CSV</a> lalu isi sesuai contoh.</p>
-        </div>
-        <div class="form-actions">
-          <a href="/admin/schedule-import/template.csv" class="btn btn-outline">
-            <i class="fas fa-file-arrow-down"></i> Template CSV
-          </a>
-          <a href="/admin/available-times/export.csv" class="btn btn-outline">
-            <i class="fas fa-download"></i> Export Available Time
-          </a>
-          <a href="/admin/presences/export.csv" class="btn btn-outline">
-            <i class="fas fa-download"></i> Export Presensi
-          </a>
-          <button type="submit" class="btn btn-primary">
-            <i class="fas fa-upload"></i> Import Schedule
-          </button>
-        </div>
-      </form>
-      <div class="csv-schema-box">
-        <strong>Header CSV:</strong>
-        <code><%= expectedHeaders.join(',') %></code>
+      <div class="schedule-card-head">
+        <h3 class="section-title"><i class="fab fa-google-drive"></i> Sync dari Google Sheet</h3>
+        <span class="sync-status <%= _cfg ? 'is-on' : 'is-off' %>">
+          <i class="fas fa-<%= _cfg ? 'plug-circle-check' : 'plug-circle-xmark' %>"></i>
+          <%= _cfg ? 'Sumber terhubung' : 'Sumber belum dikonfigurasi' %>
+        </span>
       </div>
+      <p class="field-hint">Aplikasi menarik data dari tab <strong>Master Jadwal</strong>. Baris baru ditambah, yang diubah diperbarui, dan yang dihapus dari sheet akan <strong>dibatalkan</strong> (histori tetap tersimpan). Auto-sync berjalan berkala; klik tombol untuk menarik sekarang.</p>
+
+      <% if (_last) { %>
+        <div class="sync-last <%= _last.ok ? 'ok' : 'fail' %>">
+          <i class="fas fa-<%= _last.ok ? 'circle-check' : 'triangle-exclamation' %>"></i>
+          <div>
+            <strong>Sync terakhir: <%= formatDate(_last.created_at) %> <%= new Date(_last.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}) %></strong>
+            <small><%= _last.message || '-' %> · <%= _last.total_rows %> baris · via <%= _last.triggered_by %></small>
+          </div>
+        </div>
+      <% } %>
+
+      <form action="/admin/schedule-sync" method="POST" class="form-actions" style="margin-top:14px">
+        <a href="/admin/available-times/export.csv" class="btn btn-outline"><i class="fas fa-download"></i> Export Available Time</a>
+        <a href="/admin/presences/export.csv" class="btn btn-outline"><i class="fas fa-download"></i> Export Presensi</a>
+        <button type="submit" class="btn btn-primary" <%= _cfg ? '' : 'disabled' %>>
+          <i class="fas fa-rotate"></i> Sync Sekarang
+        </button>
+      </form>
+      <% if (!_cfg) { %>
+        <div class="csv-schema-box">
+          <strong>Aktifkan:</strong> deploy Apps Script (doGet) lalu isi <code>SCHEDULE_SOURCE_URL</code> di <code>.env</code> &amp; restart. Kolom sheet: <code>id, tutor_email, program_name, title, date, start_time, end_time, location, meeting_link, notes, member_emails</code>
+        </div>
+      <% } %>
     </div>
 
     <% if (result) { %>

@@ -60,6 +60,7 @@ router.post('/schedule/:id/delete', isAdmin, adminController.deleteSchedule);
 router.get('/schedule-plot', isAdmin, adminController.schedulePlot);
 router.post('/schedule-plot', isAdmin, adminController.generateSchedulePlot);
 router.get('/schedule-import', isAdmin, adminController.scheduleImport);
+router.post('/schedule-sync', isAdmin, adminController.scheduleSyncNow);
 router.get('/schedule-import/template.csv', isAdmin, adminController.downloadScheduleTemplate);
 router.post('/schedule-import', isAdmin, scheduleCsvUpload, adminController.importScheduleCsv);
 router.post('/schedule-import/schedule/:id/delete', isAdmin, adminController.deleteSchedule);

@@ -137,4 +137,8 @@ app.listen(PORT, () => {
   ensureUserAccessColumns(query)
     .then(() => console.log('Kolom akses user siap.'))
     .catch((err) => console.error('Gagal menyiapkan akses user:', err.message));
+  const { ensureScheduleSyncSchema, startSchedulePoller } = require('./utils/scheduleSheetSync');
+  ensureScheduleSyncSchema(query)
+    .then(() => { console.log('Kolom sync jadwal siap.'); startSchedulePoller(); })
+    .catch((err) => console.error('Gagal menyiapkan sync jadwal:', err.message));
 });
