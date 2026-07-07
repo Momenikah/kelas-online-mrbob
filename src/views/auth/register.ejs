@@ -339,8 +339,14 @@ const startDate = document.getElementById('startDate');
 const friendField = document.getElementById('friendField');
 const friendList = document.getElementById('friendList');
 const addFriendBtn = document.getElementById('addFriendBtn');
-const MAX_FRIENDS = 3;
+let maxFriends = 3;
 let friendRequired = false;
+// BTS/Private are per-person. Headcount bounds from the package note.
+function groupSizeBounds(note) {
+  const n = String(note || '');
+  if (!n.includes('HARUS MENDAFTAR')) return null;
+  return n.includes('2-3') ? { min: 2, max: 3 } : { min: 2, max: 2 };
+}
 const luxuryTutorField = document.getElementById('luxuryTutorField');
 const preferredTutorRadios = document.querySelectorAll('input[name="preferred_tutor_id"]');
 const tutorDetailModal = document.getElementById('tutorDetailModal');
@@ -512,11 +518,11 @@ function syncFriendUI() {
   friendList.querySelectorAll('.friend-input').forEach((input, index) => {
     input.required = friendRequired && index === 0;
   });
-  addFriendBtn.hidden = friendRows().length >= MAX_FRIENDS;
+  addFriendBtn.hidden = friendRows().length >= maxFriends;
 }
 
 function addFriendRow() {
-  if (friendRows().length >= MAX_FRIENDS) return;
+  if (friendRows().length >= maxFriends) return;
   const row = document.createElement('div');
   row.className = 'friend-row';
   row.innerHTML = `
@@ -533,19 +539,29 @@ function resetFriendRows() {
     </div>`;
 }
 
-addFriendBtn.addEventListener('click', addFriendRow);
+addFriendBtn.addEventListener('click', () => { addFriendRow(); updatePayment(); });
 friendList.addEventListener('click', (event) => {
   const removeBtn = event.target.closest('.friend-remove-btn');
   if (!removeBtn) return;
   removeBtn.closest('.friend-row').remove();
   syncFriendUI();
+  updatePayment();
+});
+// Recompute the per-person total live as friend names are typed.
+friendList.addEventListener('input', (event) => {
+  if (event.target.classList.contains('friend-input')) updatePayment();
 });
 
 function updateFriendRequirement(selectedPackage) {
-  const needsFriend = (selectedPackage.note || '').includes('HARUS MENDAFTAR');
+  const bounds = groupSizeBounds(selectedPackage.note);
+  const needsFriend = !!bounds;
   friendField.hidden = !needsFriend;
   friendRequired = needsFriend;
+  maxFriends = bounds ? bounds.max - 1 : 3;
   if (!needsFriend) resetFriendRows();
+  // Trim any friend rows beyond the package's allowed group size.
+  const rows = friendRows();
+  for (let i = rows.length - 1; i >= 1 && i >= maxFriends; i--) rows[i].remove();
   syncFriendUI();
 }
 
@@ -590,7 +606,13 @@ function updatePayment() {
 
   const uniqueRaw = String(phoneLastThree && phoneLastThree.value || '').trim();
   const uniqueCode = /^\d{3}$/.test(uniqueRaw) ? uniqueRaw : '';
-  const totalTransfer = selectedPackage.price + (uniqueCode ? Number(uniqueCode) : 0);
+  // Per-person group packages (BTS/Private): multiply by headcount (1 + friends).
+  const gBounds = groupSizeBounds(selectedPackage.note);
+  const filledFriends = Array.from(friendList.querySelectorAll('.friend-input'))
+    .filter((i) => i.value.trim() !== '').length;
+  const headcount = gBounds ? Math.min(gBounds.max, Math.max(gBounds.min, 1 + filledFriends)) : 1;
+  const subtotal = selectedPackage.price * headcount;
+  const totalTransfer = subtotal + (uniqueCode ? Number(uniqueCode) : 0);
 
   paymentSummary.innerHTML = `
     <div class="summary-heading">
@@ -607,8 +629,8 @@ function updatePayment() {
     </div>
     ${selectedPackage.note ? `<div class="summary-note">${escapeHtml(selectedPackage.note)}</div>` : ''}
     <div class="summary-row">
-      <span>Harga Paket</span>
-      <strong>${rupiah(selectedPackage.price)}</strong>
+      <span>Harga Paket${gBounds ? ` (${rupiah(selectedPackage.price)} × ${headcount} orang)` : ''}</span>
+      <strong>${rupiah(subtotal)}</strong>
     </div>
     <div class="summary-row">
       <span>Kode Unik</span>

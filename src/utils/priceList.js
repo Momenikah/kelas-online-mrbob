@@ -112,4 +112,15 @@ const packagesForProgram = (programName) => {
   return [luxuryPackage, ...vipPackages];
 };
 
-module.exports = { PRICE_LIST, packagesForProgram };
+// BTS / group-private packages are priced PER PERSON and require registering with
+// friends. Returns the allowed headcount { min, max } from the package note, or
+// null when the package is not a group package.
+//   "HARUS MENDAFTAR 2 ORANG"            -> exactly 2 (BTS)
+//   "HARUS MENDAFTAR DENGAN TEMAN (2-3 ORANG)" -> 2 or 3 (Private)
+const groupSizeBounds = (note) => {
+  const n = String(note || '');
+  if (!n.includes('HARUS MENDAFTAR')) return null;
+  return n.includes('2-3') ? { min: 2, max: 3 } : { min: 2, max: 2 };
+};
+
+module.exports = { PRICE_LIST, packagesForProgram, groupSizeBounds };

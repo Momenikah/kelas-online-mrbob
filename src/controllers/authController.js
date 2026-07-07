@@ -10,7 +10,7 @@ const {
 } = require('../utils/registrationEmail');
 const { syncRegistration, syncConfirmation } = require('../utils/spreadsheetSync');
 const { STUDY_TIME_SLOTS, PROGRAM_CATALOG } = require('../utils/catalog');
-const { PRICE_LIST } = require('../utils/priceList');
+const { PRICE_LIST, packagesForProgram, groupSizeBounds } = require('../utils/priceList');
 const { ensureUserAccessColumns, isLuxuryPackage, getAccessFromRegistration } = require('../utils/userAccess');
 
 const ensureRegistrationTable = async () => {
@@ -155,10 +155,21 @@ exports.register = async (req, res) => {
     start_date, preferred_tutor_id, friend_name, coupon_code, referral_code
   } = req.body;
 
-  const friendNames = (Array.isArray(friend_name) ? friend_name : [friend_name])
+  const friendList = (Array.isArray(friend_name) ? friend_name : [friend_name])
     .map((value) => (value || '').trim())
-    .filter(Boolean)
-    .join(', ');
+    .filter(Boolean);
+  const friendNames = friendList.join(', ');
+
+  // Group packages (BTS/Private) are priced per person. Recompute the amount
+  // authoritatively from the catalog × headcount (1 + friends, clamped to the
+  // package's allowed group size) so the invoice can't be under/over-charged.
+  const catalogPkg = packagesForProgram(selected_class).find((p) => p.name === package_name);
+  const perPersonPrice = catalogPkg ? Number(catalogPkg.price) : (package_price ? Number(package_price) : 0);
+  const groupBounds = groupSizeBounds(catalogPkg ? catalogPkg.note : package_note);
+  const headcount = groupBounds
+    ? Math.min(groupBounds.max, Math.max(groupBounds.min, 1 + friendList.length))
+    : 1;
+  const finalPackagePrice = perPersonPrice * headcount;
 
   try {
     await ensureRegistrationTable();
@@ -239,7 +250,7 @@ exports.register = async (req, res) => {
         selected_class || null,
         package_group || null,
         package_name || null,
-        package_price ? Number(package_price) : null,
+        finalPackagePrice > 0 ? finalPackagePrice : null,
         package_note || null,
         duration || null,
         meeting_count || null,
