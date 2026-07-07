@@ -269,10 +269,12 @@ function renderPackages() {
   if (rPackageType.options.length > 1) rPackageType.selectedIndex = 1;
   updateSummary();
 }
-function renderStudyTimes(group) {
+function renderStudyTimes(group, pkg) {
+  // Paket grup (BTS + Private 3x/2x — "HARUS MENDAFTAR") pakai jam penuh seperti VIP.
+  const isGroupPkg = pkg && String(pkg.note || '').includes('HARUS MENDAFTAR');
   let times = defaultStudyTimes, label = 'Jam Belajar';
-  if (group === 'Private' || group === 'BTS') { times = privateStudyTimes; label = 'Jam Belajar ' + (group === 'BTS' ? 'BTS' : 'Private'); }
-  else if (group === 'Semi Private') { times = semiPrivateStudyTimes; label = 'Jam Belajar Semi Private'; }
+  if (group === 'Semi Private') { times = semiPrivateStudyTimes; label = 'Jam Belajar Semi Private'; }
+  else if ((group === 'Private' || group === 'BTS') && !isGroupPkg) { times = privateStudyTimes; label = 'Jam Belajar ' + (group === 'BTS' ? 'BTS' : 'Private'); }
   if (rStudyTimeLabel) rStudyTimeLabel.textContent = label;
   const prev = rStudyTime.value;
   rStudyTime.innerHTML = '<option value="">-- Pilih Jam --</option>';
@@ -305,7 +307,7 @@ function updateSummary() {
   rMeetingCount.value = pkg.meetings + ' pertemuan';
   rPackageName.value = pkg.name;
   rPackagePrice.value = pkg.price;
-  renderStudyTimes(group);
+  renderStudyTimes(group, pkg);
 
   const base = Number(pkg.price) || 0;
   const total = Math.max(0, base - RENEWAL_DISCOUNT);

@@ -492,22 +492,27 @@ function setProgramDetailRequired(isRequired) {
 const privateStudyTimes = ['16.00 WIB - 17.00 WIB', '19.00 WIB - 20.00 WIB', '20.00 WIB - 21.00 WIB'];
 const semiPrivateStudyTimes = ['19.00 WIB - 20.00 WIB'];
 
-function renderStudyTimes(group) {
+function renderStudyTimes(group, pkg) {
+  // Group packages (BTS + Private 3x/2x — those with "HARUS MENDAFTAR") pakai
+  // jam belajar penuh seperti VIP. Hanya PRIVATE/1 BULAN - PRIVATE solo yang dibatasi.
+  const isGroupPkg = pkg ? !!groupSizeBounds(pkg.note) : false;
   let times = defaultStudyTimes;
   let label = 'Pilihan Jam Belajar';
-  if (group === 'Private' || group === 'BTS') {
-    times = privateStudyTimes;
-    label = `Pilihan Jam Belajar ${group === 'BTS' ? 'BTS' : 'Private'}`;
-  } else if (group === 'Semi Private') {
+  if (group === 'Semi Private') {
     times = semiPrivateStudyTimes;
     label = 'Pilihan Jam Belajar Semi Private';
+  } else if ((group === 'Private' || group === 'BTS') && !isGroupPkg) {
+    times = privateStudyTimes;
+    label = `Pilihan Jam Belajar ${group === 'BTS' ? 'BTS' : 'Private'}`;
   }
 
   if (studyTimeLabel) studyTimeLabel.textContent = label;
+  const prev = studyTime.value;
   studyTime.innerHTML = '<option value="">Pilih jam</option>';
   times.forEach((time) => {
     studyTime.insertAdjacentHTML('beforeend', `<option>${escapeHtml(time)}</option>`);
   });
+  if (times.indexOf(prev) !== -1) studyTime.value = prev;
 }
 
 function friendRows() {
@@ -600,7 +605,7 @@ function updatePayment() {
   packageGroupValue.value = selectedGroup;
   packagePrice.value = selectedPackage.price;
   packageNote.value = selectedPackage.note || '';
-  renderStudyTimes(selectedGroup);
+  renderStudyTimes(selectedGroup, selectedPackage);
   updateFriendRequirement(selectedPackage);
   updateLuxuryTutorRequirement(selectedPackage);
 
