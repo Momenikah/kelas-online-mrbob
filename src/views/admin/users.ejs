@@ -40,22 +40,34 @@
       </div>
     </div>
 
+    <!-- Role tabs — each role is its own page -->
+    <% const tabs = [
+         { key: 'member', label: 'Member', icon: 'fa-user-graduate', count: stats.members },
+         { key: 'tutor',  label: 'Tutor',  icon: 'fa-chalkboard-teacher', count: stats.tutors },
+         { key: 'admin',  label: 'Admin',  icon: 'fa-user-shield', count: stats.admins },
+       ]; %>
+    <div class="user-tabs">
+      <% tabs.forEach(t => {
+           const qs = new URLSearchParams({ role: t.key, search: filters.search || '', status: filters.status || '' }).toString(); %>
+        <a href="/admin/users?<%= qs %>" class="user-tab <%= filters.role === t.key ? 'active' : '' %>">
+          <i class="fas <%= t.icon %>"></i>
+          <span><%= t.label %></span>
+          <b><%= t.count %></b>
+        </a>
+      <% }) %>
+    </div>
+
     <div class="section-card">
       <form method="GET" action="/admin/users" class="filter-form">
+        <input type="hidden" name="role" value="<%= filters.role %>">
         <input type="text" name="search" class="form-input" placeholder="Cari nama, email, atau no. HP..." value="<%= filters.search || '' %>">
-        <select name="role" class="form-input">
-          <option value="">Semua Role</option>
-          <option value="admin" <%= filters.role === 'admin' ? 'selected' : '' %>>Admin</option>
-          <option value="tutor" <%= filters.role === 'tutor' ? 'selected' : '' %>>Tutor</option>
-          <option value="member" <%= filters.role === 'member' ? 'selected' : '' %>>Member</option>
-        </select>
         <select name="status" class="form-input">
           <option value="">Semua Status</option>
           <option value="active" <%= filters.status === 'active' ? 'selected' : '' %>>Aktif</option>
           <option value="inactive" <%= filters.status === 'inactive' ? 'selected' : '' %>>Non-aktif</option>
         </select>
         <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Cari</button>
-        <a href="/admin/users" class="btn btn-outline">Reset</a>
+        <a href="/admin/users?role=<%= filters.role %>" class="btn btn-outline">Reset</a>
         <a href="/admin/users/export.csv?<%= new URLSearchParams({ role: filters.role || '', search: filters.search || '', status: filters.status || '' }).toString() %>" class="btn btn-outline"><i class="fas fa-download"></i> Export CSV</a>
       </form>
     </div>
@@ -69,9 +81,17 @@
         <div class="empty-state"><i class="fas fa-user-slash"></i><p>Tidak ada pengguna yang cocok dengan filter.</p></div>
       <% } else { %>
       <div class="table-wrapper">
-        <table class="data-table">
+        <table class="data-table users-table">
           <thead>
-            <tr><th>Nama</th><th>Email</th><th>Phone</th><th>Role</th><th>Akses</th><th>Grade</th><th>Status</th><th>Bergabung</th><th>Aksi</th></tr>
+            <tr>
+              <th>Nama</th>
+              <th>Kontak</th>
+              <% if (filters.role === 'member') { %><th>Akses</th><% } %>
+              <% if (filters.role === 'tutor') { %><th>Grade</th><% } %>
+              <th>Status</th>
+              <th>Bergabung</th>
+              <th class="col-actions">Aksi</th>
+            </tr>
           </thead>
           <tbody>
             <% users.forEach(u => { %>
@@ -83,37 +103,37 @@
                   <% } else { %>
                     <div class="table-avatar-init"><%= getInitials(u.name) %></div>
                   <% } %>
-                  <%= u.name %>
+                  <div class="user-name-block">
+                    <strong><%= u.name %></strong>
+                    <% if (u.id === user.id) { %><span class="user-you">Anda</span><% } %>
+                  </div>
                 </div>
               </td>
-              <td><%= u.email %></td>
-              <td><%= u.phone || '-' %></td>
-              <td><span class="badge-pill badge-<%= u.role %>"><%= u.role %></span></td>
               <td>
-                <form action="/admin/users/<%= u.id %>/toggle-vip" method="POST" style="display:inline">
-                  <button class="btn-icon" title="Toggle VIP"><%= u.is_vip ? 'VIP' : 'VIP?' %></button>
-                </form>
-                <% if (u.role === 'member') { %>
-                <form action="/admin/users/<%= u.id %>/toggle-luxury" method="POST" style="display:inline">
-                  <button class="btn-icon" title="Toggle Luxury"><%= u.is_luxury ? 'Luxury' : 'Luxury?' %></button>
-                </form>
-                <% } %>
+                <div class="user-contact">
+                  <span><i class="fas fa-envelope"></i> <%= u.email %></span>
+                  <span class="muted"><i class="fas fa-phone"></i> <%= u.phone || '-' %></span>
+                </div>
               </td>
+              <% if (filters.role === 'member') { %>
               <td>
-                <% if (u.role === 'tutor') { %>
-                  <span class="badge-pill badge-active">Grade <%= u.tutor_grade || 'B' %></span>
-                <% } else { %>
-                  -
-                <% } %>
+                <div class="access-toggles">
+                  <form action="/admin/users/<%= u.id %>/toggle-vip" method="POST">
+                    <button class="access-chip <%= u.is_vip ? 'on' : '' %>" title="<%= u.is_vip ? 'Nonaktifkan VIP' : 'Jadikan VIP' %>"><i class="fas fa-star"></i> VIP</button>
+                  </form>
+                  <form action="/admin/users/<%= u.id %>/toggle-luxury" method="POST">
+                    <button class="access-chip luxury <%= u.is_luxury ? 'on' : '' %>" title="<%= u.is_luxury ? 'Nonaktifkan Luxury' : 'Jadikan Luxury' %>"><i class="fas fa-gem"></i> Luxury</button>
+                  </form>
+                </div>
               </td>
+              <% } %>
+              <% if (filters.role === 'tutor') { %>
+              <td><span class="grade-badge grade-<%= (u.tutor_grade || 'B') %>">Grade <%= u.tutor_grade || 'B' %></span></td>
+              <% } %>
               <td>
-                <% if (u.is_active) { %>
-                  <span class="badge-pill badge-completed">Aktif</span>
-                <% } else { %>
-                  <span class="badge-pill badge-cancelled">Non-aktif</span>
-                <% } %>
+                <span class="status-dot <%= u.is_active ? 'active' : 'inactive' %>"><%= u.is_active ? 'Aktif' : 'Non-aktif' %></span>
               </td>
-              <td><%= formatDate(u.created_at) %></td>
+              <td class="muted"><%= formatDate(u.created_at) %></td>
               <td>
                 <div class="row-actions">
                   <a href="/admin/users/<%= u.id %>" class="btn-icon" title="Detail lengkap"><i class="fas fa-eye"></i></a>
@@ -322,6 +342,13 @@
     if (select) select.addEventListener('change', function () { syncRoleFields(form); });
     syncRoleFields(form);
   });
+
+  // Pre-select the active tab's role when adding a new user.
+  var addForm = document.querySelector('#userModal form[data-user-form]');
+  if (addForm) {
+    var addRole = addForm.querySelector('[name="role"]');
+    if (addRole) { addRole.value = '<%= filters.role %>'; syncRoleFields(addForm); }
+  }
 
   var form = document.getElementById('editUserForm');
   document.querySelectorAll('[data-edit-user]').forEach(function (btn) {

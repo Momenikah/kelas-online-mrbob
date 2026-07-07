@@ -34,6 +34,32 @@
     </div>
     <% } %>
 
+    <%
+      const visibleMaterials = (programMaterials || []).filter((pm) => !filters.programId || String(filters.programId) === String(pm.id));
+    %>
+    <% if (visibleMaterials.length > 0) { %>
+    <div class="section-card module-materials">
+      <h3 class="section-title"><i class="fab fa-google-drive"></i> Materi Program (Google Drive)</h3>
+      <p class="module-materials-note">Materi lengkap sesuai program yang kamu ikuti. Hanya program yang kamu daftarkan yang tampil di sini.</p>
+      <div class="module-materials-grid">
+        <% visibleMaterials.forEach(pm => { %>
+          <div class="module-material-item">
+            <div class="module-material-info">
+              <span class="module-material-icon"><i class="fas fa-folder-open"></i></span>
+              <div>
+                <strong><%= pm.name %></strong>
+                <small>Materi belajar lengkap</small>
+              </div>
+            </div>
+            <a href="<%= pm.material_url %>" class="btn btn-sm btn-primary" target="_blank" rel="noopener">
+              <i class="fas fa-up-right-from-square"></i> Buka Materi
+            </a>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+    <% } %>
+
     <% if (modules.length === 0) { %>
       <div class="empty-state">
         <i class="fas fa-book-open"></i>

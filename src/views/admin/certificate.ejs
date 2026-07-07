@@ -24,7 +24,19 @@
 
     <div class="section-card">
       <form method="GET" action="/admin/certificate" class="filter-form">
-        <input type="text" name="search" class="form-input" placeholder="Cari member / program / nomor sertifikat..." value="<%= filters.search || '' %>">
+        <input type="text" name="search" class="form-input" placeholder="Cari member / program / tutor / nomor sertifikat..." value="<%= filters.search || '' %>">
+        <select name="tutor" class="form-input" onchange="this.form.submit()">
+          <option value="">Semua Tutor</option>
+          <% tutorOptions.forEach(t => { %>
+            <option value="<%= t %>" <%= filters.tutor === t ? 'selected' : '' %>><%= t %></option>
+          <% }) %>
+        </select>
+        <select name="period" class="form-input" onchange="this.form.submit()">
+          <option value="">Semua Periode</option>
+          <% periodOptions.forEach(pr => { %>
+            <option value="<%= pr %>" <%= filters.period === pr ? 'selected' : '' %>><%= pr %></option>
+          <% }) %>
+        </select>
         <button class="btn btn-primary"><i class="fas fa-search"></i> Cari</button>
         <a href="/admin/certificate" class="btn btn-outline">Reset</a>
       </form>
@@ -37,7 +49,7 @@
       <% } else { %>
         <div class="table-wrapper">
           <table class="data-table">
-            <thead><tr><th>Nomor</th><th>Member</th><th>Program</th><th>Kategori</th><th>Grade</th><th>Tanggal</th><th>Status</th><th>Aksi</th></tr></thead>
+            <thead><tr><th>Nomor</th><th>Member</th><th>Program</th><th>Tutor</th><th>Periode</th><th>Kategori</th><th>Grade</th><th>Tanggal</th><th>Status</th><th>Aksi</th></tr></thead>
             <tbody>
               <% certificates.forEach(c => { %>
                 <% const d = c.details || {}; %>
@@ -45,6 +57,8 @@
                   <td><%= c.certificate_number %></td>
                   <td><strong><%= c.member_name %></strong></td>
                   <td><%= c.program_name %></td>
+                  <td><%= c.tutor_name || '-' %></td>
+                  <td><%= c.period_label || '-' %></td>
                   <td><%= d.category || '-' %></td>
                   <td><%= d.grade || '-' %></td>
                   <td><%= formatDate(c.issued_date) %></td>
@@ -53,6 +67,11 @@
                     <a class="btn btn-outline btn-sm" href="/admin/certificate/<%= c.id %>/print" target="_blank" rel="noopener">
                       <i class="fas fa-eye"></i> Lihat
                     </a>
+                    <form action="/admin/certificate/<%= c.id %>/sync" method="POST" style="display:inline">
+                      <button type="submit" class="btn btn-primary btn-sm" title="Sinkronkan sertifikat & personal report ke spreadsheet">
+                        <i class="fas fa-file-export"></i> Sync
+                      </button>
+                    </form>
                   </td>
                 </tr>
               <% }) %>

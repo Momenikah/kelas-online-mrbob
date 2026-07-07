@@ -21,6 +21,8 @@ const ensureRenewalRequestsTable = async (query) => {
       updated_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  // Carry the class chosen at the initial registration onto the renewal request.
+  await query(`ALTER TABLE renewal_requests ADD COLUMN IF NOT EXISTS selected_class VARCHAR(255)`);
 };
 
 const renewalStatuses = ['pending', 'approved', 'rejected', 'cancelled'];

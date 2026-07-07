@@ -6,6 +6,16 @@ const methodOverride = require('method-override');
 const path = require('path');
 const fs = require('fs');
 
+// Process-level safety nets: log async errors instead of letting them silently
+// kill the server. PM2 still restarts on a hard exit, but this keeps the app
+// alive for recoverable rejections and makes crashes diagnosable in the logs.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason && reason.stack ? reason.stack : reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err && err.stack ? err.stack : err);
+});
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -78,23 +88,37 @@ app.use('/member', require('./routes/member'));
 app.use('/tutor', require('./routes/tutor'));
 app.use('/admin', require('./routes/admin'));
 
+// Safe render helper — never let the error page itself throw (e.g. missing view).
+const renderError = (res, status, title, message, user) => {
+  try {
+    res.status(status).render('error', { title, message, user: user || null });
+  } catch (e) {
+    console.error('[error-view failed]', e && e.message);
+    res.status(status).type('html').send(`<h1>${title}</h1><p>${message}</p>`);
+  }
+};
+
 // 404
 app.use((req, res) => {
-  res.status(404).render('error', {
-    title: 'Halaman Tidak Ditemukan',
-    message: 'Halaman yang Anda cari tidak ditemukan.',
-    user: req.session.user,
-  });
+  renderError(res, 404, 'Halaman Tidak Ditemukan', 'Halaman yang Anda cari tidak ditemukan.', req.session && req.session.user);
 });
 
-// Error handler
+// Global error handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).render('error', {
-    title: 'Terjadi Kesalahan',
-    message: 'Terjadi kesalahan pada server. Silakan coba lagi.',
-    user: req.session.user,
-  });
+  const user = req.session && req.session.user;
+
+  // Malformed / oversized request body -> 400 instead of a generic 500.
+  if (err && (err.type === 'entity.parse.failed' || err.type === 'entity.too.large' || (err instanceof SyntaxError && 'body' in err))) {
+    console.warn(`[400] Bad request body ${req.method} ${req.originalUrl}: ${err.message}`);
+    return renderError(res, 400, 'Permintaan Tidak Valid', 'Data yang dikirim tidak valid. Silakan coba lagi.', user);
+  }
+
+  console.error(`[500] ${req.method} ${req.originalUrl}\n`, err && err.stack ? err.stack : err);
+
+  // If the response already started streaming, defer to Express' default handler.
+  if (res.headersSent) return next(err);
+
+  renderError(res, 500, 'Terjadi Kesalahan', 'Terjadi kesalahan pada server. Silakan coba lagi.', user);
 });
 
 app.listen(PORT, () => {

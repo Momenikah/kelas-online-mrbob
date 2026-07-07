@@ -77,11 +77,23 @@
       overflow: hidden;
       page-break-after: always;
       break-after: page;
+      container-type: inline-size;
     }
     .sheet:last-child { page-break-after: auto; break-after: auto; }
-    .sheet-general { aspect-ratio: 2160 / 3056; }
+    .sheet-general { aspect-ratio: 2086 / 2947; }
     .sheet-test { aspect-ratio: 1414 / 2000; }
-    .sheet-report { aspect-ratio: 1447 / 2048; }
+    .sheet-report { aspect-ratio: 2086 / 2947; }
+    /* Value overlays positioned/sized relative to the sheet (cqw = 1% of sheet width). */
+    .v {
+      position: absolute;
+      z-index: 1;
+      color: #111;
+      font-family: Georgia, "Times New Roman", serif;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+    .v.c { transform: translate(-50%, -50%); text-align: center; }
+    .v.l { transform: translateY(-50%); }
     .template-img {
       position: absolute;
       inset: 0;
@@ -106,31 +118,6 @@
       font-family: Georgia, "Times New Roman", serif;
       font-weight: 800;
       letter-spacing: .2px;
-    }
-    .general-name {
-      left: 10.7%;
-      top: 36.5%;
-      width: 78%;
-      font-size: clamp(26px, 4.2vw, 46px);
-    }
-    .general-grade {
-      left: 11%;
-      top: 46.4%;
-      width: 78%;
-      font-size: clamp(24px, 4vw, 42px);
-    }
-    .general-program {
-      left: 11%;
-      top: 58.3%;
-      width: 79%;
-      font-size: clamp(25px, 3.8vw, 42px);
-      text-transform: uppercase;
-    }
-    .general-period {
-      left: 13.2%;
-      top: 68.9%;
-      width: 74%;
-      font-size: clamp(21px, 3.1vw, 34px);
     }
     .test-name {
       left: 10.8%;
@@ -164,113 +151,6 @@
       top: 69.6%;
       width: 78%;
       font-size: clamp(19px, 2.7vw, 31px);
-    }
-    .report-title {
-      top: 14.2%;
-      left: 0;
-      width: 100%;
-      text-align: center;
-      font-size: clamp(25px, 3.2vw, 36px);
-    }
-    .report-code {
-      top: 18.9%;
-      left: 0;
-      width: 100%;
-      text-align: center;
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(8px, 1vw, 12px);
-      font-weight: 500;
-    }
-    .report-ident {
-      top: 22.1%;
-      left: 8.6%;
-      width: 82.8%;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(13px, 1.55vw, 18px);
-      font-weight: 800;
-    }
-    .report-band {
-      left: 8.2%;
-      width: 83.5%;
-      height: 3.05%;
-      display: flex;
-      align-items: center;
-      padding-left: 8px;
-      background: #8248d8;
-      color: #fff;
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(18px, 2.25vw, 26px);
-      font-weight: 800;
-    }
-    .report-band.personal { top: 28.3%; }
-    .report-band.improvement { top: 60.7%; }
-    .mini-score {
-      top: 32.7%;
-      left: 8.2%;
-      width: 83.5%;
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      border: 1px solid #111;
-      font-family: Georgia, "Times New Roman", serif;
-      text-align: center;
-    }
-    .mini-score div {
-      min-height: 42px;
-      border-right: 1px solid #111;
-      display: grid;
-      align-content: center;
-      gap: 5px;
-      font-size: clamp(8px, .75vw, 11px);
-      font-weight: 700;
-    }
-    .mini-score div:last-child { border-right: 0; }
-    .mini-score strong { font-size: clamp(12px, 1.3vw, 18px); }
-    .report-table {
-      top: 38.8%;
-      left: 8.2%;
-      width: 83.5%;
-      border-collapse: collapse;
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(10px, 1.05vw, 14px);
-      text-align: center;
-    }
-    .report-table th {
-      background: #8248d8;
-      color: #fff;
-      padding: 7px 6px;
-      border: 1px solid #111;
-      font-size: clamp(12px, 1.2vw, 16px);
-    }
-    .report-table td {
-      border: 1px solid #111;
-      padding: 7px 6px;
-      min-height: 27px;
-    }
-    .report-table td:first-child {
-      background: #fff36a;
-      font-weight: 800;
-    }
-    .improvement-table {
-      top: 66.2%;
-      left: 8.2%;
-      width: 83.5%;
-      border-collapse: collapse;
-      font-family: Georgia, "Times New Roman", serif;
-      text-align: center;
-      font-size: clamp(9px, .9vw, 12px);
-    }
-    .improvement-table th {
-      font-size: clamp(14px, 1.5vw, 20px);
-      padding-bottom: 4px;
-    }
-    .improvement-table td {
-      width: 50%;
-      border: 1px solid #111;
-      padding: 7px 9px;
-      min-height: 38px;
     }
     @media print {
       body { padding: 0; background: #fff; }
@@ -319,49 +199,32 @@
     <% } else { %>
       <section class="sheet sheet-general">
         <img class="template-img" src="/img/certificates/sertifikat-umum.png" alt="">
-        <div class="abs top-code"><%= dateSlash %>/<%= certNo %></div>
-        <div class="abs general-name serif"><%= recipientName %></div>
-        <div class="abs general-grade serif"><%= gradeText %></div>
-        <div class="abs general-program serif"><%= programName %></div>
-        <div class="abs general-period serif"><%= periodLabel %></div>
+        <div class="v l" style="left:12%;top:41.8%;font-size:3.2cqw;"><%= recipientName %></div>
+        <div class="v l" style="left:12%;top:50.5%;font-size:3cqw;"><%= gradeText %></div>
+        <div class="v l" style="left:12%;top:59.2%;font-size:2.9cqw;"><%= programName %></div>
+        <div class="v l" style="left:12%;top:67.2%;font-size:2.4cqw;"><%= periodLabel %></div>
       </section>
     <% } %>
 
-    <% if (hasPersonalReport) { %>
+    <% if (hasPersonalReport) {
+         const miniVals = [scores.speaking_score, scores.vocabulary_score, scores.grammar_score, scores.pronunciation_score, scores.understanding_score, scores.cefr_score];
+         const miniX = [18.7, 32.2, 45.6, 59, 72.4, 85.9];
+         const rowKeys = ['speaking_score', 'vocabulary_score', 'grammar_score', 'pronunciation_score', 'understanding_score'];
+         const rowY = [39.75, 42.85, 46.0, 49.1, 52.25];
+    %>
       <section class="sheet sheet-report">
         <img class="template-img" src="/img/certificates/Personal-Report.png" alt="">
-        <h1 class="abs report-title serif">Member Report</h1>
-        <div class="abs report-code"><%= dateSlash %>/<%= certNo %></div>
-        <div class="abs report-ident">
-          <span>Member's Name : <%= recipientName %></span>
-          <span>Tutor's Name : <%= show(d.tutor_name, '-') %></span>
-        </div>
-        <div class="abs report-band personal">Personal Report</div>
-        <div class="abs mini-score">
-          <div><span>Speaking</span><strong><%= show(scores.speaking_score) %></strong></div>
-          <div><span>Vocabulary</span><strong><%= show(scores.vocabulary_score) %></strong></div>
-          <div><span>Grammar</span><strong><%= show(scores.grammar_score) %></strong></div>
-          <div><span>Pronunciation</span><strong><%= show(scores.pronunciation_score) %></strong></div>
-          <div><span>Understanding</span><strong><%= show(scores.understanding_score) %></strong></div>
-          <div><span>CEFR</span><strong><%= show(scores.cefr_score) %></strong></div>
-        </div>
-        <table class="abs report-table">
-          <thead>
-            <tr><th>Section</th><th>Score</th><th>Result</th><th>Notes</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>Speaking</td><td><%= show(scores.speaking_score) %></td><td><%= resultLabel(scores.speaking_score) %></td><td></td></tr>
-            <tr><td>Vocabulary</td><td><%= show(scores.vocabulary_score) %></td><td><%= resultLabel(scores.vocabulary_score) %></td><td></td></tr>
-            <tr><td>Grammar</td><td><%= show(scores.grammar_score) %></td><td><%= resultLabel(scores.grammar_score) %></td><td></td></tr>
-            <tr><td>Pronunciation</td><td><%= show(scores.pronunciation_score) %></td><td><%= resultLabel(scores.pronunciation_score) %></td><td></td></tr>
-            <tr><td>Understanding</td><td><%= show(scores.understanding_score) %></td><td><%= resultLabel(scores.understanding_score) %></td><td></td></tr>
-          </tbody>
-        </table>
-        <div class="abs report-band improvement">Improvement</div>
-        <table class="abs improvement-table">
-          <thead><tr><th>Before</th><th>After</th></tr></thead>
-          <tbody><tr><td><%= show(improvement.before, '') %></td><td><%= show(improvement.after, '') %></td></tr></tbody>
-        </table>
+        <div class="v l" style="left:31%;top:20.3%;font-size:1.5cqw;font-weight:600;"><%= recipientName %></div>
+        <div class="v l" style="left:73%;top:20.3%;font-size:1.5cqw;font-weight:600;"><%= show(d.tutor_name, '-') %></div>
+        <% miniVals.forEach((val, i) => { %>
+          <div class="v c" style="left:<%= miniX[i] %>%;top:26%;font-size:1.4cqw;"><%= show(val, '') %></div>
+        <% }) %>
+        <% rowKeys.forEach((key, i) => { %>
+          <div class="v c" style="left:39.2%;top:<%= rowY[i] %>%;font-size:1.1cqw;"><%= show(scores[key], '') %></div>
+          <div class="v c" style="left:53.7%;top:<%= rowY[i] %>%;font-size:1cqw;"><%= scores[key] ? resultLabel(scores[key]) : '' %></div>
+        <% }) %>
+        <div class="v l" style="left:12.7%;top:65.5%;width:38%;font-size:1cqw;font-weight:600;line-height:1.25;"><%= show(improvement.before, '') %></div>
+        <div class="v l" style="left:54%;top:65.5%;width:38%;font-size:1cqw;font-weight:600;line-height:1.25;"><%= show(improvement.after, '') %></div>
       </section>
     <% } %>
   </main>

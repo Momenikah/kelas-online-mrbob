@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const at = require('../utils/availableTime');
 const { toCsv } = require('../utils/csv');
-const { syncTutorAvailableTime } = require('../utils/spreadsheetSync');
+const { syncTutorAvailableTime, syncCertificate } = require('../utils/spreadsheetSync');
 const { sendScheduleNotificationEmails } = require('../utils/scheduleEmail');
 const { emptyReportDays, normalizeReportDays, ensureMemberReportsTable } = require('../utils/memberReports');
 const { ensureCertificateDetailsColumn, normalizeCertificateDetails } = require('../utils/certificates');
@@ -1277,7 +1277,11 @@ exports.certificate = async (req, res) => {
              FROM certificates c JOIN users u ON c.member_id = u.id JOIN programs p ON c.program_id = p.id
              JOIN schedules s ON s.program_id = p.id WHERE s.tutor_id = $1${searchFilter}
              GROUP BY c.id, u.name, p.name ORDER BY c.issued_date DESC`, params),
-      query(`SELECT DISTINCT u.id, u.name, u.email, p.id as program_id, p.name as program_name
+      query(`SELECT DISTINCT u.id, u.name, u.email, p.id as program_id, p.name as program_name,
+                    (SELECT COUNT(*)::int FROM presences pr
+                     JOIN schedules s2 ON s2.id = pr.schedule_id
+                     WHERE pr.member_id = u.id AND s2.program_id = p.id
+                       AND pr.status IN ('present', 'late')) AS attended
              FROM enrollments e JOIN users u ON e.member_id = u.id
              JOIN programs p ON e.program_id = p.id
              JOIN schedules s ON s.program_id = p.id WHERE s.tutor_id = $1 AND e.status = 'active'`, [tutorId]),
@@ -1330,14 +1334,36 @@ exports.issueCertificate = async (req, res) => {
       req.flash('error', 'Pilih member dan program terlebih dahulu.');
       return res.redirect('/tutor/certificate');
     }
+
+    // Eligibility: member must have attended at least MIN_CERT_MEETINGS sessions
+    // (present/late) in this program — no need to complete the full 10.
+    const MIN_CERT_MEETINGS = 7;
+    const attendedRes = await query(
+      `SELECT COUNT(*)::int AS n
+       FROM presences pr
+       JOIN schedules s ON s.id = pr.schedule_id
+       WHERE pr.member_id = $1 AND s.program_id = $2 AND pr.status IN ('present', 'late')`,
+      [member_id, program_id]
+    );
+    const attended = attendedRes.rows[0].n;
+    if (attended < MIN_CERT_MEETINGS) {
+      req.flash('error', `Member baru menghadiri ${attended} pertemuan. Minimal ${MIN_CERT_MEETINGS} pertemuan untuk menerbitkan sertifikat.`);
+      return res.redirect('/tutor/certificate');
+    }
+
     await ensureCertificateDetailsColumn(query);
     const details = normalizeCertificateDetails(req.body);
     const certNum = `CERT-${Date.now()}-${member_id}`;
-    await query(
+    const inserted = await query(
       `INSERT INTO certificates (member_id, program_id, title, certificate_number, details)
-       VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
+       VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING
+       RETURNING id`,
       [member_id, program_id, title, certNum, JSON.stringify(details)]
     );
+    if (inserted.rows[0]) {
+      syncCertificate(inserted.rows[0].id)
+        .catch((e) => console.error('Gagal sinkronisasi sertifikat ke spreadsheet:', e.message));
+    }
     req.flash('success', 'Sertifikat berhasil diterbitkan.');
     res.redirect('/tutor/certificate');
   } catch (err) {

@@ -7,7 +7,7 @@
   <div class="sub-banner">
     <a href="/admin/questionnaire" class="back-link"><i class="fas fa-arrow-left"></i></a>
     <h1><%= questionnaire.title %></h1>
-    <p class="sub-banner-desc">Mode view-only untuk admin.</p>
+    <p class="sub-banner-desc"><%= isTeachingQuestionnaire ? 'Form referensi bawaan — view-only.' : 'Susun soal dan pantau respon.' %></p>
   </div>
 
   <div class="container">
@@ -19,6 +19,11 @@
         <% if (questionnaire.due_date) { %><span><i class="fas fa-calendar"></i> <%= formatDate(questionnaire.due_date) %></span><% } %>
       </div>
       <% if (questionnaire.description) { %><p class="quiz-desc" style="margin-top:10px"><%= questionnaire.description %></p><% } %>
+      <% if (!isTeachingQuestionnaire) { %>
+        <form method="POST" action="/admin/questionnaire/<%= questionnaire.id %>/delete" style="margin-top:12px" onsubmit="return confirm('Hapus questionnaire ini beserta seluruh soal dan respon?')">
+          <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i> Hapus Questionnaire</button>
+        </form>
+      <% } %>
     </div>
 
     <div class="two-col">
@@ -46,23 +51,106 @@
               <div class="question-num">Pilihan YA/TIDAK</div>
               <p class="question-text">Apakah tutor memberikan referensi untuk self study diluar pembelajaran di kelas?</p>
             </div>
-          <% } else if (questions.length === 0) { %>
-            <div class="empty-state compact"><i class="fas fa-question"></i><p>Belum ada soal.</p></div>
           <% } else { %>
+            <%
+              const typeLabel = { rating: 'Skor 1-5', essay: 'Esai', multiple_choice: 'Pilihan Ganda' };
+              const parseOpts = (o) => (o ? (Array.isArray(o) ? o : JSON.parse(o)) : []);
+            %>
+            <% if (questions.length === 0) { %>
+              <div class="empty-state compact"><i class="fas fa-question"></i><p>Belum ada soal. Tambahkan lewat form di bawah.</p></div>
+            <% } %>
             <% questions.forEach((q, idx) => { %>
+              <% const opts = parseOpts(q.options); %>
+              <% const isYesNo = q.question_type === 'multiple_choice' && opts.length === 2 && opts[0] === 'YA' && opts[1] === 'TIDAK'; %>
+              <% const editType = isYesNo ? 'yes_no' : q.question_type; %>
               <div class="question-review-card">
-                <div class="question-num">Soal <%= idx + 1 %> · <%= q.question_type.replace('_', ' ') %></div>
+                <div class="qb-item-head">
+                  <div class="question-num">Soal <%= idx + 1 %> · <%= isYesNo ? 'Ya / Tidak' : (typeLabel[q.question_type] || q.question_type) %></div>
+                  <div class="qb-item-actions">
+                    <button type="button" class="btn btn-sm btn-outline qb-edit-toggle"><i class="fas fa-pen"></i></button>
+                    <form method="POST" action="/admin/questionnaire/<%= questionnaire.id %>/questions/<%= q.id %>/delete" onsubmit="return confirm('Hapus soal ini?')">
+                      <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                    </form>
+                  </div>
+                </div>
                 <p class="question-text"><%= q.question_text %></p>
-                <% if (q.options && q.question_type === 'multiple_choice') { %>
-                  <% const opts = Array.isArray(q.options) ? q.options : JSON.parse(q.options); %>
+                <% if (q.question_type === 'multiple_choice') { %>
                   <div class="options-preview">
                     <% opts.forEach((o, i) => { %>
                       <span class="option-preview <%= o === q.correct_answer ? 'correct' : '' %>"><%= String.fromCharCode(65+i) %>. <%= o %></span>
                     <% }) %>
                   </div>
                 <% } %>
+
+                <form method="POST" action="/admin/questionnaire/<%= questionnaire.id %>/questions/<%= q.id %>/update" class="qb-form qb-edit-form" hidden>
+                  <div class="form-group">
+                    <label class="form-label">Tipe Soal</label>
+                    <select name="question_type" class="form-input qb-type">
+                      <option value="rating" <%= editType === 'rating' ? 'selected' : '' %>>Skor 1-5 (slider)</option>
+                      <option value="essay" <%= editType === 'essay' ? 'selected' : '' %>>Esai (jawaban panjang)</option>
+                      <option value="multiple_choice" <%= editType === 'multiple_choice' ? 'selected' : '' %>>Pilihan Ganda</option>
+                      <option value="yes_no" <%= editType === 'yes_no' ? 'selected' : '' %>>Ya / Tidak</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Pertanyaan <span class="req">*</span></label>
+                    <input type="text" name="question_text" class="form-input" value="<%= q.question_text %>" required>
+                  </div>
+                  <div class="qb-when qb-when-multiple_choice">
+                    <label class="form-label">Opsi Jawaban (min. 2)</label>
+                    <% for (let i = 0; i < 4; i++) { %>
+                      <input type="text" name="options" class="form-input qb-opt" placeholder="Opsi <%= i + 1 %>" value="<%= (!isYesNo && opts[i]) ? opts[i] : '' %>">
+                    <% } %>
+                    <input type="text" name="correct_answer" class="form-input" placeholder="Jawaban benar (opsional)" value="<%= (!isYesNo && q.correct_answer) ? q.correct_answer : '' %>">
+                  </div>
+                  <div class="qb-when qb-when-yes_no">
+                    <label class="form-label">Jawaban benar (opsional)</label>
+                    <select name="correct_answer" class="form-input">
+                      <option value="">- Tidak dinilai -</option>
+                      <option value="YA" <%= isYesNo && q.correct_answer === 'YA' ? 'selected' : '' %>>YA</option>
+                      <option value="TIDAK" <%= isYesNo && q.correct_answer === 'TIDAK' ? 'selected' : '' %>>TIDAK</option>
+                    </select>
+                  </div>
+                  <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-save"></i> Simpan Perubahan</button>
+                </form>
               </div>
             <% }) %>
+
+            <details class="qbuilder-create" open>
+              <summary><i class="fas fa-plus-circle"></i> Tambah Soal</summary>
+              <form method="POST" action="/admin/questionnaire/<%= questionnaire.id %>/questions" class="qb-form">
+                <div class="form-group">
+                  <label class="form-label">Tipe Soal</label>
+                  <select name="question_type" class="form-input qb-type">
+                    <option value="rating">Skor 1-5 (slider)</option>
+                    <option value="essay">Esai (jawaban panjang)</option>
+                    <option value="multiple_choice">Pilihan Ganda</option>
+                    <option value="yes_no">Ya / Tidak</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Pertanyaan <span class="req">*</span></label>
+                  <input type="text" name="question_text" class="form-input" placeholder="Tulis pertanyaan..." required>
+                </div>
+                <div class="qb-when qb-when-multiple_choice">
+                  <label class="form-label">Opsi Jawaban (min. 2)</label>
+                  <input type="text" name="options" class="form-input qb-opt" placeholder="Opsi 1">
+                  <input type="text" name="options" class="form-input qb-opt" placeholder="Opsi 2">
+                  <input type="text" name="options" class="form-input qb-opt" placeholder="Opsi 3">
+                  <input type="text" name="options" class="form-input qb-opt" placeholder="Opsi 4">
+                  <input type="text" name="correct_answer" class="form-input" placeholder="Jawaban benar (opsional)">
+                </div>
+                <div class="qb-when qb-when-yes_no">
+                  <label class="form-label">Jawaban benar (opsional)</label>
+                  <select name="correct_answer" class="form-input">
+                    <option value="">- Tidak dinilai -</option>
+                    <option value="YA">YA</option>
+                    <option value="TIDAK">TIDAK</option>
+                  </select>
+                </div>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Tambah Soal</button>
+              </form>
+            </details>
           <% } %>
         </div>
       </div>
@@ -114,5 +202,32 @@
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+  function syncTypeFields(form) {
+    const type = form.querySelector('.qb-type').value;
+    form.querySelectorAll('.qb-when').forEach((block) => {
+      const show = block.classList.contains('qb-when-' + type);
+      block.hidden = !show;
+      block.querySelectorAll('input, select').forEach((field) => { field.disabled = !show; });
+    });
+  }
+  document.querySelectorAll('.qb-form').forEach((form) => {
+    const typeSelect = form.querySelector('.qb-type');
+    if (typeSelect) {
+      typeSelect.addEventListener('change', () => syncTypeFields(form));
+      syncTypeFields(form);
+    }
+  });
+  document.querySelectorAll('.qb-edit-toggle').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const form = btn.closest('.question-review-card').querySelector('.qb-edit-form');
+      form.hidden = !form.hidden;
+      if (!form.hidden) syncTypeFields(form);
+    });
+  });
+})();
+</script>
 
 <%- include('../partials/footer') %>

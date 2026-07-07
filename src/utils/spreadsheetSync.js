@@ -190,13 +190,125 @@ async function syncSchedule(scheduleId) {
   return postToWebhook(url, payload);
 }
 
+// Build a single certificate row payload (includes the personal-report fields
+// stored in certificates.details: scores + before/after improvement).
+async function buildCertificatePayload(certificateId) {
+  const res = await query(
+    `SELECT c.*, u.name AS member_name, u.email AS member_email, p.name AS program_name
+     FROM certificates c
+     JOIN users u ON c.member_id = u.id
+     JOIN programs p ON c.program_id = p.id
+     WHERE c.id = $1`,
+    [certificateId]
+  );
+  const c = res.rows[0];
+  if (!c) return null;
+
+  const details = (c.details && typeof c.details === 'object') ? c.details : {};
+  const scores = details.scores || {};
+  const improvement = details.improvement || {};
+
+  return {
+    event: 'sertifikat',
+    timestamp: new Date().toISOString(),
+    certificate_id: c.id,
+    certificate_number: c.certificate_number || '',
+    issued_date: dateOnly(c.issued_date),
+    title: c.title || '',
+    member_name: c.member_name || '',
+    member_email: details.member_email || c.member_email || '',
+    program_name: c.program_name || '',
+    program_label: details.program_label || c.program_name || '',
+    tutor_name: details.tutor_name || '',
+    period_label: details.period_label || '',
+    category: details.category || '',
+    grade: details.grade || '',
+    status: c.is_active ? 'Aktif' : 'Nonaktif',
+    // Personal report / test-score fields
+    speaking_score: scores.speaking_score || '',
+    pronunciation_score: scores.pronunciation_score || '',
+    vocabulary_score: scores.vocabulary_score || '',
+    grammar_score: scores.grammar_score || '',
+    understanding_score: scores.understanding_score || '',
+    cefr_score: scores.cefr_score || '',
+    listening_score: scores.listening_score || '',
+    structure_score: scores.structure_score || '',
+    reading_score: scores.reading_score || '',
+    writing_score: scores.writing_score || '',
+    total_score: scores.total_score || '',
+    improvement_before: improvement.before || '',
+    improvement_after: improvement.after || '',
+    print_url: `${appBaseUrl()}/admin/certificate/${c.id}/print`,
+  };
+}
+
+// Push (upsert) a single certificate + its personal report to the
+// spreadsheet "Sertifikat" tab.
+async function syncCertificate(certificateId) {
+  const url = process.env.CERTIFICATE_WEBHOOK_URL || process.env.SHEET_WEBHOOK_URL;
+  if (!url) {
+    console.warn('Webhook spreadsheet belum dikonfigurasi. Sinkronisasi sertifikat dilewati.');
+    return { skipped: true };
+  }
+  const payload = await buildCertificatePayload(certificateId);
+  if (!payload) return { skipped: true };
+  return postToWebhook(url, payload);
+}
+
+// Build a single renewal-request row payload for the spreadsheet "Renewal" tab.
+async function buildRenewalPayload(renewalId) {
+  const res = await query(
+    `SELECT rr.*, p.name AS program_name
+     FROM renewal_requests rr
+     LEFT JOIN programs p ON p.id = rr.program_id
+     WHERE rr.id = $1`,
+    [renewalId]
+  );
+  const r = res.rows[0];
+  if (!r) return null;
+  return {
+    event: 'renewal',
+    timestamp: new Date().toISOString(),
+    renewal_id: r.id,
+    request_type: r.request_type || 'renewal',
+    member_name: r.member_name || '',
+    member_email: r.member_email || '',
+    phone: r.phone || '',
+    program_name: r.program_name || '',
+    selected_class: r.selected_class || '',
+    package_name: r.package_name || '',
+    package_price: r.package_price || '',
+    preferred_start_date: dateOnly(r.preferred_start_date),
+    study_time: r.study_time || '',
+    status: r.status || '',
+    notes: r.notes || '',
+    transfer_proof_url: r.transfer_proof ? `${appBaseUrl()}${r.transfer_proof}` : '',
+  };
+}
+
+// Push (upsert) a single renewal request to the spreadsheet "Renewal" tab.
+async function syncRenewal(renewalId) {
+  const url = process.env.RENEWAL_WEBHOOK_URL || process.env.SHEET_WEBHOOK_URL;
+  if (!url) {
+    console.warn('Webhook spreadsheet belum dikonfigurasi. Sinkronisasi renewal dilewati.');
+    return { skipped: true };
+  }
+  const payload = await buildRenewalPayload(renewalId);
+  if (!payload) return { skipped: true };
+  return postToWebhook(url, payload);
+}
+
 module.exports = {
   buildPayload,
   buildAvailableTimePayload,
   buildSchedulePayload,
+  buildCertificatePayload,
+  buildRenewalPayload,
   syncToSpreadsheet,
   syncRegistration,
   syncConfirmation,
   syncTutorAvailableTime,
   syncSchedule,
+  syncCertificate,
+  syncRenewal,
 };

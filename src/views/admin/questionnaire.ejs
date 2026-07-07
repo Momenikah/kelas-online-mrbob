@@ -7,7 +7,7 @@
   <div class="sub-banner">
     <a href="/admin" class="back-link"><i class="fas fa-arrow-left"></i></a>
     <h1>Questionnaire</h1>
-    <p class="sub-banner-desc">Admin hanya melihat questionnaire, soal, dan respon yang masuk.</p>
+    <p class="sub-banner-desc">Buat questionnaire, susun soal, dan pantau respon yang masuk.</p>
   </div>
 
   <div class="container">
@@ -30,12 +30,60 @@
       </div>
     </div>
 
+    <details class="section-card qbuilder-create">
+      <summary><i class="fas fa-plus-circle"></i> Buat Questionnaire Baru</summary>
+      <form method="POST" action="/admin/questionnaire" class="qbuilder-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Judul <span class="req">*</span></label>
+            <input type="text" name="title" class="form-input" placeholder="mis. Evaluasi Kelas Speaking" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Program <span class="req">*</span></label>
+            <select name="program_id" class="form-input" required>
+              <option value="">- Pilih Program -</option>
+              <% programs.forEach(p => { %>
+                <option value="<%= p.id %>"><%= p.name %></option>
+              <% }) %>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Deskripsi</label>
+          <input type="text" name="description" class="form-input" placeholder="Keterangan singkat (opsional)">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Deadline</label>
+            <input type="date" name="due_date" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Durasi (menit)</label>
+            <input type="number" name="duration_minutes" class="form-input" min="1" value="30">
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Buat &amp; Tambah Soal</button>
+      </form>
+    </details>
+
     <div class="section-card">
       <form method="GET" action="/admin/questionnaire" class="filter-form">
         <select name="program_id" class="form-input" onchange="this.form.submit()">
           <option value="">Semua Program</option>
           <% programs.forEach(p => { %>
             <option value="<%= p.id %>" <%= filters.programId == p.id ? 'selected' : '' %>><%= p.name %></option>
+          <% }) %>
+        </select>
+        <select name="tutor" class="form-input" onchange="this.form.submit()">
+          <option value="">Semua Tutor</option>
+          <% tutorOptions.forEach(t => { %>
+            <option value="<%= t %>" <%= filters.tutor === t ? 'selected' : '' %>><%= t %></option>
+          <% }) %>
+        </select>
+        <select name="period" class="form-input" onchange="this.form.submit()">
+          <option value="">Semua Periode</option>
+          <% periodOptions.forEach(pr => { %>
+            <option value="<%= pr %>" <%= filters.period === pr ? 'selected' : '' %>><%= pr %></option>
           <% }) %>
         </select>
         <a href="/admin/questionnaire" class="btn btn-outline">Reset</a>

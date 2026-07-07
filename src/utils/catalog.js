@@ -29,6 +29,11 @@ const PROGRAM_CATALOG = {
 
 const ALL_PROGRAMS = [...PROGRAM_CATALOG.adult.items, ...PROGRAM_CATALOG.kids.items];
 
+// Seasonal programs — only offered during certain months (Ramadan / school holidays).
+// Seeded as HIDDEN (is_active = false) so they stay out of registration and every
+// active-program list until an admin activates them for the season.
+const SEASONAL_PROGRAMS = ['Paket Ramadan', 'Smart Holiday SD', 'Smart Holiday SMP/SMA'];
+
 // Idempotently ensure each catalog program exists in the `programs` table so
 // enrollment + schedule plotting use the same programs members register for.
 async function ensurePrograms(query) {
@@ -39,12 +44,21 @@ async function ensurePrograms(query) {
       [name]
     );
   }
-  return ALL_PROGRAMS.length;
+  // Seasonal programs default to hidden; never override an admin who activated one.
+  for (const name of SEASONAL_PROGRAMS) {
+    await query(
+      `INSERT INTO programs (name, is_active)
+       SELECT $1::text, false WHERE NOT EXISTS (SELECT 1 FROM programs WHERE name = $1::text)`,
+      [name]
+    );
+  }
+  return ALL_PROGRAMS.length + SEASONAL_PROGRAMS.length;
 }
 
 module.exports = {
   STUDY_TIME_SLOTS,
   PROGRAM_CATALOG,
   ALL_PROGRAMS,
+  SEASONAL_PROGRAMS,
   ensurePrograms,
 };

@@ -147,8 +147,13 @@
             <label class="form-label">Program <span class="req">*</span></label>
             <select name="program_id" class="form-input" required>
               <option value="">- Select -</option>
-              <% programs.forEach(p => { %><option value="<%= p.id %>"><%= p.name %></option><% }) %>
+              <% programs.forEach(p => { %><option value="<%= p.id %>" <%= programs.length === 1 ? 'selected' : '' %>><%= p.name %></option><% }) %>
             </select>
+            <% if (programs.length === 0) { %>
+              <small class="field-hint">Belum ada program terdaftar. Hubungi admin bila kelasmu belum muncul.</small>
+            <% } else { %>
+              <small class="field-hint">Sesuai program pendaftaranmu.</small>
+            <% } %>
           </div>
           <div class="form-group">
             <label class="form-label">Meeting <span class="req">*</span></label>

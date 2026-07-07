@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const at = require('../utils/availableTime');
 const { parseCsv, rowsToObjects, toCsv } = require('../utils/csv');
-const { syncSchedule } = require('../utils/spreadsheetSync');
+const { syncSchedule, syncCertificate } = require('../utils/spreadsheetSync');
 const {
   syncSchedulesFromSheet,
   getLastSyncRun,
@@ -17,6 +17,7 @@ const { ensureRenewalRequestsTable, renewalStatuses } = require('../utils/renewa
 const { ensureUserAccessColumns } = require('../utils/userAccess');
 const {
   isTeachingQuestionnaire,
+  isTeachingMode,
   teachingRatings,
   teachingEssays,
   ratingLabels,
@@ -299,7 +300,8 @@ const buildUserFilter = ({ role, search, status }) => {
 exports.users = async (req, res) => {
   try {
     await ensureUserAccessColumns(query);
-    const role = req.query.role || '';
+    // Each role is its own tab/page; default to the Member tab.
+    const role = ['member', 'tutor', 'admin'].includes(req.query.role) ? req.query.role : 'member';
     const search = (req.query.search || '').trim();
     const status = req.query.status || '';
     const perPage = 15;
@@ -561,6 +563,65 @@ exports.userDetail = async (req, res) => {
   }
 };
 
+// Admin edits a member's registration/profile data (the fields captured at signup).
+// Payment status, confirmation timestamp, and transfer proof stay owned by the
+// payment-confirmation flow and are intentionally not editable here.
+exports.updateRegistration = async (req, res) => {
+  const userId = Number(req.params.id);
+  const regId = Number(req.body.registration_id);
+  const back = `/admin/users/${userId}`;
+  const clean = (val) => {
+    const s = String(val ?? '').trim();
+    return s === '' ? null : s;
+  };
+  const toInt = (val) => {
+    const n = parseInt(String(val ?? '').replace(/[^\d-]/g, ''), 10);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  try {
+    if (!regId) {
+      req.flash('error', 'Data pendaftaran tidak ditemukan.');
+      return res.redirect(back);
+    }
+    const existing = await query(
+      'SELECT id FROM member_registrations WHERE id = $1 AND user_id = $2',
+      [regId, userId]
+    );
+    if (!existing.rows.length) {
+      req.flash('error', 'Data pendaftaran tidak ditemukan.');
+      return res.redirect(back);
+    }
+
+    const phoneLastThree = String(req.body.phone_last_three ?? '').replace(/\D/g, '').slice(0, 3) || null;
+
+    await query(
+      `UPDATE member_registrations SET
+         city=$1, education_background=$2, education_level=$3, occupation=$4, age=$5,
+         instagram=$6, friend_name=$7, program_type=$8, selected_class=$9, package_group=$10,
+         package_name=$11, package_price=$12, duration=$13, meeting_count=$14, study_time=$15,
+         start_date=$16, preferred_tutor=$17, phone_last_three=$18, coupon_code=$19, referral_code=$20
+       WHERE id=$21`,
+      [
+        clean(req.body.city), clean(req.body.education_background), clean(req.body.education_level),
+        clean(req.body.occupation), toInt(req.body.age), clean(req.body.instagram),
+        clean(req.body.friend_name), clean(req.body.program_type), clean(req.body.selected_class),
+        clean(req.body.package_group), clean(req.body.package_name), toInt(req.body.package_price),
+        clean(req.body.duration), clean(req.body.meeting_count), clean(req.body.study_time),
+        clean(req.body.start_date), clean(req.body.preferred_tutor), phoneLastThree,
+        clean(req.body.coupon_code), clean(req.body.referral_code), regId,
+      ]
+    );
+
+    req.flash('success', 'Data pendaftaran member berhasil diperbarui.');
+    res.redirect(back);
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal memperbarui data pendaftaran.');
+    res.redirect(back);
+  }
+};
+
 exports.deleteUser = async (req, res) => {
   const id = Number(req.params.id);
   try {
@@ -637,150 +698,13 @@ exports.toggleLuxury = async (req, res) => {
   }
 };
 
-exports.programs = async (req, res) => {
-  try {
-    const search = (req.query.search || '').trim();
-    const status = req.query.status || '';
-
-    const where = ['1=1'];
-    const params = [];
-    if (search) { params.push(`%${search}%`); where.push(`(p.name ILIKE $${params.length} OR p.description ILIKE $${params.length})`); }
-    if (status === 'active') where.push('p.is_active = true');
-    if (status === 'inactive') where.push('p.is_active = false');
-
-    const [listRes, statsRes] = await Promise.all([
-      query(
-        `SELECT p.*,
-                COUNT(DISTINCT e.id) FILTER (WHERE e.status = 'active') AS active_enrollments,
-                COUNT(DISTINCT e.id) AS total_enrollments,
-                COUNT(DISTINCT s.id) AS schedule_count
-         FROM programs p
-         LEFT JOIN enrollments e ON e.program_id = p.id
-         LEFT JOIN schedules s ON s.program_id = p.id
-         WHERE ${where.join(' AND ')}
-         GROUP BY p.id
-         ORDER BY p.is_active DESC, p.name`,
-        params
-      ),
-      query(`SELECT COUNT(*) AS total,
-                COUNT(*) FILTER (WHERE is_active) AS active,
-                (SELECT COUNT(*) FROM enrollments WHERE status = 'active') AS active_enrollments
-              FROM programs`),
-    ]);
-
-    res.render('admin/programs', {
-      title: 'Kelola Program',
-      user: req.session.user,
-      programs: listRes.rows,
-      filters: { search, status },
-      stats: statsRes.rows[0],
-      error: req.flash('error'),
-      success: req.flash('success'),
-    });
-  } catch (err) {
-    console.error(err);
-    res.render('error', { title: 'Error', message: err.message, user: req.session.user });
-  }
-};
-
-const parseProgramBody = (body) => ({
-  name: String(body.name || '').trim(),
-  description: String(body.description || '').trim() || null,
-  durationMonths: Number(body.duration_months) || 0,
-  price: Number(body.price) || 0,
-  isActive: body.is_active === 'on' || body.is_active === 'true',
-});
-
-const validateProgram = (p) => {
-  if (!p.name) return 'Nama program wajib diisi.';
-  if (p.durationMonths < 1) return 'Durasi minimal 1 bulan.';
-  if (p.price < 0) return 'Harga tidak boleh negatif.';
-  return null;
-};
-
-exports.createProgram = async (req, res) => {
-  try {
-    const p = parseProgramBody(req.body);
-    const err = validateProgram(p);
-    if (err) { req.flash('error', err); return res.redirect('/admin/programs'); }
-
-    const dupe = await query('SELECT id FROM programs WHERE LOWER(name) = LOWER($1)', [p.name]);
-    if (dupe.rows.length) { req.flash('error', `Program "${p.name}" sudah ada.`); return res.redirect('/admin/programs'); }
-
-    await query(
-      'INSERT INTO programs (name, description, duration_months, price, is_active) VALUES ($1,$2,$3,$4,true)',
-      [p.name, p.description, p.durationMonths, p.price]
-    );
-    req.flash('success', `Program "${p.name}" berhasil ditambahkan.`);
-    res.redirect('/admin/programs');
-  } catch (err) {
-    console.error(err);
-    req.flash('error', 'Gagal menambahkan program.');
-    res.redirect('/admin/programs');
-  }
-};
-
-exports.updateProgram = async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const p = parseProgramBody(req.body);
-    const err = validateProgram(p);
-    if (err) { req.flash('error', err); return res.redirect('/admin/programs'); }
-
-    const existing = await query('SELECT id FROM programs WHERE id = $1', [id]);
-    if (!existing.rows.length) { req.flash('error', 'Program tidak ditemukan.'); return res.redirect('/admin/programs'); }
-
-    const dupe = await query('SELECT id FROM programs WHERE LOWER(name) = LOWER($1) AND id <> $2', [p.name, id]);
-    if (dupe.rows.length) { req.flash('error', `Nama "${p.name}" sudah dipakai program lain.`); return res.redirect('/admin/programs'); }
-
-    await query(
-      'UPDATE programs SET name=$1, description=$2, duration_months=$3, price=$4, is_active=$5 WHERE id=$6',
-      [p.name, p.description, p.durationMonths, p.price, p.isActive, id]
-    );
-    req.flash('success', `Program "${p.name}" berhasil diperbarui.`);
-    res.redirect('/admin/programs');
-  } catch (err) {
-    console.error(err);
-    req.flash('error', 'Gagal memperbarui program.');
-    res.redirect('/admin/programs');
-  }
-};
-
-exports.toggleProgramStatus = async (req, res) => {
-  try {
-    await query('UPDATE programs SET is_active = NOT is_active WHERE id = $1', [req.params.id]);
-    req.flash('success', 'Status program diperbarui.');
-  } catch (err) {
-    console.error(err);
-    req.flash('error', 'Gagal mengubah status program.');
-  }
-  res.redirect('/admin/programs');
-};
-
-exports.deleteProgram = async (req, res) => {
-  try {
-    const result = await query('DELETE FROM programs WHERE id = $1 RETURNING name', [req.params.id]);
-    if (!result.rows.length) {
-      req.flash('error', 'Program tidak ditemukan.');
-    } else {
-      req.flash('success', `Program "${result.rows[0].name}" berhasil dihapus.`);
-    }
-  } catch (err) {
-    console.error(err);
-    if (err.code === '23503') {
-      req.flash('error', 'Program tidak bisa dihapus karena masih dipakai (enrollment/jadwal/modul). Nonaktifkan saja.');
-    } else {
-      req.flash('error', 'Gagal menghapus program.');
-    }
-  }
-  res.redirect('/admin/programs');
-};
-
 const ENROLLMENT_STATUSES = ['active', 'expired', 'suspended'];
 
 exports.enrollments = async (req, res) => {
   try {
     await ensureRenewalRequestsTable(query);
+    // Keep the system consistent: auto-expire active enrollments past their end date.
+    await query("UPDATE enrollments SET status = 'expired' WHERE status = 'active' AND end_date IS NOT NULL AND end_date < CURRENT_DATE");
     const search = (req.query.search || '').trim();
     const programId = req.query.program_id || '';
     const status = req.query.status || '';
@@ -800,11 +724,12 @@ exports.enrollments = async (req, res) => {
         params
       ),
       query("SELECT id, name, email FROM users WHERE role = 'member' AND is_active = true ORDER BY name"),
-      query("SELECT id, name FROM programs WHERE is_active = true ORDER BY name"),
+      query("SELECT id, name, duration_months FROM programs WHERE is_active = true ORDER BY name"),
       query(`SELECT COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE status = 'active') AS active,
                 COUNT(*) FILTER (WHERE status = 'expired') AS expired,
                 COUNT(*) FILTER (WHERE status = 'suspended') AS suspended,
+                COUNT(*) FILTER (WHERE status = 'active' AND end_date IS NOT NULL AND end_date >= CURRENT_DATE AND end_date <= CURRENT_DATE + INTERVAL '14 days') AS expiring,
                 COUNT(DISTINCT member_id) AS members
               FROM enrollments`),
       query(`SELECT rr.*, u.name AS member_name, u.email, p.name AS program_name, p.duration_months
@@ -815,10 +740,23 @@ exports.enrollments = async (req, res) => {
              ORDER BY CASE rr.status WHEN 'pending' THEN 0 ELSE 1 END, rr.created_at DESC
              LIMIT 12`),
     ]);
+    // Annotate each enrollment with days-left + an urgency level for the UI.
+    const nowTs = Date.now();
+    const enrollments = enrollResult.rows.map((e) => {
+      const end = e.end_date ? new Date(e.end_date) : null;
+      const daysLeft = end ? Math.ceil((end.getTime() - nowTs) / 86400000) : null;
+      let urgency = 'safe';
+      if (e.status === 'expired' || (daysLeft !== null && daysLeft < 0)) urgency = 'expired';
+      else if (e.status === 'suspended') urgency = 'suspended';
+      else if (daysLeft !== null && daysLeft <= 7) urgency = 'danger';
+      else if (daysLeft !== null && daysLeft <= 14) urgency = 'warning';
+      return { ...e, days_left: daysLeft, urgency };
+    });
+
     res.render('admin/enrollments', {
       title: 'Kelola Enrollment',
       user: req.session.user,
-      enrollments: enrollResult.rows,
+      enrollments,
       members: membersResult.rows,
       programs: programsResult.rows,
       renewalRequests: renewalRequestsResult.rows,
@@ -972,6 +910,34 @@ exports.deleteEnrollment = async (req, res) => {
     req.flash('error', 'Gagal menghapus enrollment.');
   }
   res.redirect('/admin/enrollments');
+};
+
+// One-click extend: push end_date forward N months and reactivate. Extends from
+// the current end date if still in the future, otherwise from today.
+exports.extendEnrollment = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const months = Math.min(12, Math.max(1, Number(req.body.months) || 1));
+    const result = await query('SELECT id, end_date FROM enrollments WHERE id = $1', [id]);
+    const enrollment = result.rows[0];
+    if (!enrollment) {
+      req.flash('error', 'Enrollment tidak ditemukan.');
+      return res.redirect('/admin/enrollments');
+    }
+    const todayIso = dateOnly(new Date());
+    const endIso = enrollment.end_date ? dateOnly(enrollment.end_date) : todayIso;
+    const baseIso = endIso > todayIso ? endIso : todayIso;
+    const d = dateFromIso(baseIso);
+    d.setMonth(d.getMonth() + months);
+    const newEnd = dateOnly(d);
+    await query("UPDATE enrollments SET end_date = $1, status = 'active' WHERE id = $2", [newEnd, id]);
+    req.flash('success', `Enrollment diperpanjang ${months} bulan (berakhir ${newEnd}).`);
+    res.redirect('/admin/enrollments');
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal memperpanjang enrollment.');
+    res.redirect('/admin/enrollments');
+  }
 };
 
 const getScheduleStats = async () => {
@@ -1932,11 +1898,22 @@ exports.memberPresence = async (req, res) => {
 exports.questionnaire = async (req, res) => {
   try {
     const programId = req.query.program_id || '';
-    const where = ['1=1'];
-    const params = [];
-    if (programId) { params.push(Number(programId)); where.push(`q.program_id = $${params.length}`); }
+    const tutor = (req.query.tutor || '').trim();
+    const period = (req.query.period || '').trim();
 
-    const [listRes, programsRes, statsRes] = await Promise.all([
+    // Tutor & period live inside each response's answers (teaching questionnaires
+    // capture tutor_name and study_period). Filtering by them keeps only
+    // questionnaires that have a matching response, and response_count follows suit.
+    const params = [];
+    const qrConds = ['q.id = qr.questionnaire_id'];
+    if (tutor) { params.push(tutor); qrConds.push(`qr.answers->>'tutor_name' = $${params.length}`); }
+    if (period) { params.push(period); qrConds.push(`qr.answers->>'study_period' = $${params.length}`); }
+
+    const where = ['1=1'];
+    if (programId) { params.push(Number(programId)); where.push(`q.program_id = $${params.length}`); }
+    const having = (tutor || period) ? 'HAVING COUNT(DISTINCT qr.id) > 0' : '';
+
+    const [listRes, programsRes, statsRes, tutorOptsRes, periodOptsRes] = await Promise.all([
       query(`
         SELECT q.*, p.name as program_name, u.name as creator_name,
                COUNT(DISTINCT qq.id) as question_count,
@@ -1945,9 +1922,10 @@ exports.questionnaire = async (req, res) => {
         JOIN programs p ON q.program_id = p.id
         LEFT JOIN users u ON q.created_by = u.id
         LEFT JOIN questions qq ON q.id = qq.questionnaire_id
-        LEFT JOIN questionnaire_responses qr ON q.id = qr.questionnaire_id
+        LEFT JOIN questionnaire_responses qr ON ${qrConds.join(' AND ')}
         WHERE ${where.join(' AND ')}
         GROUP BY q.id, p.name, u.name
+        ${having}
         ORDER BY q.created_at DESC
       `, params),
       query('SELECT id, name FROM programs WHERE is_active = true ORDER BY name'),
@@ -1958,6 +1936,10 @@ exports.questionnaire = async (req, res) => {
           (SELECT COUNT(*) FROM questionnaire_responses) AS responses,
           (SELECT COUNT(DISTINCT member_id) FROM questionnaire_responses) AS respondents
       `),
+      query(`SELECT DISTINCT answers->>'tutor_name' AS name FROM questionnaire_responses
+             WHERE COALESCE(answers->>'tutor_name', '') <> '' ORDER BY name`),
+      query(`SELECT DISTINCT answers->>'study_period' AS label FROM questionnaire_responses
+             WHERE COALESCE(answers->>'study_period', '') <> '' ORDER BY label`),
     ]);
 
     res.render('admin/questionnaire', {
@@ -1965,7 +1947,9 @@ exports.questionnaire = async (req, res) => {
       user: req.session.user,
       questionnaires: listRes.rows,
       programs: programsRes.rows,
-      filters: { programId },
+      filters: { programId, tutor, period },
+      tutorOptions: tutorOptsRes.rows.map((r) => r.name),
+      periodOptions: periodOptsRes.rows.map((r) => r.label),
       stats: statsRes.rows[0],
       error: req.flash('error'),
       success: req.flash('success'),
@@ -2012,7 +1996,7 @@ exports.questionnaireDetail = async (req, res) => {
       questionnaire,
       questions,
       responses,
-      isTeachingQuestionnaire: isTeachingQuestionnaire(questionnaire),
+      isTeachingQuestionnaire: isTeachingMode(questionnaire, questions.length),
       teachingRatings,
       teachingEssays,
       ratingLabels,
@@ -2022,6 +2006,163 @@ exports.questionnaireDetail = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.render('error', { title: 'Error', message: err.message, user: req.session.user });
+  }
+};
+
+exports.createQuestionnaire = async (req, res) => {
+  try {
+    const { title, description, program_id, due_date, duration_minutes } = req.body;
+    if (!title || !title.trim() || !program_id) {
+      req.flash('error', 'Judul dan program wajib diisi.');
+      return res.redirect('/admin/questionnaire');
+    }
+    const result = await query(
+      `INSERT INTO questionnaires (title, description, program_id, created_by, due_date, duration_minutes, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, true) RETURNING id`,
+      [
+        title.trim(),
+        description && description.trim() ? description.trim() : null,
+        Number(program_id),
+        req.session.user.id,
+        due_date || null,
+        duration_minutes ? Number(duration_minutes) : 30,
+      ]
+    );
+    req.flash('success', 'Questionnaire dibuat. Tambahkan soal untuk melengkapinya.');
+    res.redirect(`/admin/questionnaire/${result.rows[0].id}`);
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal membuat questionnaire.');
+    res.redirect('/admin/questionnaire');
+  }
+};
+
+// Normalise a question's type-specific payload (options/correct_answer/points/text).
+const parseQuestionPayload = (body) => {
+  let questionType = body.question_type;
+  let options = null;
+  let correctAnswer = null;
+  let points = body.points ? Number(body.points) : 1;
+
+  if (questionType === 'yes_no') {
+    questionType = 'multiple_choice';
+    options = ['YA', 'TIDAK'];
+    correctAnswer = body.correct_answer && ['YA', 'TIDAK'].includes(body.correct_answer) ? body.correct_answer : null;
+  } else if (questionType === 'multiple_choice') {
+    const raw = Array.isArray(body.options) ? body.options : [body.options];
+    options = raw.map((o) => String(o || '').trim()).filter(Boolean);
+    correctAnswer = body.correct_answer && options.includes(body.correct_answer) ? body.correct_answer : null;
+  } else if (questionType === 'rating') {
+    points = 5;
+  }
+
+  return {
+    questionText: String(body.question_text || '').trim(),
+    questionType,
+    options,
+    correctAnswer,
+    points: points > 0 ? points : 1,
+  };
+};
+
+exports.addQuestion = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const payload = parseQuestionPayload(req.body);
+    if (!payload.questionText || !['multiple_choice', 'essay', 'rating'].includes(payload.questionType)) {
+      req.flash('error', 'Teks pertanyaan dan tipe soal wajib diisi.');
+      return res.redirect(`/admin/questionnaire/${id}`);
+    }
+    if (payload.questionType === 'multiple_choice' && (!payload.options || payload.options.length < 2)) {
+      req.flash('error', 'Pilihan ganda membutuhkan minimal 2 opsi.');
+      return res.redirect(`/admin/questionnaire/${id}`);
+    }
+    const orderResult = await query(
+      'SELECT COALESCE(MAX(order_number), 0) + 1 AS next FROM questions WHERE questionnaire_id = $1',
+      [id]
+    );
+    await query(
+      `INSERT INTO questions (questionnaire_id, question_text, question_type, options, correct_answer, points, order_number)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        id,
+        payload.questionText,
+        payload.questionType,
+        payload.options ? JSON.stringify(payload.options) : null,
+        payload.correctAnswer,
+        payload.points,
+        orderResult.rows[0].next,
+      ]
+    );
+    req.flash('success', 'Soal ditambahkan.');
+    res.redirect(`/admin/questionnaire/${id}`);
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal menambahkan soal.');
+    res.redirect(`/admin/questionnaire/${id}`);
+  }
+};
+
+exports.updateQuestion = async (req, res) => {
+  const { id, questionId } = req.params;
+  try {
+    const payload = parseQuestionPayload(req.body);
+    if (!payload.questionText || !['multiple_choice', 'essay', 'rating'].includes(payload.questionType)) {
+      req.flash('error', 'Teks pertanyaan dan tipe soal wajib diisi.');
+      return res.redirect(`/admin/questionnaire/${id}`);
+    }
+    if (payload.questionType === 'multiple_choice' && (!payload.options || payload.options.length < 2)) {
+      req.flash('error', 'Pilihan ganda membutuhkan minimal 2 opsi.');
+      return res.redirect(`/admin/questionnaire/${id}`);
+    }
+    await query(
+      `UPDATE questions
+       SET question_text = $1, question_type = $2, options = $3, correct_answer = $4, points = $5
+       WHERE id = $6 AND questionnaire_id = $7`,
+      [
+        payload.questionText,
+        payload.questionType,
+        payload.options ? JSON.stringify(payload.options) : null,
+        payload.correctAnswer,
+        payload.points,
+        questionId,
+        id,
+      ]
+    );
+    req.flash('success', 'Soal diperbarui.');
+    res.redirect(`/admin/questionnaire/${id}`);
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal memperbarui soal.');
+    res.redirect(`/admin/questionnaire/${id}`);
+  }
+};
+
+exports.deleteQuestion = async (req, res) => {
+  const { id, questionId } = req.params;
+  try {
+    await query('DELETE FROM questions WHERE id = $1 AND questionnaire_id = $2', [questionId, id]);
+    req.flash('success', 'Soal dihapus.');
+    res.redirect(`/admin/questionnaire/${id}`);
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal menghapus soal.');
+    res.redirect(`/admin/questionnaire/${id}`);
+  }
+};
+
+exports.deleteQuestionnaire = async (req, res) => {
+  const { id } = req.params;
+  try {
+    await query('DELETE FROM questionnaire_responses WHERE questionnaire_id = $1', [id]);
+    await query('DELETE FROM questions WHERE questionnaire_id = $1', [id]);
+    await query('DELETE FROM questionnaires WHERE id = $1', [id]);
+    req.flash('success', 'Questionnaire dihapus.');
+    res.redirect('/admin/questionnaire');
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal menghapus questionnaire.');
+    res.redirect(`/admin/questionnaire/${id}`);
   }
 };
 
@@ -2109,28 +2250,48 @@ exports.certificate = async (req, res) => {
   try {
     await ensureCertificateDetailsColumn(query);
     const search = (req.query.search || '').trim();
+    const tutor = (req.query.tutor || '').trim();
+    const period = (req.query.period || '').trim();
     const params = [];
-    let searchFilter = '';
+    const conds = [];
     if (search) {
       params.push(`%${search}%`);
-      searchFilter = `WHERE u.name ILIKE $${params.length} OR c.certificate_number ILIKE $${params.length} OR p.name ILIKE $${params.length}`;
+      const i = params.length;
+      conds.push(`(u.name ILIKE $${i} OR c.certificate_number ILIKE $${i} OR p.name ILIKE $${i} OR c.details->>'tutor_name' ILIKE $${i})`);
     }
-    const [certsResult, statsRes] = await Promise.all([
+    if (tutor) {
+      params.push(tutor);
+      conds.push(`c.details->>'tutor_name' = $${params.length}`);
+    }
+    if (period) {
+      params.push(period);
+      conds.push(`c.details->>'period_label' = $${params.length}`);
+    }
+    const whereClause = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+    const [certsResult, statsRes, tutorOptsRes, periodOptsRes] = await Promise.all([
       query(`
-        SELECT c.*, u.name as member_name, p.name as program_name
+        SELECT c.*, u.name as member_name, p.name as program_name,
+               c.details->>'tutor_name' AS tutor_name,
+               c.details->>'period_label' AS period_label
         FROM certificates c
         JOIN users u ON c.member_id = u.id
         JOIN programs p ON c.program_id = p.id
-        ${searchFilter}
+        ${whereClause}
         ORDER BY c.issued_date DESC
       `, params),
       query('SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE is_active = true) AS active FROM certificates'),
+      query(`SELECT DISTINCT details->>'tutor_name' AS name FROM certificates
+             WHERE COALESCE(details->>'tutor_name', '') <> '' ORDER BY name`),
+      query(`SELECT DISTINCT details->>'period_label' AS label FROM certificates
+             WHERE COALESCE(details->>'period_label', '') <> '' ORDER BY label`),
     ]);
     res.render('admin/certificate', {
       title: 'Sertifikat',
       user: req.session.user,
       certificates: certsResult.rows,
-      filters: { search },
+      filters: { search, tutor, period },
+      tutorOptions: tutorOptsRes.rows.map((r) => r.name),
+      periodOptions: periodOptsRes.rows.map((r) => r.label),
       stats: statsRes.rows[0],
       error: req.flash('error'),
       success: req.flash('success'),
@@ -2167,6 +2328,21 @@ exports.certificatePrint = async (req, res) => {
     console.error(err);
     res.render('error', { title: 'Error', message: err.message, user: req.session.user });
   }
+};
+
+exports.certificateSync = async (req, res) => {
+  try {
+    const result = await syncCertificate(req.params.id);
+    if (result.skipped) {
+      req.flash('error', 'Webhook spreadsheet belum dikonfigurasi (SHEET_WEBHOOK_URL / CERTIFICATE_WEBHOOK_URL).');
+    } else {
+      req.flash('success', 'Sertifikat & personal report berhasil disinkronkan ke spreadsheet.');
+    }
+  } catch (err) {
+    console.error('Gagal sinkronisasi sertifikat ke spreadsheet:', err.message);
+    req.flash('error', 'Gagal sinkronisasi sertifikat ke spreadsheet.');
+  }
+  res.redirect('/admin/certificate');
 };
 
 // ===== Support Feedback Inbox =====

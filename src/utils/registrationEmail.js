@@ -61,6 +61,88 @@ const getLearnerType = (registration) => {
   return registration.program_type || '-';
 };
 
+// ---- Shared, email-client-safe UI components (tables + inline styles only) ----
+
+const EMAIL_BRAND = '#7c3aed';
+const EMAIL_BRAND_DARK = '#5b21b6';
+
+// Full branded wrapper: header band, accent rule, body card, footer.
+function emailShell({ heading, subheading = '', bodyHtml, accent = EMAIL_BRAND, accentDark = EMAIL_BRAND_DARK }) {
+  return `
+<div style="margin:0;padding:0;background-color:#f3f4f6;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#f3f4f6;">${escapeHtml(subheading || heading)}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:24px 12px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;">
+    <tr><td align="center">
+      <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 6px 22px rgba(17,24,39,0.08);">
+        <tr><td style="background-color:${accent};background-image:linear-gradient(135deg,${accent} 0%,${accentDark} 100%);padding:28px 34px;">
+          <div style="color:#ffffff;font-size:22px;font-weight:800;">Mr.BOB Kampung Inggris</div>
+          <div style="color:#ede9fe;font-size:12px;font-weight:700;margin-top:5px;letter-spacing:2px;text-transform:uppercase;">Kelas Online</div>
+        </td></tr>
+        <tr><td style="height:5px;background-color:#fbbf24;font-size:0;line-height:0;">&nbsp;</td></tr>
+        <tr><td style="padding:32px 34px 8px;color:#374151;font-size:15px;line-height:1.7;">
+          <h1 style="margin:0 0 ${subheading ? '6px' : '18px'};font-size:21px;color:#111827;font-weight:800;">${heading}</h1>
+          ${subheading ? `<p style="margin:0 0 20px;color:#6b7280;font-size:14px;">${subheading}</p>` : ''}
+          ${bodyHtml}
+        </td></tr>
+        <tr><td style="background-color:#faf5ff;padding:22px 34px;text-align:center;border-top:1px solid #f0e7fb;">
+          <div style="color:#7c3aed;font-size:14px;font-weight:800;">#MrBobSuperSeru</div>
+          <div style="color:#9ca3af;font-size:12px;margin-top:6px;line-height:1.6;">Kelas Online Mr.BOB Kampung Inggris</div>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</div>`;
+}
+
+const emailParagraph = (html) => `<p style="margin:0 0 16px;color:#374151;font-size:15px;line-height:1.7;">${html}</p>`;
+
+const emailHeading = (text, accent = EMAIL_BRAND) =>
+  `<h3 style="margin:26px 0 12px;font-size:16px;color:${accent};font-weight:800;border-left:4px solid ${accent};padding-left:11px;">${text}</h3>`;
+
+const emailButton = (href, label, color = EMAIL_BRAND) => `
+  <table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px auto 4px;"><tr>
+    <td style="border-radius:10px;background-color:${color};">
+      <a href="${href}" style="display:inline-block;padding:14px 30px;color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;border-radius:10px;">${label}</a>
+    </td>
+  </tr></table>`;
+
+// Label/value detail table with zebra rows and rounded border.
+function keyValueTable(rows) {
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:0;width:100%;border:1px solid #ececf1;border-radius:12px;overflow:hidden;font-size:14px;">
+      ${rows.map(([label, value], i) => {
+        const border = i === rows.length - 1 ? '0' : '1px solid #f1f0f5';
+        return `
+        <tr style="background-color:${i % 2 ? '#faf9fc' : '#ffffff'};">
+          <td style="padding:11px 16px;color:#6b7280;font-weight:600;width:42%;border-bottom:${border};vertical-align:top;">${escapeHtml(label)}</td>
+          <td style="padding:11px 16px;color:#111827;font-weight:600;border-bottom:${border};">${escapeHtml(value)}</td>
+        </tr>`;
+      }).join('')}
+    </table>`;
+}
+
+const emailTotalBox = (label, amount, sub = '') => `
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0;border-radius:12px;background-color:#f5f3ff;border:1px solid #ddd6fe;">
+    <tr><td style="padding:18px 22px;">
+      <div style="color:#7c3aed;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.6px;">${label}</div>
+      <div style="color:#111827;font-size:27px;font-weight:800;margin-top:4px;">${amount}</div>
+      ${sub ? `<div style="color:#6b7280;font-size:13px;margin-top:8px;line-height:1.6;">${sub}</div>` : ''}
+    </td></tr>
+  </table>`;
+
+const emailNoteBox = (title, items) => `
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;border-radius:12px;background-color:#fef2f2;border:1px solid #fecaca;">
+    <tr><td style="padding:16px 20px;color:#991b1b;font-size:14px;line-height:1.7;">
+      <strong style="display:block;margin-bottom:8px;color:#b91c1c;font-size:14px;">${title}</strong>
+      <ol style="margin:0;padding-left:18px;">${items.map((i) => `<li style="margin-bottom:6px;">${i}</li>`).join('')}</ol>
+    </td></tr>
+  </table>`;
+
+const emailInfoBox = (html, bg = '#f5f3ff', border = '#ddd6fe') => `
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:14px 0;border-radius:12px;background-color:${bg};border:1px solid ${border};">
+    <tr><td style="padding:16px 20px;color:#374151;font-size:14px;line-height:1.7;">${html}</td></tr>
+  </table>`;
+
 const buildPaymentSummary = (registration) => {
   const rows = [
     ['Program', registration.selected_class],
@@ -73,16 +155,7 @@ const buildPaymentSummary = (registration) => {
     ['Tutor Pilihan', registration.preferred_tutor],
   ].filter(([, value]) => value);
 
-  return `
-    <table cellpadding="8" cellspacing="0" style="border-collapse:collapse;font-size:16px;color:#000000;">
-      ${rows.map(([label, value]) => `
-        <tr>
-          <td style="border:1px solid #dddddd;"><strong>${escapeHtml(label)}</strong></td>
-          <td style="border:1px solid #dddddd;">${escapeHtml(value)}</td>
-        </tr>
-      `).join('')}
-    </table>
-  `;
+  return keyValueTable(rows);
 };
 
 function buildRegistrationEmailHtml(registration) {
@@ -100,41 +173,40 @@ function buildRegistrationEmailHtml(registration) {
   const paymentSummary = buildPaymentSummary(registration);
   const confirmationUrl = getConfirmationUrl(registration);
 
-  return `
-    <h2><span style="color: #000000;">Halo Kak ${displayName} ${restDisplayName} ^_^ ...</span></h2>
-    <p style="font-size: 20px;"><span style="color: #000000;">Terimakasih sudah mendaftar&nbsp;<strong>KELAS ONLINE&nbsp;di Mr.BOB Kampung Inggris</strong>&nbsp;Untuk pilihan Belajar pada&nbsp;<strong>Hari Senin, ${startDate}, Jam ${studyTime}.&nbsp;</strong></span></p>
-    <p style="font-size: 20px;"><span style="color: #000000;">Selanjutnya, silahkan kak ${displayName} - ${restDisplayName}&nbsp;melakukan pembayaran :</span></p>
-    <h2><span style="color: #000000; padding: 5px; background-color: yellow;">Program ${program} ( ${learnerType} - ${duration}) , Sebesar <span style="color: #ff0000;">${paymentTotal}</span>&nbsp;</span></h2>
-    <p>${paymentSummary}</p>
-    <p style="font-size: 20px;"><br /><span style="color: #000000;">(<strong>${uniqueCode}</strong>&nbsp;adalah&nbsp;kode daftar kamu, transfer nya jangan dibulatkan ya).&nbsp;</span></p>
-    <p style="font-size: 20px;"><span style="color: #000000;">.....</span></p>
-    <p style="font-size: 20px;"><span style="color: #000000;">Pembayaran bisa kak ${displayName} lakukan via transfer ke salah satu nomer rekening berikut ini : &nbsp;</span></p>
-    <p>&nbsp;</p>
-    <p><img class="aligncenter wp-image-10808 size-large" src="https://app.kelasonlinemrbob.com/wp-content/uploads/2024/12/BRI-Kelas-online-mrbob-1024x683.png" alt="BRI KELAS ONLINE : 055501001605561 (LKBI MR BOB QQ ONLINE)" width="1024" height="683" /></p>
-    <p style="font-size: 20px; text-align: center;"><strong><span style="color: #000000;">BRI KELAS ONLINE : 055501001605561 (LKBI MR BOB QQ ONLINE)</span></strong></p>
-    <p>&nbsp;</p>
-    <p style="font-size: 20px; text-align: center;"><strong><span style="color: #000000;">atau scan QRIS berikut ini ^_^</span></strong></p>
-    <p style="text-align: center;"><img src="cid:${QRIS_CID}" alt="QRIS Kelas Online Mr.BOB" width="320" style="max-width:320px;width:100%;height:auto;" /></p>
-    <p style="font-size: 14px; text-align: center;"><span style="color: #555555;">QRIS menerima semua e-wallet &amp; m-banking</span></p>
-    <p><span style="color: #000000;">.....</span></p>
-    <p style="font-size: 20px;"><span style="color: #000000;">Kayak begini nih contoh transfer nya ^_^</span></p>
-    <p><img class="aligncenter wp-image-10193 size-large" src="https://app.kelasonlinemrbob.com/wp-content/uploads/2024/12/Screenshot_20241207_155306_BRImo-473x1024.jpg" alt="" width="473" height="1024" /></p>
-    <p><br /><span style="color: #000000;">.....</span></p>
-    <p style="font-size: 20px;"><br /><span style="color: #000000;">Setelah&nbsp;transfer, mohon segera melakukan <strong>KONFIRMASI PEMBAYARAN</strong>, dengan mengirimkan foto bukti transfer ${displayName} dengan KLIK link berikut ini ^_^</span></p>
-    <p>&nbsp;</p>
-    <p style="text-align: center;"><a style="color: #ffffff; background-color: #0072ff; font-size: 20px; border-radius: 7px; text-decoration: none; font-weight: normal; font-style: normal; padding: 0.8rem 1rem; border-color: #0072ff;" href="${confirmationUrl}">Konfirmasi Bukti Transfer</a></p>
-    <p>&nbsp;</p>
-    <p style="font-size: 20px;"><span style="color: #000000;">atau dengan KLIK link berikut ini ==&gt; <a href="${confirmationUrl}"><span style="color: #0000ff;"><strong>${confirmationUrl}</strong></span></a></span></p>
-    <p>&nbsp;</p>
-    <p style="font-size: 20px;"><br /><span style="color: #ff0000;">NOTE :&nbsp;</span></p>
-    <p style="font-size: 20px;"><span style="color: #ff0000;">1. Jika 1x24 jam tidak ada konfirmasi, kami anggap&nbsp;BATAL.&nbsp;Di Mr.BOB tidak ada sistem booking. Mereka yg sudah melakukan FIX transfer-lah yg akan RESMI tercatat sebagai member di Mr.BOB. Siapa cepat dia dapat.&nbsp;^_^</span></p>
-    <p style="font-size: 20px;"><span style="color: #ff0000;">2. Data Pendaftaran Kamu akan kami PROSES secara otomatis masuk ke DataBase Kami SETELAH MELAKUKAN KONFIRMASI FIX TRANSFER ^_^</span></p>
-    <p style="font-size: 20px;"><span style="color: #ff0000;">3. Pembayaran bersifat NON-REFUNDABLE&nbsp;(biaya yang sudah dibayarkan tidak bisa ditarik kembali).</span></p>
-    <p style="font-size: 20px;"><br /><span style="color: #000000;">.......&nbsp;</span></p>
-    <p>&nbsp;</p>
-    <p>&nbsp;</p>
-    <p>&nbsp;</p>
+  const body = `
+    ${emailParagraph(`Terimakasih sudah mendaftar <strong>Kelas Online di Mr.BOB Kampung Inggris</strong>. Jadwal belajar pilihanmu: <strong>Hari Senin, ${startDate}, jam ${studyTime}</strong>.`)}
+    ${emailParagraph(`Program <strong>${program}</strong> (${learnerType} — ${duration}). Silakan selesaikan pembayaran sesuai rincian berikut:`)}
+    ${emailTotalBox('Total Transfer', paymentTotal, `Kode unik kamu: <strong>${uniqueCode}</strong>. Transfer tepat sampai 3 digit terakhir (jangan dibulatkan) supaya pembayaran mudah kami verifikasi.`)}
+    ${emailHeading('Rincian Program')}
+    ${paymentSummary}
+    ${emailHeading('Metode Pembayaran')}
+    ${emailParagraph('Transfer ke rekening BRI berikut:')}
+    ${emailInfoBox(`
+      <div style="text-align:center;">
+        <img src="https://app.kelasonlinemrbob.com/wp-content/uploads/2024/12/BRI-Kelas-online-mrbob-1024x683.png" alt="BRI Kelas Online Mr.BOB" width="420" style="width:100%;max-width:420px;height:auto;border-radius:10px;" />
+        <div style="margin-top:12px;font-size:17px;font-weight:800;color:#111827;letter-spacing:0.5px;">BRI &nbsp;055501001605561</div>
+        <div style="font-size:13px;color:#6b7280;margin-top:3px;">a.n. LKBI MR BOB QQ ONLINE</div>
+      </div>
+    `)}
+    ${emailParagraph('<strong>Atau</strong> scan QRIS berikut (menerima semua e-wallet &amp; m-banking):')}
+    <p style="text-align:center;margin:0 0 16px;"><img src="cid:${QRIS_CID}" alt="QRIS Kelas Online Mr.BOB" width="300" style="width:100%;max-width:300px;height:auto;border-radius:10px;border:1px solid #eeeeee;" /></p>
+    ${emailHeading('Contoh Transfer')}
+    <p style="text-align:center;margin:0 0 8px;"><img src="https://app.kelasonlinemrbob.com/wp-content/uploads/2024/12/Screenshot_20241207_155306_BRImo-473x1024.jpg" alt="Contoh bukti transfer" width="220" style="width:100%;max-width:220px;height:auto;border-radius:10px;border:1px solid #eeeeee;" /></p>
+    ${emailHeading('Konfirmasi Pembayaran')}
+    ${emailParagraph('Setelah transfer, mohon segera unggah foto bukti transfer melalui tombol di bawah ini:')}
+    ${emailButton(confirmationUrl, 'Konfirmasi Bukti Transfer')}
+    <p style="text-align:center;margin:6px 0 0;font-size:13px;color:#6b7280;">atau buka tautan berikut:<br><a href="${confirmationUrl}" style="color:#7c3aed;word-break:break-all;">${confirmationUrl}</a></p>
+    ${emailNoteBox('PENTING — mohon dibaca ya ^_^', [
+      'Jika dalam 1×24 jam tidak ada konfirmasi, pendaftaran kami anggap <strong>BATAL</strong>. Di Mr.BOB tidak ada sistem booking — yang sudah FIX transfer yang resmi tercatat sebagai member. Siapa cepat dia dapat ^_^',
+      'Data pendaftaranmu diproses otomatis masuk database kami <strong>setelah</strong> melakukan konfirmasi FIX transfer.',
+      'Pembayaran bersifat <strong>NON-REFUNDABLE</strong> (biaya yang sudah dibayarkan tidak bisa ditarik kembali).',
+    ])}
   `;
+  return emailShell({
+    heading: `Halo Kak ${displayName} ${restDisplayName} 👋`,
+    subheading: 'Pendaftaran kamu sudah kami terima — tinggal satu langkah pembayaran lagi.',
+    bodyHtml: body,
+  });
 }
 
 function getTransportConfig() {
@@ -194,15 +266,7 @@ function registrationDetailRows(registration) {
 }
 
 function detailRowsTable(rows) {
-  return `
-    <table cellpadding="8" cellspacing="0" style="border-collapse:collapse;font-size:14px;color:#111827;width:100%;max-width:640px;">
-      ${rows.map(([label, value], i) => `
-        <tr style="background-color:${i % 2 ? '#f9fafb' : '#ffffff'};">
-          <td style="border:1px solid #e5e7eb;width:200px;vertical-align:top;"><strong>${escapeHtml(label)}</strong></td>
-          <td style="border:1px solid #e5e7eb;">${escapeHtml(value)}</td>
-        </tr>`).join('')}
-    </table>
-  `;
+  return keyValueTable(rows);
 }
 
 function waButtonHtml(registration) {
@@ -221,12 +285,18 @@ function waButtonHtml(registration) {
 }
 
 function buildAdminEmailHtml(registration) {
-  return `
-    <h2 style="color:#111827;">Pendaftaran Baru (NON FIX) — Kelas Online Mr.BOB</h2>
-    <p style="color:#374151;font-size:14px;">Member baru mendaftar melalui web dan menunggu konfirmasi pembayaran.</p>
+  const body = `
+    ${emailParagraph('Member baru mendaftar melalui web dan menunggu konfirmasi pembayaran.')}
     ${detailRowsTable(registrationDetailRows(registration))}
     ${waButtonHtml(registration)}
   `;
+  return emailShell({
+    heading: 'Pendaftaran Baru (NON FIX)',
+    subheading: 'Menunggu konfirmasi pembayaran dari member.',
+    bodyHtml: body,
+    accent: '#d97706',
+    accentDark: '#b45309',
+  });
 }
 
 // ---- Payment confirmed (after transfer proof upload) ----
@@ -257,31 +327,34 @@ function buildPaymentConfirmedEmailHtml(registration, options = {}) {
   const chatUrl = escapeHtml(adminChatUrl());
   const maps = escapeHtml(mapsUrl());
 
-  return `
-    <h2><span style="color: #000000;">Halo kak ${displayName} ..^_^..</span></h2>
-    <p style="font-size: 20px;"><span style="color: #000000;">Terimakasih sudah melakukan transfer untuk pendaftaran <strong>${program} ${programClass}</strong> Kelas Online untuk <strong>${paketBelajar}</strong> ^_^..</span></p>
-    <h2><span style="color: #000000;">Welcome to Kelas Online Mr.BOB Kampung Inggris ...</span></h2>
-    <p style="font-size: 20px;"><span style="color: #000000;">Berikut Rincian Kelas Kamu :</span></p>
-    <p style="font-size: 20px;"><span style="color: #000000;">Kelas Online Mrbob Selama <strong>${lamaBelajar}</strong> dari jam <strong>${jam}</strong>, untuk penentuan tutor akan kami acak dan sesuaikan sesuai dengan program yang kamu pilih ^_^.</span></p>
-    <h2><span style="color: #000000; padding: 5px; background-color: yellow;">LOGIN MEMBER AREA</span></h2>
-    <p style="font-size: 20px;"><span style="color: #000000;">Email : <strong>${email}</strong></span></p>
-    <p style="font-size: 20px;"><span style="color: #000000;">Password : <strong>${password}</strong></span></p>
-    <p style="text-align: center; margin: 18px 0;"><a href="${loginUrl}" style="display:inline-block;background-color:#7E22CE;color:#ffffff;font-size:18px;text-decoration:none;padding:12px 26px;border-radius:8px;">Masuk Member Area</a></p>
-    <p style="font-size: 20px;"><span style="color: #000000;">Jika ada yang kurang jelas atau ada kendala dll jangan ragu untuk bertanya silahkan <a href="${chatUrl}"><strong>KLIK DISINI</strong></a>, untuk komunikasi dengan admin Fast respon kak ^_^</span></p>
-    <p style="font-size: 20px;"><span style="color: #000000;">*Sebelum kelas online di mulai pastikan kak ${displayName}, Sudah menginstall Aplikasi Zoom ( Sebagai Video Call ) :</span></p>
-    <ul style="font-size: 20px; color: #000000;">
-      <li>Untuk Android : <a href="${ZOOM_ANDROID_URL}">Download Aplikasi Zoom</a></li>
-      <li>Untuk IOS : <a href="${ZOOM_IOS_URL}">Download Aplikasi Zoom</a></li>
-    </ul>
-    <p><span style="color: #000000;">....</span></p>
-    <p style="font-size: 20px;"><span style="color: #ff0000;">NOTE :</span></p>
-    <p style="font-size: 20px;"><span style="color: #ff0000;">1. Pembayaran bersifat non-refundable (biaya yang sudah dibayarkan tidak bisa ditarik kembali).</span></p>
-    <p><span style="color: #000000;">......</span></p>
-    <p style="font-size: 20px;"><span style="color: #000000;">Berikut Peta Lokasi Mr.BOB Kampung Inggris via Google Maps, silahkan KLIK link di bawah ini ^_^</span></p>
-    <p style="text-align: center; margin: 14px 0;"><a href="${maps}" style="display:inline-block;background-color:#0072ff;color:#ffffff;font-size:18px;text-decoration:none;padding:10px 22px;border-radius:8px;">Buka Lokasi di Google Maps</a></p>
-    <p style="font-size: 20px;"><span style="color: #000000;">#MrBobSuperSeru</span></p>
-    <p><span style="color: #000000;">....</span></p>
+  const body = `
+    ${emailParagraph(`Terimakasih sudah melakukan transfer untuk pendaftaran <strong>${program} ${programClass}</strong> — Kelas Online untuk <strong>${paketBelajar}</strong>. 🎉`)}
+    ${emailInfoBox('<strong style="color:#7c3aed;font-size:16px;">Welcome to Kelas Online Mr.BOB Kampung Inggris!</strong>')}
+    ${emailHeading('Rincian Kelas')}
+    ${emailParagraph(`Kelas Online Mr.BOB selama <strong>${lamaBelajar}</strong>, mulai jam <strong>${jam}</strong>. Penentuan tutor akan kami acak dan sesuaikan dengan program yang kamu pilih ^_^`)}
+    ${emailHeading('Login Member Area')}
+    ${emailInfoBox(`
+      <div style="margin-bottom:7px;">Email: &nbsp;<strong style="color:#111827;">${email}</strong></div>
+      <div>Password: &nbsp;<strong style="color:#111827;">${password}</strong></div>
+    `, '#fffbeb', '#fde68a')}
+    ${emailButton(loginUrl, 'Masuk Member Area')}
+    ${emailParagraph(`Ada yang kurang jelas atau kendala? <a href="${chatUrl}" style="color:#7c3aed;font-weight:700;">Hubungi admin di sini</a> — fast response kak ^_^`)}
+    ${emailHeading('Sebelum Kelas Dimulai')}
+    ${emailParagraph(`Pastikan kak ${displayName} sudah menginstall aplikasi Zoom (untuk video call):`)}
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 8px;"><tr>
+      <td style="padding:0 8px 8px 0;"><a href="${ZOOM_ANDROID_URL}" style="display:inline-block;padding:10px 18px;background-color:#eef2ff;color:#4338ca;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;">Zoom Android</a></td>
+      <td style="padding:0 0 8px 0;"><a href="${ZOOM_IOS_URL}" style="display:inline-block;padding:10px 18px;background-color:#eef2ff;color:#4338ca;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;">Zoom iOS</a></td>
+    </tr></table>
+    ${emailNoteBox('NOTE', ['Pembayaran bersifat <strong>non-refundable</strong> (biaya yang sudah dibayarkan tidak bisa ditarik kembali).'])}
+    ${emailHeading('Lokasi Mr.BOB Kampung Inggris')}
+    ${emailParagraph('Berikut peta lokasi Mr.BOB Kampung Inggris via Google Maps:')}
+    ${emailButton(maps, 'Buka Lokasi di Google Maps', '#2563eb')}
   `;
+  return emailShell({
+    heading: `Halo Kak ${displayName} 🎉`,
+    subheading: 'Pembayaranmu sudah kami terima — selamat bergabung!',
+    bodyHtml: body,
+  });
 }
 
 function buildAdminFixSubject(registration) {
@@ -291,12 +364,18 @@ function buildAdminFixSubject(registration) {
 }
 
 function buildAdminFixEmailHtml(registration) {
-  return `
-    <h2 style="color:#065F46;">Pembayaran FIX — Kelas Online Mr.BOB</h2>
-    <p style="color:#374151;font-size:14px;">Member telah mengunggah bukti transfer dan dikonfirmasi. Bukti transfer terlampir pada email ini.</p>
+  const body = `
+    ${emailParagraph('Member telah mengunggah bukti transfer dan sudah dikonfirmasi. Bukti transfer terlampir pada email ini.')}
     ${detailRowsTable(registrationDetailRows(registration))}
     ${waButtonHtml(registration)}
   `;
+  return emailShell({
+    heading: 'Pembayaran FIX ✅',
+    subheading: 'Pembayaran member terkonfirmasi.',
+    bodyHtml: body,
+    accent: '#059669',
+    accentDark: '#047857',
+  });
 }
 
 async function sendRegistrationEmail(registration) {
@@ -395,6 +474,96 @@ async function sendAdminPaymentConfirmedEmail(registration, options = {}) {
   return { sent: true };
 }
 
+// ---- Renewal emails ----
+
+const formatDateID = (value) => {
+  if (!value) return '';
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+};
+
+function renewalDetailRows(renewal) {
+  return [
+    ['Nama', renewal.member_name],
+    ['Email', renewal.member_email],
+    ['WhatsApp', renewal.phone],
+    ['Program', renewal.program_name],
+    ['Pilihan Kelas', renewal.selected_class],
+    ['Paket', renewal.package_name],
+    ['Mulai Belajar', formatDateID(renewal.preferred_start_date)],
+    ['Jam Belajar', renewal.study_time],
+    ['Diskon Renewal', renewal.discount ? `- ${formatCurrency(renewal.discount)}` : null],
+    ['Total Renewal', formatCurrency(renewal.package_price)],
+    ['Catatan', renewal.notes],
+  ].filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== '');
+}
+
+function buildRenewalMemberHtml(renewal) {
+  const { firstName } = splitName(renewal.member_name);
+  const body = `
+    ${emailParagraph(`Halo ${escapeHtml(firstName || renewal.member_name)}, form perpanjangan (renewal) kamu sudah kami terima. Tim admin akan mengecek pembayaran dan memperbarui masa aktif programmu.`)}
+    ${emailInfoBox('<strong style="color:#7c3aed;">🎁 Kamu mendapat potongan renewal Rp100.000.</strong>')}
+    ${detailRowsTable(renewalDetailRows(renewal))}
+    ${emailParagraph('<span style="color:#6b7280;font-size:13px;">Terima kasih sudah melanjutkan belajar bersama Mr.BOB Kampung Inggris.</span>')}
+  `;
+  return emailShell({
+    heading: 'Renewal Diterima ✅',
+    subheading: 'Perpanjangan programmu sudah kami terima.',
+    bodyHtml: body,
+  });
+}
+
+function buildRenewalAdminHtml(renewal) {
+  const body = `
+    ${emailParagraph('Ada pengajuan renewal dari member. Berikut detailnya:')}
+    ${detailRowsTable(renewalDetailRows(renewal))}
+  `;
+  return emailShell({
+    heading: 'Pengajuan Renewal Baru',
+    subheading: 'Kelas Online Mr.BOB Kampung Inggris.',
+    bodyHtml: body,
+    accent: '#d97706',
+    accentDark: '#b45309',
+  });
+}
+
+async function sendRenewalEmail(renewal) {
+  const transportConfig = getTransportConfig();
+  if (!transportConfig) {
+    console.warn('SMTP belum dikonfigurasi. Email renewal (member) dilewati.');
+    return { skipped: true };
+  }
+  if (!renewal.member_email) return { skipped: true };
+  const transporter = nodemailer.createTransport(transportConfig);
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || process.env.SMTP_USER,
+    to: renewal.member_email,
+    subject: 'Renewal Kelas Online Mr.BOB Kampung Inggris',
+    html: buildRenewalMemberHtml(renewal),
+  });
+  return { sent: true };
+}
+
+async function sendRenewalAdminEmail(renewal) {
+  const transportConfig = getTransportConfig();
+  if (!transportConfig) {
+    console.warn('SMTP belum dikonfigurasi. Email renewal (admin) dilewati.');
+    return { skipped: true };
+  }
+  const adminEmail = process.env.ADMIN_EMAIL || process.env.MAIL_FROM || process.env.SMTP_USER;
+  if (!adminEmail) return { skipped: true };
+  const transporter = nodemailer.createTransport(transportConfig);
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || process.env.SMTP_USER,
+    to: adminEmail,
+    replyTo: renewal.member_email || undefined,
+    subject: `RENEWAL Kelas Online # ${renewal.member_name || '-'} # ${renewal.program_name || '-'}`,
+    html: buildRenewalAdminHtml(renewal),
+  });
+  return { sent: true };
+}
+
 module.exports = {
   buildRegistrationEmailHtml,
   buildAdminSubject,
@@ -406,5 +575,7 @@ module.exports = {
   sendAdminNotificationEmail,
   sendPaymentConfirmedEmail,
   sendAdminPaymentConfirmedEmail,
+  sendRenewalEmail,
+  sendRenewalAdminEmail,
   getPaymentTotal,
 };

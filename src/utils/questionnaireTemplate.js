@@ -2,6 +2,13 @@ const isTeachingQuestionnaire = (questionnaire = {}) => (
   /questionnaire|questioner|kuesioner/i.test(String(questionnaire.title || ''))
 );
 
+// A questionnaire uses the hardcoded teaching template only when its title matches
+// the teaching keywords AND it has no custom questions. Once an admin adds questions
+// it becomes a custom questionnaire rendered generically.
+const isTeachingMode = (questionnaire = {}, questionCount = 0) => (
+  isTeachingQuestionnaire(questionnaire) && Number(questionCount || 0) === 0
+);
+
 const teachingQuestionnaireFilter = (alias = 'q') => (
   `(${alias}.title ILIKE '%questionnaire%' OR ${alias}.title ILIKE '%questioner%' OR ${alias}.title ILIKE '%kuesioner%')`
 );
@@ -95,6 +102,7 @@ const ensureTeachingQuestionnaires = async (query) => {
 
 module.exports = {
   isTeachingQuestionnaire,
+  isTeachingMode,
   teachingQuestionnaireFilter,
   teachingRatings,
   teachingEssays,

@@ -12,8 +12,19 @@
   <div class="container">
     <div class="section-card">
       <h3 class="section-title"><i class="fas fa-file-lines"></i> Member Report</h3>
+      <% if (periodOptions && periodOptions.length > 0) { %>
+        <form method="GET" action="/member/report" class="filter-form">
+          <select name="period" class="form-input" onchange="this.form.submit()">
+            <option value="">Semua Periode</option>
+            <% periodOptions.forEach(opt => { %>
+              <option value="<%= opt.period_value %>" <%= filters.period === opt.period_value ? 'selected' : '' %>><%= opt.label || formatDate(opt.period_value) %></option>
+            <% }) %>
+          </select>
+          <% if (filters.period) { %><a href="/member/report" class="btn btn-outline">Reset</a><% } %>
+        </form>
+      <% } %>
       <% if (reports.length === 0) { %>
-        <div class="empty-state compact"><i class="fas fa-file-lines"></i><p>Belum ada report dari tutor.</p></div>
+        <div class="empty-state compact"><i class="fas fa-file-lines"></i><p><%= filters.period ? 'Tidak ada report pada periode ini.' : 'Belum ada report dari tutor.' %></p></div>
       <% } else { %>
         <div class="table-wrapper">
           <table class="data-table">

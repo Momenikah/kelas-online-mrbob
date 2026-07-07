@@ -22,39 +22,65 @@
           <strong><%= stats.nearestDays === null ? '-' : stats.nearestDays + ' hari' %></strong>
         </div>
 
-        <form action="/member/renewal" method="POST" enctype="multipart/form-data" class="renewal-form-card">
-          <div class="form-row renewal-program-row">
-            <div class="form-group">
-              <label class="form-label">Program <span class="required">*</span></label>
-              <select name="program_id" id="renewalProgram" class="form-input" required>
-                <option value="">-- Pilih Program --</option>
-                <% programs.forEach(p => { %>
-                  <option value="<%= p.id %>"
-                          data-price="<%= p.price || 0 %>"
-                          data-renewal-price="<%= p.renewal_price || 0 %>"
-                          data-duration="<%= p.duration_months || '' %>"
-                          <%= recommended && String(recommended.program_id) === String(p.id) ? 'selected' : '' %>>
-                    <%= p.name %>
-                  </option>
-                <% }) %>
-              </select>
-              <small class="field-hint">Harga renewal otomatis potong Rp100.000 dari harga program.</small>
+        <form action="/member/renewal" method="POST" enctype="multipart/form-data" class="renewal-form-card" id="renewalForm">
+          <!-- Resolved fields the backend needs (set by the picker below) -->
+          <input type="hidden" name="program_id" id="renewalProgramId">
+          <input type="hidden" name="selected_class" id="renewalSelectedClass">
+          <input type="hidden" name="package_name" id="renewalPackageName">
+          <input type="hidden" name="package_price" id="renewalPackagePrice" value="0">
+
+          <div class="form-group">
+            <label class="form-label">Tipe Program <span class="required">*</span></label>
+            <div class="signup-program-tabs" role="group" aria-label="Tipe program">
+              <label><input type="radio" name="program_type" value="adult"><span>Kelas Online Adult</span></label>
+              <label><input type="radio" name="program_type" value="kids"><span>Kelas Online Kids &amp; Teen</span></label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" id="renewalClassLabel">Kelas <span class="required">*</span></label>
+            <div class="signup-class-chips" id="renewalClassOptions"></div>
+            <small class="field-hint">Pilih kelas yang ingin diperpanjang. Harga renewal otomatis potong Rp100.000.</small>
+          </div>
+
+          <div class="signup-grid three-col renewal-package-grid" id="renewalPackageGrid" hidden>
+            <div class="signup-field">
+              <label>Tipe Paket <span>*</span></label>
+              <select id="renewalPackageGroup"><option value="">Pilih tipe</option></select>
+            </div>
+            <div class="signup-field">
+              <label>Durasi Belajar <span>*</span></label>
+              <select id="renewalDuration"><option value="">Pilih durasi</option></select>
+            </div>
+            <div class="signup-field">
+              <label>Paket <span>*</span></label>
+              <select id="renewalPackageType"><option value="">Pilih paket</option></select>
+            </div>
+            <div class="signup-field">
+              <label>Jumlah Pertemuan</label>
+              <input type="text" id="renewalMeetingCount" readonly>
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Mulai Belajar <span class="required">*</span></label>
-              <input type="date" name="preferred_start_date" class="form-input" required>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Jam Belajar <span class="required">*</span></label>
-              <select name="study_time" class="form-input" required>
+              <label class="form-label"><span id="renewalStudyTimeLabel">Jam Belajar</span> <span class="required">*</span></label>
+              <select name="study_time" id="renewalStudyTime" class="form-input" required>
                 <option value="">-- Pilih Jam --</option>
                 <% studyTimes.forEach(slot => { %>
                   <option value="<%= slot %>"><%= slot %></option>
                 <% }) %>
               </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Mulai Belajar (Periode) <span class="required">*</span></label>
+              <select name="preferred_start_date" class="form-input" required>
+                <option value="">-- Pilih Periode --</option>
+                <% periods.forEach(pr => { %>
+                  <option value="<%= pr.value %>"><%= pr.label %></option>
+                <% }) %>
+              </select>
+              <small class="field-hint">Sesuai periode pendaftaran yang tersedia.</small>
             </div>
           </div>
 
@@ -78,14 +104,12 @@
             <textarea name="notes" class="form-textarea" rows="3" placeholder="Contoh: lanjut tutor yang sama, prefer jam malam, atau sudah transfer ke BCA."></textarea>
           </div>
 
-          <div class="renewal-mini-summary">
-            <span id="renewalSummaryProgram">Belum pilih program</span>
-            <strong id="renewalSummaryPrice">-</strong>
-            <small id="renewalSummaryDuration">-</small>
-          </div>
-          <div class="renewal-discount-note" id="renewalDiscountNote">
-            <i class="fas fa-tags"></i>
-            <span>Renewal mendapat potongan Rp100.000 setiap program.</span>
+          <div class="renewal-payment-summary" id="renewalPaymentSummary">
+            <div class="rps-head"><i class="fas fa-receipt"></i> <span id="renewalSummaryProgram">Belum pilih program</span></div>
+            <div class="rps-row"><span>Harga Paket</span><b id="rpsBase">-</b></div>
+            <div class="rps-row rps-discount"><span>Diskon Renewal</span><b id="rpsDiscount">- Rp 100.000</b></div>
+            <div class="rps-total"><span>Total Pembayaran</span><strong id="rpsTotal">-</strong></div>
+            <small class="field-hint renewal-package-note" id="renewalPackageNote" hidden></small>
           </div>
 
           <div class="form-actions renewal-simple-actions">
@@ -109,7 +133,7 @@
           <div class="renewal-compact-list">
             <% enrollments.forEach(e => { %>
               <button type="button" class="renewal-compact-item is-<%= e.urgency %>"
-                      data-active-pick data-id="<%= e.program_id %>">
+                      data-active-pick data-id="<%= e.program_id %>" data-name="<%= e.program_name %>">
                 <span>
                   <strong><%= e.program_name %></strong>
                   <small><%= formatDate(e.end_date) %></small>
@@ -142,8 +166,8 @@
           <% renewalRequests.forEach(r => { %>
             <div class="renewal-history-item">
               <div>
-                <strong><%= r.program_name %></strong>
-                <span>Renewal • <%= formatDate(r.preferred_start_date) %> • <%= r.study_time || '-' %> • <%= formatCurrency(r.package_price || 0) %></span>
+                <strong><%= r.program_name %><%= r.selected_class ? ' • ' + r.selected_class : '' %></strong>
+                <span>Renewal • <%= r.package_name || '-' %> • <%= formatDate(r.preferred_start_date) %> • <%= r.study_time || '-' %> • <%= formatCurrency(r.package_price || 0) %></span>
               </div>
               <span class="badge-pill badge-renewal-<%= r.status %>"><%= r.status %></span>
             </div>
@@ -155,30 +179,170 @@
 </div>
 
 <script>
-const renewalProgram = document.getElementById('renewalProgram');
-const renewalSummaryProgram = document.getElementById('renewalSummaryProgram');
-const renewalSummaryPrice = document.getElementById('renewalSummaryPrice');
-const renewalSummaryDuration = document.getElementById('renewalSummaryDuration');
-const renewalDiscountNote = document.getElementById('renewalDiscountNote');
+// Same program/package picker as the registration form, driven by the shared
+// price catalog — but without any personal-data fields.
+const RENEWAL_DISCOUNT = 100000;
+const priceList = <%- JSON.stringify(priceList) %>;
+const programCatalog = <%- JSON.stringify(programCatalog) %>;
+const programIdByName = <%- JSON.stringify(programIdByName) %>;
+const defaultStudyTimes = <%- JSON.stringify(studyTimes) %>;
+const recommendedProgram = "<%= recommended ? recommended.program_name : '' %>";
+const privateStudyTimes = ['16.00 WIB - 17.00 WIB', '19.00 WIB - 20.00 WIB', '20.00 WIB - 21.00 WIB'];
+const semiPrivateStudyTimes = ['19.00 WIB - 20.00 WIB'];
 
-function formatRupiah(value) {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value || 0));
+const rClassLabel = document.getElementById('renewalClassLabel');
+const rClassOptions = document.getElementById('renewalClassOptions');
+const rPackageGrid = document.getElementById('renewalPackageGrid');
+const rPackageGroup = document.getElementById('renewalPackageGroup');
+const rDuration = document.getElementById('renewalDuration');
+const rPackageType = document.getElementById('renewalPackageType');
+const rMeetingCount = document.getElementById('renewalMeetingCount');
+const rStudyTime = document.getElementById('renewalStudyTime');
+const rStudyTimeLabel = document.getElementById('renewalStudyTimeLabel');
+const rProgramId = document.getElementById('renewalProgramId');
+const rSelectedClass = document.getElementById('renewalSelectedClass');
+const rPackageName = document.getElementById('renewalPackageName');
+const rPackagePrice = document.getElementById('renewalPackagePrice');
+const rSummaryProgram = document.getElementById('renewalSummaryProgram');
+const rpsBase = document.getElementById('rpsBase');
+const rpsDiscount = document.getElementById('rpsDiscount');
+const rpsTotal = document.getElementById('rpsTotal');
+const rPackageNote = document.getElementById('renewalPackageNote');
+
+function rupiah(v) {
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(v || 0));
+}
+function escapeHtml(v) {
+  return String(v || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
+}
+function getType() { const s = document.querySelector('input[name="program_type"]:checked'); return s ? s.value : ''; }
+function getClassName() { const s = document.querySelector('input[name="renewal_class"]:checked'); return s ? s.value : ''; }
+function getPackages() { return priceList[getClassName()] || []; }
+function getPackageGroup(item) {
+  if (item.name.includes('LUXURY')) return 'Luxury';
+  if (item.name.includes('IELTS')) return 'IELTS';
+  if (item.name.includes('BTS')) return 'BTS';
+  if (item.name.includes('SEMI')) return 'Semi Private';
+  if (item.name.includes('PRIVATE')) return 'Private';
+  return 'VIP';
+}
+function getGroups() { return [...new Set(getPackages().map(getPackageGroup))]; }
+function getFilteredPackages() {
+  const g = rPackageGroup.value, d = rDuration.value;
+  return getPackages().map((it, i) => ({ ...it, index: i }))
+    .filter((it) => !g || getPackageGroup(it) === g)
+    .filter((it) => !d || it.duration === d);
+}
+function getSelectedPackage() { return getPackages()[Number(rPackageType.value)] || null; }
+
+function renderClassOptions(type) {
+  const cfg = programCatalog[type];
+  rClassOptions.innerHTML = '';
+  if (!cfg) return;
+  rClassLabel.innerHTML = escapeHtml(cfg.label) + ' <span class="required">*</span>';
+  cfg.items.forEach((item, i) => {
+    rClassOptions.insertAdjacentHTML('beforeend',
+      '<label><input type="radio" name="renewal_class" value="' + escapeHtml(item) + '" ' + (i === 0 ? 'checked' : '') + '><span>' + escapeHtml(item) + '</span></label>');
+  });
+}
+function renderGroups() {
+  const groups = getGroups();
+  rPackageGroup.innerHTML = '<option value="">Pilih tipe</option>';
+  groups.forEach((g) => rPackageGroup.insertAdjacentHTML('beforeend', '<option value="' + escapeHtml(g) + '">' + escapeHtml(g) + '</option>'));
+  if (groups.length) rPackageGroup.value = groups.includes('VIP') ? 'VIP' : groups[0];
+  renderDurations();
+}
+function renderDurations() {
+  const g = rPackageGroup.value;
+  const durs = [...new Set(getPackages().filter((it) => !g || getPackageGroup(it) === g).map((it) => it.duration))];
+  rDuration.innerHTML = '<option value="">Pilih durasi</option>';
+  durs.forEach((d) => rDuration.insertAdjacentHTML('beforeend', '<option value="' + escapeHtml(d) + '">' + escapeHtml(d) + '</option>'));
+  if (durs.length) rDuration.value = durs[0];
+  renderPackages();
+}
+function renderPackages() {
+  const pkgs = getFilteredPackages();
+  rPackageType.innerHTML = '<option value="">Pilih paket</option>';
+  pkgs.forEach((it) => rPackageType.insertAdjacentHTML('beforeend', '<option value="' + it.index + '">' + escapeHtml(it.name) + '</option>'));
+  if (rPackageType.options.length > 1) rPackageType.selectedIndex = 1;
+  updateSummary();
+}
+function renderStudyTimes(group) {
+  let times = defaultStudyTimes, label = 'Jam Belajar';
+  if (group === 'Private' || group === 'BTS') { times = privateStudyTimes; label = 'Jam Belajar ' + (group === 'BTS' ? 'BTS' : 'Private'); }
+  else if (group === 'Semi Private') { times = semiPrivateStudyTimes; label = 'Jam Belajar Semi Private'; }
+  if (rStudyTimeLabel) rStudyTimeLabel.textContent = label;
+  const prev = rStudyTime.value;
+  rStudyTime.innerHTML = '<option value="">-- Pilih Jam --</option>';
+  times.forEach((t) => rStudyTime.insertAdjacentHTML('beforeend', '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>'));
+  if (times.indexOf(prev) !== -1) rStudyTime.value = prev;
 }
 
-function updateRenewalSummary() {
-  const selected = renewalProgram.options[renewalProgram.selectedIndex];
-  const renewalPrice = Number(selected && selected.dataset ? selected.dataset.renewalPrice : 0);
-  renewalSummaryProgram.textContent = selected && selected.value ? selected.textContent.trim() : 'Belum pilih program';
-  renewalSummaryPrice.textContent = selected && selected.value ? `Renewal ${formatRupiah(renewalPrice)}` : '-';
-  renewalSummaryDuration.textContent = selected && selected.value && selected.dataset.duration ? selected.dataset.duration + ' bulan' : '-';
-  renewalDiscountNote.style.display = selected && selected.value ? 'flex' : 'none';
+function updateSummary() {
+  const cls = getClassName();
+  const pkg = getSelectedPackage();
+  rProgramId.value = cls ? (programIdByName[cls.toLowerCase()] || '') : '';
+  rSelectedClass.value = cls || '';
+
+  if (!getType() || !cls || !pkg) {
+    rPackageGrid.hidden = !cls;
+    rMeetingCount.value = '';
+    rPackageName.value = '';
+    rPackagePrice.value = '0';
+    rSummaryProgram.textContent = cls || 'Belum pilih program';
+    rpsBase.textContent = '-';
+    rpsDiscount.textContent = '- ' + rupiah(RENEWAL_DISCOUNT);
+    rpsTotal.textContent = '-';
+    if (rPackageNote) rPackageNote.hidden = true;
+    return;
+  }
+
+  const group = getPackageGroup(pkg);
+  rPackageGrid.hidden = false;
+  rDuration.value = pkg.duration;
+  rMeetingCount.value = pkg.meetings + ' pertemuan';
+  rPackageName.value = pkg.name;
+  rPackagePrice.value = pkg.price;
+  renderStudyTimes(group);
+
+  const base = Number(pkg.price) || 0;
+  const total = Math.max(0, base - RENEWAL_DISCOUNT);
+  rSummaryProgram.textContent = cls + ' — ' + pkg.name;
+  rpsBase.textContent = base ? rupiah(base) : '-';
+  rpsDiscount.textContent = '- ' + rupiah(RENEWAL_DISCOUNT);
+  rpsTotal.textContent = base ? rupiah(total) : '-';
+  if (rPackageNote) { rPackageNote.textContent = pkg.note ? ('* ' + pkg.note) : ''; rPackageNote.hidden = !pkg.note; }
 }
 
-if (renewalProgram) renewalProgram.addEventListener('change', updateRenewalSummary);
+document.querySelectorAll('input[name="program_type"]').forEach((radio) => {
+  radio.addEventListener('change', () => { renderClassOptions(radio.value); renderGroups(); updateSummary(); });
+});
+rClassOptions.addEventListener('change', () => { renderGroups(); updateSummary(); });
+rPackageGroup.addEventListener('change', renderDurations);
+rDuration.addEventListener('change', renderPackages);
+rPackageType.addEventListener('change', updateSummary);
+
+// Quick-pick from the active-program list: activate the right type + class chip.
+function pickProgramByName(name) {
+  if (!name) return;
+  const lower = name.toLowerCase();
+  let type = null;
+  Object.keys(programCatalog).forEach((t) => {
+    if (!type && (programCatalog[t].items || []).some((it) => it.toLowerCase() === lower)) type = t;
+  });
+  if (!type) return;
+  const typeRadio = document.querySelector('input[name="program_type"][value="' + type + '"]');
+  if (typeRadio) typeRadio.checked = true;
+  renderClassOptions(type);
+  const chip = Array.from(document.querySelectorAll('input[name="renewal_class"]')).find((r) => r.value.toLowerCase() === lower);
+  if (chip) chip.checked = true;
+  renderGroups();
+  updateSummary();
+}
+
 document.querySelectorAll('[data-active-pick]').forEach((button) => {
   button.addEventListener('click', () => {
-    renewalProgram.value = button.dataset.id || '';
-    updateRenewalSummary();
+    pickProgramByName(button.dataset.name || '');
     document.getElementById('renewal-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 });
@@ -190,7 +354,17 @@ if (renewalProofInput) {
     renewalProofLabel.textContent = renewalProofInput.files.length ? renewalProofInput.files[0].name : 'Upload bukti jika sudah transfer';
   });
 }
-updateRenewalSummary();
+
+document.getElementById('renewalForm').addEventListener('submit', (e) => {
+  if (!rProgramId.value || !rPackageName.value) {
+    e.preventDefault();
+    alert('Silakan pilih tipe program, kelas, dan paket terlebih dahulu.');
+    document.getElementById('renewal-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+});
+
+// Preselect the program nearest to expiry (if any) so a total shows on load.
+if (recommendedProgram) pickProgramByName(recommendedProgram);
 </script>
 
 <%- include('../partials/footer') %>

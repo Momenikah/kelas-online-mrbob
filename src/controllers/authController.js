@@ -10,6 +10,7 @@ const {
 } = require('../utils/registrationEmail');
 const { syncRegistration, syncConfirmation } = require('../utils/spreadsheetSync');
 const { STUDY_TIME_SLOTS, PROGRAM_CATALOG } = require('../utils/catalog');
+const { PRICE_LIST } = require('../utils/priceList');
 const { ensureUserAccessColumns, isLuxuryPackage, getAccessFromRegistration } = require('../utils/userAccess');
 
 const ensureRegistrationTable = async () => {
@@ -130,6 +131,7 @@ exports.showRegister = async (req, res) => {
       error: req.flash('error'),
       studyTimeSlots: STUDY_TIME_SLOTS,
       programCatalog: PROGRAM_CATALOG,
+      priceList: PRICE_LIST,
       gradeATutors: tutors.rows,
     });
   } catch (err) {
@@ -139,6 +141,7 @@ exports.showRegister = async (req, res) => {
       error: req.flash('error'),
       studyTimeSlots: STUDY_TIME_SLOTS,
       programCatalog: PROGRAM_CATALOG,
+      priceList: PRICE_LIST,
       gradeATutors: [],
     });
   }
@@ -151,6 +154,11 @@ exports.register = async (req, res) => {
     package_name, package_price, package_note, duration, meeting_count, study_time,
     start_date, preferred_tutor_id, friend_name, coupon_code, referral_code
   } = req.body;
+
+  const friendNames = (Array.isArray(friend_name) ? friend_name : [friend_name])
+    .map((value) => (value || '').trim())
+    .filter(Boolean)
+    .join(', ');
 
   try {
     await ensureRegistrationTable();
@@ -239,7 +247,7 @@ exports.register = async (req, res) => {
         start_date || null,
         preferredTutorId,
         preferredTutorName,
-        friend_name || null,
+        friendNames || null,
         coupon_code || null,
         referral_code || null,
       ]

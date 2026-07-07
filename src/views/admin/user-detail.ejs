@@ -100,47 +100,67 @@
       </form>
     </div>
 
-    <!-- Registration data -->
+    <!-- Registration data (editable) -->
     <div class="section-card">
       <h3 class="section-title"><i class="fas fa-id-card"></i> Data Pendaftaran</h3>
       <% if (!registration) { %>
         <div class="empty-state"><i class="fas fa-id-card"></i><p>Tidak ada data pendaftaran untuk pengguna ini.</p></div>
       <% } else { %>
-        <h4 class="kv-subtitle">Data Diri</h4>
+        <!-- Read-only record info -->
         <div class="kv-grid">
           <div class="kv"><span>ID Pendaftaran</span><strong><%= v(registration.registration_code) %></strong></div>
-          <div class="kv"><span>Kota</span><strong><%= v(registration.city) %></strong></div>
-          <div class="kv"><span>Usia</span><strong><%= v(registration.age) %></strong></div>
-          <div class="kv"><span>Pekerjaan</span><strong><%= v(registration.occupation) %></strong></div>
-          <div class="kv"><span>Jenjang Pendidikan</span><strong><%= v(registration.education_level) %></strong></div>
-          <div class="kv"><span>Latar Pendidikan</span><strong><%= v(registration.education_background) %></strong></div>
-          <div class="kv"><span>Instagram</span><strong><%= v(registration.instagram) %></strong></div>
-          <div class="kv"><span>Nama Teman</span><strong><%= v(registration.friend_name) %></strong></div>
-        </div>
-
-        <h4 class="kv-subtitle">Program &amp; Paket</h4>
-        <div class="kv-grid">
-          <div class="kv"><span>Tipe Peserta</span><strong><%= v(registration.program_type) %></strong></div>
-          <div class="kv"><span>Program</span><strong><%= v(registration.selected_class) %></strong></div>
-          <div class="kv"><span>Tipe Paket</span><strong><%= v(registration.package_group) %></strong></div>
-          <div class="kv"><span>Paket</span><strong><%= v(registration.package_name) %></strong></div>
-          <div class="kv"><span>Durasi</span><strong><%= v(registration.duration) %></strong></div>
-          <div class="kv"><span>Jumlah Pertemuan</span><strong><%= v(registration.meeting_count) %></strong></div>
-          <div class="kv"><span>Jam Belajar</span><strong><%= v(registration.study_time) %></strong></div>
-          <div class="kv"><span>Mulai Belajar</span><strong><%= v(registration.start_date) %></strong></div>
-          <div class="kv"><span>Tutor Pilihan</span><strong><%= v(registration.preferred_tutor) %></strong></div>
-        </div>
-
-        <h4 class="kv-subtitle">Pembayaran</h4>
-        <div class="kv-grid">
-          <div class="kv"><span>Harga Paket</span><strong><%= registration.package_price ? formatCurrency(registration.package_price) : '-' %></strong></div>
-          <div class="kv"><span>Kode Unik</span><strong><%= v(registration.phone_last_three) %></strong></div>
-          <div class="kv"><span>Kupon</span><strong><%= v(registration.coupon_code) %></strong></div>
-          <div class="kv"><span>Referral</span><strong><%= v(registration.referral_code) %></strong></div>
           <div class="kv"><span>Status</span><strong><%= registration.status === 'confirmed' ? 'Confirmed (FIX)' : 'Menunggu pembayaran' %></strong></div>
           <div class="kv"><span>Tanggal Daftar</span><strong><%= formatDate(registration.created_at) %></strong></div>
           <div class="kv"><span>Tanggal Konfirmasi</span><strong><%= registration.confirmed_at ? formatDate(registration.confirmed_at) : '-' %></strong></div>
         </div>
+
+        <form action="/admin/users/<%= profile.id %>/registration" method="POST" class="modal-form" style="margin-top:6px">
+          <input type="hidden" name="registration_id" value="<%= registration.id %>">
+
+          <h4 class="kv-subtitle">Data Diri</h4>
+          <div class="admin-form-grid">
+            <div class="form-group"><label class="form-label">Kota</label><input type="text" name="city" class="form-input" value="<%= registration.city || '' %>"></div>
+            <div class="form-group"><label class="form-label">Usia</label><input type="number" name="age" class="form-input" min="0" max="120" value="<%= registration.age || '' %>"></div>
+            <div class="form-group"><label class="form-label">Pekerjaan</label><input type="text" name="occupation" class="form-input" value="<%= registration.occupation || '' %>"></div>
+            <div class="form-group"><label class="form-label">Jenjang Pendidikan</label><input type="text" name="education_level" class="form-input" value="<%= registration.education_level || '' %>"></div>
+            <div class="form-group"><label class="form-label">Latar Pendidikan</label><input type="text" name="education_background" class="form-input" value="<%= registration.education_background || '' %>"></div>
+            <div class="form-group"><label class="form-label">Instagram</label><input type="text" name="instagram" class="form-input" value="<%= registration.instagram || '' %>"></div>
+            <div class="form-group"><label class="form-label">Nama Teman</label><input type="text" name="friend_name" class="form-input" value="<%= registration.friend_name || '' %>"></div>
+          </div>
+
+          <h4 class="kv-subtitle">Program &amp; Paket</h4>
+          <div class="admin-form-grid">
+            <div class="form-group">
+              <label class="form-label">Tipe Peserta</label>
+              <select name="program_type" class="form-input">
+                <option value="" <%= !registration.program_type ? 'selected' : '' %>>-</option>
+                <option value="adult" <%= registration.program_type === 'adult' ? 'selected' : '' %>>Adult</option>
+                <option value="kids" <%= registration.program_type === 'kids' ? 'selected' : '' %>>Kids</option>
+              </select>
+            </div>
+            <div class="form-group"><label class="form-label">Program</label><input type="text" name="selected_class" class="form-input" value="<%= registration.selected_class || '' %>"></div>
+            <div class="form-group"><label class="form-label">Tipe Paket</label><input type="text" name="package_group" class="form-input" value="<%= registration.package_group || '' %>"></div>
+            <div class="form-group"><label class="form-label">Paket</label><input type="text" name="package_name" class="form-input" value="<%= registration.package_name || '' %>"></div>
+            <div class="form-group"><label class="form-label">Durasi</label><input type="text" name="duration" class="form-input" value="<%= registration.duration || '' %>"></div>
+            <div class="form-group"><label class="form-label">Jumlah Pertemuan</label><input type="text" name="meeting_count" class="form-input" value="<%= registration.meeting_count || '' %>"></div>
+            <div class="form-group"><label class="form-label">Jam Belajar</label><input type="text" name="study_time" class="form-input" value="<%= registration.study_time || '' %>"></div>
+            <div class="form-group"><label class="form-label">Mulai Belajar</label><input type="text" name="start_date" class="form-input" value="<%= registration.start_date || '' %>"></div>
+            <div class="form-group"><label class="form-label">Tutor Pilihan</label><input type="text" name="preferred_tutor" class="form-input" value="<%= registration.preferred_tutor || '' %>"></div>
+          </div>
+
+          <h4 class="kv-subtitle">Pembayaran</h4>
+          <div class="admin-form-grid">
+            <div class="form-group"><label class="form-label">Harga Paket (Rp)</label><input type="number" name="package_price" class="form-input" min="0" value="<%= registration.package_price || '' %>"></div>
+            <div class="form-group"><label class="form-label">Kode Unik (3 digit)</label><input type="text" name="phone_last_three" class="form-input" maxlength="3" pattern="[0-9]{3}" value="<%= registration.phone_last_three || '' %>"></div>
+            <div class="form-group"><label class="form-label">Kupon</label><input type="text" name="coupon_code" class="form-input" value="<%= registration.coupon_code || '' %>"></div>
+            <div class="form-group"><label class="form-label">Referral</label><input type="text" name="referral_code" class="form-input" value="<%= registration.referral_code || '' %>"></div>
+          </div>
+          <p class="field-hint"><i class="fas fa-circle-info"></i> Status pembayaran, tanggal konfirmasi, dan bukti transfer dikelola oleh alur konfirmasi pembayaran dan tidak diubah dari sini.</p>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan Data Pendaftaran</button>
+          </div>
+        </form>
 
         <% if (registration.package_note) { %>
           <div class="summary-note" style="margin-top:14px"><%= registration.package_note %></div>

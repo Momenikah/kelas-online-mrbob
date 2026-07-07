@@ -176,13 +176,12 @@
               <% } else if (q.question_type === 'essay') { %>
                 <textarea name="q_<%= q.id %>" class="form-textarea qform-textarea" rows="4" required placeholder="Tulis jawaban Anda..."></textarea>
               <% } else if (q.question_type === 'rating') { %>
-                <div class="qform-rating">
-                  <% for (let i = 1; i <= 5; i++) { %>
-                    <label>
-                      <input type="radio" name="q_<%= q.id %>" value="<%= i %>" required>
-                      <span><strong><%= i %></strong><small><%= i === 1 ? 'Sangat kurang' : i === 2 ? 'Kurang' : i === 3 ? 'Cukup' : i === 4 ? 'Baik' : 'Sangat baik' %></small></span>
-                    </label>
-                  <% } %>
+                <div class="qstandard-range qform-range">
+                  <input type="range" name="q_<%= q.id %>" min="0" max="5" value="0" step="1" data-rating-required>
+                  <div class="qrange-foot">
+                    <output>0</output>
+                    <small class="qrange-hint">1 = Sangat kurang · 5 = Sangat baik</small>
+                  </div>
                 </div>
               <% } %>
             </div>
@@ -238,7 +237,6 @@ document.getElementById('qProgramSelect')?.addEventListener('change', function (
   document.getElementById('qProgramName').value = this.options[this.selectedIndex]?.dataset.name || '';
 });
 form.addEventListener('submit', function (event) {
-  if (!isTeachingMode) return;
   const invalidRating = Array.from(form.querySelectorAll('[data-rating-required]')).some((range) => Number(range.value) <= 0);
   if (invalidRating) {
     event.preventDefault();

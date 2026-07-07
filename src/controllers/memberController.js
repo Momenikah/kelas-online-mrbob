@@ -6,12 +6,17 @@ const at = require('../utils/availableTime');
 const kidsQuestions = require('../data/placementTestKids');
 const { normalizeReportDays, ensureMemberReportsTable } = require('../utils/memberReports');
 const { ensureCertificateDetailsColumn } = require('../utils/certificates');
-const { STUDY_TIME_SLOTS } = require('../utils/catalog');
+const { STUDY_TIME_SLOTS, PROGRAM_CATALOG } = require('../utils/catalog');
 const { ensureRenewalRequestsTable } = require('../utils/renewalRequests');
+const { getModuleMaterial } = require('../utils/moduleLinks');
+const { packagesForProgram, PRICE_LIST } = require('../utils/priceList');
+const { syncRenewal } = require('../utils/spreadsheetSync');
+const { sendRenewalEmail, sendRenewalAdminEmail } = require('../utils/registrationEmail');
 const { SUPPORT_EMAIL, sendSupportFeedback } = require('../utils/supportEmail');
 const { saveSupportFeedback, updateSupportFeedbackEmailStatus } = require('../utils/supportFeedback');
 const {
   isTeachingQuestionnaire,
+  isTeachingMode,
   teachingQuestionnaireFilter,
   teachingRatings,
   teachingEssays,
@@ -88,12 +93,17 @@ exports.dashboard = async (req, res) => {
       query(`
         WITH pending AS (
           SELECT q.id, q.title, q.due_date, p.name as program_name,
-                 ROW_NUMBER() OVER (PARTITION BY p.name ORDER BY q.created_at DESC, q.id DESC) AS rn
+                 ROW_NUMBER() OVER (
+                   PARTITION BY (CASE WHEN COALESCE(qc.cnt, 0) > 0 THEN 'c' || q.id ELSE 'p' || p.name END)
+                   ORDER BY q.created_at DESC, q.id DESC
+                 ) AS rn
           FROM questionnaires q
           JOIN programs p ON q.program_id = p.id
+          LEFT JOIN (SELECT questionnaire_id, COUNT(*) AS cnt FROM questions GROUP BY questionnaire_id) qc
+            ON qc.questionnaire_id = q.id
           WHERE q.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
             AND q.is_active = true
-            AND ${teachingQuestionnaireFilter('q')}
+            AND (${teachingQuestionnaireFilter('q')} OR COALESCE(qc.cnt, 0) > 0)
             AND NOT EXISTS (SELECT 1 FROM questionnaire_responses qr WHERE qr.questionnaire_id = q.id AND qr.member_id = $1)
         )
         SELECT id, title, due_date, program_name
@@ -270,11 +280,18 @@ exports.module = async (req, res) => {
              WHERE m.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
                AND m.is_active = true`, [userId]),
     ]);
+    // Google Drive material link per enrolled program (member only sees links
+    // for programs they are enrolled in — access is scoped to the chosen program).
+    const programMaterials = programsRes.rows
+      .map((p) => ({ id: p.id, name: p.name, material_url: getModuleMaterial(p.name) }))
+      .filter((p) => p.material_url);
+
     res.render('member/module', {
       title: 'Modul Belajar',
       user: req.session.user,
       modules: result.rows,
       programs: programsRes.rows,
+      programMaterials,
       filters: { programId },
       stats: statsRes.rows[0],
       isVip: req.session.user.is_vip || req.session.user.is_luxury,
@@ -292,7 +309,13 @@ exports.presence = async (req, res) => {
     const [tutorsRes, periodsRes, programsRes, submissionsRes, schedulesRes] = await Promise.all([
       query("SELECT id, name FROM users WHERE role = 'tutor' AND is_active = true ORDER BY name"),
       query('SELECT period_start, label FROM periods ORDER BY period_start'),
-      query('SELECT id, name FROM programs WHERE is_active = true ORDER BY name'),
+      // Only the programs this member registered/enrolled in — matches the
+      // registration choice instead of listing every program. DISTINCT ON (name)
+      // collapses duplicate program rows that share the same name.
+      query(`SELECT DISTINCT ON (p.name) p.id, p.name
+             FROM enrollments e JOIN programs p ON e.program_id = p.id
+             WHERE e.member_id = $1
+             ORDER BY p.name, p.id`, [userId]),
       query(`SELECT mp.*, t.name as tutor_name, p.name as program_name
              FROM member_presences mp
              LEFT JOIN users t ON mp.tutor_id = t.id
@@ -506,13 +529,19 @@ exports.questionnaire = async (req, res) => {
         SELECT q.*,
                qr.id as response_id, qr.score, qr.max_score, qr.submitted_at,
                p.name as program_name,
-               ROW_NUMBER() OVER (PARTITION BY p.name ORDER BY q.created_at DESC, q.id DESC) AS rn
+               COALESCE(qc.cnt, 0) AS question_count,
+               ROW_NUMBER() OVER (
+                 PARTITION BY (CASE WHEN COALESCE(qc.cnt, 0) > 0 THEN 'c' || q.id ELSE 'p' || p.name END)
+                 ORDER BY q.created_at DESC, q.id DESC
+               ) AS rn
         FROM questionnaires q
         JOIN programs p ON q.program_id = p.id
         LEFT JOIN questionnaire_responses qr ON q.id = qr.questionnaire_id AND qr.member_id = $1
+        LEFT JOIN (SELECT questionnaire_id, COUNT(*) AS cnt FROM questions GROUP BY questionnaire_id) qc
+          ON qc.questionnaire_id = q.id
         WHERE q.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
           AND q.is_active = true
-          AND ${teachingQuestionnaireFilter('q')}
+          AND (${teachingQuestionnaireFilter('q')} OR COALESCE(qc.cnt, 0) > 0)
       )
       SELECT *
       FROM available
@@ -556,7 +585,7 @@ exports.questionnaireShow = async (req, res) => {
       questionnaire,
       questions: questionsResult.rows,
       response: responseResult.rows[0] || null,
-      isTeachingQuestionnaire: isTeachingQuestionnaire(questionnaire),
+      isTeachingQuestionnaire: isTeachingMode(questionnaire, questionsResult.rows.length),
       teachingRatings,
       teachingEssays,
       ratingLabels,
@@ -587,7 +616,10 @@ exports.questionnaireSubmit = async (req, res) => {
 
     const qResult = await query('SELECT * FROM questionnaires WHERE id = $1', [id]);
     const questionnaire = qResult.rows[0];
-    if (questionnaire && isTeachingQuestionnaire(questionnaire)) {
+    const questionsResult = await query('SELECT * FROM questions WHERE questionnaire_id = $1', [id]);
+    const questions = questionsResult.rows;
+
+    if (questionnaire && isTeachingMode(questionnaire, questions.length)) {
       const built = buildTeachingQuestionnaireAnswer(req.body);
       await query(`
         INSERT INTO questionnaire_responses (questionnaire_id, member_id, answers, score, max_score, started_at)
@@ -597,9 +629,6 @@ exports.questionnaireSubmit = async (req, res) => {
       req.flash('success', `Questionnaire berhasil dikumpulkan. Skor: ${built.score}/${built.maxScore}`);
       return res.redirect('/member/questionnaire');
     }
-
-    const questionsResult = await query('SELECT * FROM questions WHERE questionnaire_id = $1', [id]);
-    const questions = questionsResult.rows;
 
     let score = 0;
     let maxScore = 0;
@@ -638,7 +667,16 @@ exports.report = async (req, res) => {
   try {
     const userId = req.session.user.id;
     await ensureMemberReportsTable(query);
-    const [enrollResult, presStats, quizStats, reportsRes] = await Promise.all([
+
+    const periodFilter = req.query.period || '';
+    const reportParams = [userId];
+    let periodWhere = '';
+    if (periodFilter) {
+      reportParams.push(periodFilter);
+      periodWhere = ` AND mr.period_start = $${reportParams.length}::date`;
+    }
+
+    const [enrollResult, presStats, quizStats, reportsRes, periodOptionsRes] = await Promise.all([
       query(`SELECT e.*, p.name as program_name FROM enrollments e JOIN programs p ON e.program_id = p.id WHERE e.member_id = $1`, [userId]),
       query(`
         SELECT p.name as program_name,
@@ -662,8 +700,15 @@ exports.report = async (req, res) => {
         FROM member_reports mr
         JOIN users t ON t.id = mr.tutor_id
         JOIN programs p ON p.id = mr.program_id
-        WHERE mr.member_id = $1
+        WHERE mr.member_id = $1${periodWhere}
         ORDER BY mr.period_start DESC, mr.updated_at DESC
+      `, reportParams),
+      query(`
+        SELECT DISTINCT to_char(mr.period_start, 'YYYY-MM-DD') AS period_value, pr.label
+        FROM member_reports mr
+        LEFT JOIN periods pr ON pr.period_start = mr.period_start
+        WHERE mr.member_id = $1
+        ORDER BY period_value DESC
       `, [userId]),
     ]);
     res.render('member/report', {
@@ -673,6 +718,8 @@ exports.report = async (req, res) => {
       presStats: presStats.rows,
       quizStats: quizStats.rows,
       reports: reportsRes.rows,
+      periodOptions: periodOptionsRes.rows,
+      filters: { period: periodFilter },
     });
   } catch (err) {
     console.error(err);
@@ -855,7 +902,7 @@ exports.renewal = async (req, res) => {
   try {
     const userId = req.session.user.id;
     await ensureRenewalRequestsTable(query);
-    const [enrollResult, programsResult, requestsResult, profileResult] = await Promise.all([
+    const [enrollResult, programsResult, requestsResult, profileResult, registrationsResult, periodsResult] = await Promise.all([
       query(`SELECT e.*, p.name as program_name, p.description as program_description, p.price, p.duration_months
              FROM enrollments e JOIN programs p ON e.program_id = p.id
              WHERE e.member_id = $1 ORDER BY e.end_date`, [userId]),
@@ -867,7 +914,19 @@ exports.renewal = async (req, res) => {
              ORDER BY rr.created_at DESC
              LIMIT 8`, [userId]),
       query('SELECT phone FROM users WHERE id = $1', [userId]),
+      query(`SELECT selected_class, package_group, package_name, package_price, study_time, start_date, created_at
+             FROM member_registrations WHERE user_id = $1 ORDER BY created_at DESC`, [userId]),
+      query('SELECT period_start, label FROM periods ORDER BY period_start'),
     ]);
+
+    // Original-registration data used to prefill class, package, and study time.
+    const registrations = registrationsResult.rows;
+    const latestReg = registrations[0] || null;
+    const regByClass = new Map();
+    registrations.forEach((r) => {
+      const key = String(r.selected_class || '').trim().toLowerCase();
+      if (key && !regByClass.has(key)) regByClass.set(key, r);
+    });
 
     // Normalise admin WhatsApp (0xxxx -> 62xxxx) for the renewal request link.
     let adminWhatsapp = String(process.env.ADMIN_WHATSAPP || '').replace(/\D/g, '');
@@ -915,13 +974,34 @@ exports.renewal = async (req, res) => {
       if (!key || seenPrograms.has(key)) return;
       seenPrograms.add(key);
       const currentEnrollment = active.find((e) => String(e.program_name || '').trim().toLowerCase() === key);
+      // Prefill class/package/study-time from the member's original registration:
+      // prefer a registration whose selected_class matches this program, else the latest.
+      const reg = regByClass.get(key) || latestReg;
+      // Package price catalog for this program (real prices — the programs table
+      // itself has no price column). Renewal total = package price - discount.
+      const packages = packagesForProgram(program.name).map((p) => ({ name: p.name, price: p.price, note: p.note || '' }));
+      const defaultPackagePrice = packages.length ? packages[0].price : Number(program.price || 0);
+      const basePrice = reg && reg.package_price ? Number(reg.package_price) : defaultPackagePrice;
       uniquePrograms.push({
         ...program,
-        renewal_price: renewalPriceFor(program.price),
+        packages,
+        renewal_price: renewalPriceFor(basePrice),
         is_current: activeProgramNames.has(key),
         current_end_date: currentEnrollment ? currentEnrollment.end_date : null,
         current_days_left: currentEnrollment ? currentEnrollment.days_left : null,
+        prefill_class: reg ? (reg.selected_class || '') : '',
+        prefill_package: reg ? (reg.package_name || '') : '',
+        prefill_package_price: reg && reg.package_price ? Number(reg.package_price) : defaultPackagePrice,
+        prefill_study_time: reg ? (reg.study_time || '') : '',
       });
+    });
+
+    // Map catalog class name -> programs.id so the registration-style class picker
+    // (which selects by class name) can resolve the program_id the backend needs.
+    const programIdByName = {};
+    programsResult.rows.forEach((p) => {
+      const key = String(p.name || '').trim().toLowerCase();
+      if (key && !(key in programIdByName)) programIdByName[key] = p.id;
     });
 
     res.render('member/renewal', {
@@ -931,6 +1011,13 @@ exports.renewal = async (req, res) => {
       programs: uniquePrograms,
       renewalRequests: requestsResult.rows,
       studyTimes: STUDY_TIME_SLOTS,
+      programCatalog: PROGRAM_CATALOG,
+      priceList: PRICE_LIST,
+      programIdByName,
+      periods: periodsResult.rows.map((p) => ({
+        value: at.toISODate(p.period_start),
+        label: p.label || at.formatPeriodLabel(p.period_start),
+      })),
       memberPhone: profileResult.rows[0] ? profileResult.rows[0].phone : '',
       adminWhatsapp,
       recommended,
@@ -958,6 +1045,9 @@ exports.submitRenewal = async (req, res) => {
     const studyTime = String(req.body.study_time || '').trim();
     const phone = String(req.body.phone || '').trim();
     const notes = String(req.body.notes || '').trim();
+    const selectedClass = String(req.body.selected_class || '').trim();
+    const postedPackageName = String(req.body.package_name || '').trim();
+    const postedPackagePrice = Number(req.body.package_price || 0);
 
     if (!programId || !preferredStartDate || !studyTime || !phone) {
       removeUploadedFile(req.file);
@@ -979,15 +1069,19 @@ exports.submitRenewal = async (req, res) => {
     }
 
     const proofPath = req.file ? `/uploads/${req.file.filename}` : null;
-    const normalPrice = Number(program.price || 0);
-    const packagePrice = renewalPriceFor(normalPrice);
-    await query(`
+    // Base price comes from the original registration's package (prefilled on the
+    // form); fall back to the program price. Renewal discount is applied on top.
+    const basePrice = postedPackagePrice > 0 ? postedPackagePrice : Number(program.price || 0);
+    const packagePrice = renewalPriceFor(basePrice);
+    const packageName = postedPackageName || program.name;
+    const inserted = await query(`
       INSERT INTO renewal_requests (
         member_id, program_id, request_type, member_name, member_email, phone,
-        preferred_start_date, study_time, package_name, package_price,
+        preferred_start_date, study_time, selected_class, package_name, package_price,
         transfer_proof, notes, status, updated_at
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending',NOW())
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending',NOW())
+      RETURNING id
     `, [
       userId,
       programId,
@@ -997,11 +1091,38 @@ exports.submitRenewal = async (req, res) => {
       phone,
       preferredStartDate,
       studyTime,
-      program.name,
+      selectedClass || null,
+      packageName,
       packagePrice,
       proofPath,
       notes || null,
     ]);
+
+    // Fire email notifications (member + admin) and spreadsheet sync — non-blocking.
+    const renewalId = inserted.rows[0].id;
+    const renewal = {
+      member_name: member.name,
+      member_email: member.email,
+      phone,
+      program_name: program.name,
+      selected_class: selectedClass,
+      package_name: packageName,
+      package_price: packagePrice,
+      discount: RENEWAL_DISCOUNT,
+      preferred_start_date: preferredStartDate,
+      study_time: studyTime,
+      notes,
+    };
+    const tasks = [
+      ['email renewal member', sendRenewalEmail(renewal)],
+      ['email renewal admin', sendRenewalAdminEmail(renewal)],
+      ['sinkronisasi renewal spreadsheet', syncRenewal(renewalId)],
+    ];
+    Promise.allSettled(tasks.map(([, p]) => p)).then((results) => {
+      results.forEach((r, i) => {
+        if (r.status === 'rejected') console.error(`Gagal ${tasks[i][0]}:`, r.reason && r.reason.message);
+      });
+    });
 
     req.flash('success', 'Form renewal berhasil dikirim. Admin akan mengecek dan memproses request kamu.');
     return res.redirect('/member/renewal#riwayat-renewal');

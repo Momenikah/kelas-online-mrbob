@@ -16,51 +16,12 @@
         <span class="showcase-brand-name">Super&nbsp;Seru</span>
       </div>
 
-      <h1 class="showcase-headline">Satu langkah lagi<br>menuju <span>kelas impianmu.</span></h1>
+      <h1 class="showcase-headline">PeDe <span>speaking</span> dimana aja,<br>Just <span>speak up!</span></h1>
       <p class="showcase-sub">Pilih program, tentukan jadwal, dan mulai belajar bareng tutor terbaik.</p>
 
-      <!-- interactive mockup: registration steps -->
-      <div class="mock-scene" id="regMockScene">
-        <div class="mock-card mock-main" data-depth="0.18">
-          <div class="mock-head">
-            <span class="mock-avatar"><i class="fas fa-clipboard-check"></i></span>
-            <div>
-              <p class="mock-name">Pendaftaran Member</p>
-              <p class="mock-role">Hampir selesai!</p>
-            </div>
-          </div>
-          <div class="mock-steps">
-            <span class="mock-step done"><i class="fas fa-check"></i> Data Diri</span>
-            <span class="mock-step done"><i class="fas fa-check"></i> Profil Belajar</span>
-            <span class="mock-step active"><i class="fas fa-circle-notch"></i> Pilih Program</span>
-          </div>
-          <div class="mock-progress-row">
-            <div class="mock-progress-label"><span>Kelengkapan</span><span class="mock-pct" data-count="85">0%</span></div>
-            <div class="mock-bar"><i style="--w:85%"></i></div>
-          </div>
-        </div>
-
-        <div class="mock-card mock-stat" data-depth="0.34">
-          <span class="mock-stat-icon"><i class="fas fa-tags"></i></span>
-          <div>
-            <p class="mock-stat-num" data-count="14">0</p>
-            <p class="mock-stat-cap">Pilihan Program</p>
-          </div>
-        </div>
-
-        <div class="mock-card mock-schedule" data-depth="0.28">
-          <span class="mock-sched-icon"><i class="fas fa-user-tie"></i></span>
-          <div class="mock-sched-body">
-            <p class="mock-sched-title">Tutor Grade A</p>
-            <p class="mock-sched-time"><i class="fas fa-star"></i> Benefit Luxury Class</p>
-          </div>
-          <span class="mock-live mock-live-ok">SIAP</span>
-        </div>
-
-        <div class="mock-badge" data-depth="0.5">
-          <i class="fas fa-certificate"></i>
-          <span>Sertifikat <b>resmi</b></span>
-        </div>
+      <!-- app illustration -->
+      <div class="showcase-illustration">
+        <img src="/img/landing-page-1.webp" alt="Belajar online bersama Super Seru" loading="lazy">
       </div>
 
       <ul class="showcase-features">
@@ -84,7 +45,7 @@
     <header class="signup-header">
       <a href="/login" class="signup-logo" aria-label="Mr.BOB login">
         <div class="logo-box">
-          <img src="/img/logo-mrbob.webp" alt="Mr.BOB" class="app-logo">
+          <img src="/img/logo-kelasonline.png" alt="Kelas Online Mr.BOB" class="app-logo">
         </div>
       </a>
       <a href="/login" class="signup-login-link">Sudah punya akun? Masuk</a>
@@ -225,7 +186,7 @@
 
           <div class="signup-grid">
             <div class="signup-field">
-              <label>Pilihan Jam Belajar <span>*</span></label>
+              <label><span id="studyTimeLabel">Pilihan Jam Belajar</span> <span>*</span></label>
               <select name="study_time" id="studyTime">
                 <option value="">Pilih jam</option>
                 <% studyTimeSlots.forEach(function (slot) { %><option><%= slot %></option><% }) %>
@@ -260,6 +221,7 @@
                   <label class="luxury-tutor-card">
                     <input type="radio" name="preferred_tutor_id" value="<%= tutor.id %>" <%= index === 0 ? 'checked' : '' %>>
                     <span class="luxury-tutor-shell">
+                      <span class="luxury-tutor-check" aria-hidden="true"><i class="fas fa-check"></i></span>
                       <span class="luxury-tutor-avatar">
                         <% if (tutor.photo) { %>
                           <img src="<%= tutor.photo %>" alt="<%= tutor.name %>">
@@ -273,12 +235,13 @@
                       </span>
                       <button type="button" class="luxury-tutor-detail"
                         data-tutor-detail
+                        data-id="<%= tutor.id %>"
                         data-name="<%= tutor.name %>"
                         data-grade="<%= tutorGrade %>"
                         data-photo="<%= tutor.photo || '' %>"
                         data-initials="<%= getInitials(tutor.name) %>"
                         data-desc="<%= tutor.bio || 'Belum ada deskripsi tutor.' %>">
-                        <i class="fas fa-circle-info"></i>
+                        <i class="fas fa-circle-info"></i> Lihat Detail
                       </button>
                     </span>
                   </label>
@@ -294,7 +257,14 @@
 
           <div class="signup-field signup-wide signup-friend-field" id="friendField" hidden>
             <label>Nama Teman <span>*</span></label>
-            <input type="text" name="friend_name" id="friendName" placeholder="Nama teman yang ikut mendaftar">
+            <div id="friendList" class="friend-list">
+              <div class="friend-row">
+                <input type="text" name="friend_name" class="friend-input" placeholder="Nama teman yang ikut mendaftar">
+              </div>
+            </div>
+            <button type="button" id="addFriendBtn" class="friend-add-btn">
+              <i class="fas fa-plus"></i> Tambah teman
+            </button>
           </div>
 
           <div class="signup-code-grid">
@@ -345,6 +315,9 @@
       <p id="tutorModalGrade">Grade Tutor</p>
       <h3 id="tutorModalName">Detail Tutor</h3>
       <div class="signup-tutor-modal-desc" id="tutorModalDesc"></div>
+      <button type="button" class="signup-tutor-modal-select" id="tutorModalSelect">
+        <i class="fas fa-check"></i> Pilih Tutor Ini
+      </button>
     </div>
   </div>
   </main>
@@ -361,9 +334,13 @@ const packageType = document.getElementById('packageType');
 const duration = document.getElementById('duration');
 const meetingCount = document.getElementById('meetingCount');
 const studyTime = document.getElementById('studyTime');
+const studyTimeLabel = document.getElementById('studyTimeLabel');
 const startDate = document.getElementById('startDate');
 const friendField = document.getElementById('friendField');
-const friendName = document.getElementById('friendName');
+const friendList = document.getElementById('friendList');
+const addFriendBtn = document.getElementById('addFriendBtn');
+const MAX_FRIENDS = 3;
+let friendRequired = false;
 const luxuryTutorField = document.getElementById('luxuryTutorField');
 const preferredTutorRadios = document.querySelectorAll('input[name="preferred_tutor_id"]');
 const tutorDetailModal = document.getElementById('tutorDetailModal');
@@ -371,7 +348,10 @@ const tutorModalAvatar = document.getElementById('tutorModalAvatar');
 const tutorModalName = document.getElementById('tutorModalName');
 const tutorModalGrade = document.getElementById('tutorModalGrade');
 const tutorModalDesc = document.getElementById('tutorModalDesc');
+const tutorModalSelect = document.getElementById('tutorModalSelect');
+let modalTutorId = null;
 const paymentSummary = document.getElementById('paymentSummary');
+const phoneLastThree = document.querySelector('input[name="phone_last_three"]');
 const packageName = document.getElementById('packageName');
 const packageGroupValue = document.getElementById('packageGroupValue');
 const packagePrice = document.getElementById('packagePrice');
@@ -380,77 +360,8 @@ const packageNote = document.getElementById('packageNote');
 // Sumber tunggal dari server (utils/catalog.js) — sama dengan available time & plot jadwal.
 const defaultStudyTimes = <%- JSON.stringify(studyTimeSlots) %>;
 
-const vipPackages = [
-  { name: 'VIP', price: 980000, duration: '2 MINGGU', meetings: 10 },
-  { name: 'VIP FLEXIBLE', price: 1500000, duration: '2 MINGGU', meetings: 10, note: 'JAM BELAJAR DITENTUKAN H-1 KELAS' },
-  { name: 'VIP GOLD', price: 1450000, duration: '2 MINGGU', meetings: 10, note: 'DURASI WAKTU PER KELAS 90 MENIT' },
-  { name: 'VIP PLATINUM', price: 1750000, duration: '2 MINGGU', meetings: 10, note: 'DURASI WAKTU PER KELAS 120 MENIT' },
-  { name: '1 BULAN - VIP', price: 1800000, duration: '1 BULAN', meetings: 20 },
-  { name: '2 BULAN - VIP', price: 3500000, duration: '2 BULAN', meetings: 40 },
-  { name: '3X - VIP', price: 1150000, duration: '1 BULAN', meetings: 12 },
-  { name: '2X - VIP WEEKEND', price: 950000, duration: '1 BULAN', meetings: 8 },
-  { name: '2X - VIP WEEKDAY', price: 850000, duration: '1 BULAN', meetings: 8 }
-];
-
-const luxuryPackage = {
-  name: 'LUXURY CLASS',
-  price: 1500000,
-  duration: '2 MINGGU',
-  meetings: 10,
-  note: 'Benefit: pilih tutor grade A, Video Premium, dan Test TOEFL gratis.'
-};
-
-const privatePackages = [
-  { name: 'PRIVATE', price: 695000, duration: '2 MINGGU', meetings: 10 },
-  { name: '3X - PRIVATE', price: 800000, duration: '1 BULAN', meetings: 12, note: 'HARUS MENDAFTAR DENGAN TEMAN (2-3 ORANG)' },
-  { name: '2X - PRIVATE WEEKEND', price: 675000, duration: '1 BULAN', meetings: 8, note: 'HARUS MENDAFTAR DENGAN TEMAN (2-3 ORANG)' },
-  { name: '2X - PRIVATE WEEKDAY', price: 575000, duration: '1 BULAN', meetings: 8, note: 'HARUS MENDAFTAR DENGAN TEMAN (2-3 ORANG)' },
-  { name: 'BTS', price: 880000, duration: '2 MINGGU', meetings: 10, note: 'HARUS MENDAFTAR 2 ORANG' }
-];
-
-const fullPrivatePackages = [
-  { name: 'PRIVATE', price: 695000, duration: '2 MINGGU', meetings: 10 },
-  { name: '1 BULAN - PRIVATE', price: 1250000, duration: '1 BULAN', meetings: 20 },
-  ...privatePackages.slice(1)
-];
-
-const kidsPackages = [
-  ...vipPackages.map((item) => item.name === 'VIP FLEXIBLE' ? { ...item, name: 'VIP FLEKSIBLE' } : item),
-  { name: 'PRIVATE', price: 695000, duration: '2 MINGGU', meetings: 10, note: 'HANYA LEVEL 1-2' },
-  { name: '1 BULAN - PRIVATE', price: 1250000, duration: '1 BULAN', meetings: 20, note: 'HANYA LEVEL 1-2' },
-  { name: '3X - PRIVATE', price: 800000, duration: '1 BULAN', meetings: 12, note: 'HARUS MENDAFTAR DENGAN TEMAN (2-3 ORANG)' },
-  { name: '2X - PRIVATE WEEKEND', price: 675000, duration: '1 BULAN', meetings: 8, note: 'HARUS MENDAFTAR DENGAN TEMAN (2-3 ORANG)' },
-  { name: '2X - PRIVATE WEEKDAY', price: 575000, duration: '1 BULAN', meetings: 8, note: 'HARUS MENDAFTAR DENGAN TEMAN (2-3 ORANG)' },
-  { name: '2X - SEMI PRIVATE WEEKDAY', price: 350000, duration: '1 BULAN', meetings: 8, note: 'HARUS MENDAFTAR DENGAN TEMAN (4-6 ORANG)' },
-  { name: 'BTS', price: 880000, duration: '2 MINGGU', meetings: 10, note: 'HARUS MENDAFTAR 2 ORANG' }
-];
-
-const priceList = {
-  'WALKY TALKY': [luxuryPackage, ...vipPackages],
-  'SPEAK UP 1': [luxuryPackage, ...vipPackages, ...fullPrivatePackages, { name: 'SEMI - PRIVATE', price: 395000, duration: '2 MINGGU', meetings: 10, note: 'HANYA JAM 19.00 WIB' }],
-  'SPEAK UP 2': [luxuryPackage, ...vipPackages, ...privatePackages],
-  'SPEAK UP 3': [luxuryPackage, ...vipPackages],
-  'SPEAK UP 100': [luxuryPackage, ...vipPackages.map((item) => item.name === 'VIP FLEXIBLE' ? { ...item, name: 'VIP FLEKSIBLE' } : item)],
-  'GRAND SPEAKING': [luxuryPackage, ...vipPackages],
-  'SPEAKING FOR SPECIFIC PURPOSES': [luxuryPackage, ...vipPackages],
-  'CAREER CLINIC': [luxuryPackage, ...vipPackages],
-  'GRAMMAR': [luxuryPackage, ...vipPackages, ...privatePackages],
-  'TOEFL': [luxuryPackage, ...vipPackages],
-  'IELTS': [
-    luxuryPackage,
-    { name: 'IELTS', price: 1100000, duration: '2 MINGGU', meetings: 10 },
-    { name: 'IELTS FLEKSIBLE', price: 1650000, duration: '2 MINGGU', meetings: 10, note: 'JAM BELAJAR DITENTUKAN H-1 KELAS' },
-    { name: 'IELTS 3X', price: 1700000, duration: '1 BULAN', meetings: 12 },
-    { name: 'IELTS 2X WEEKDAY', price: 1200000, duration: '1 BULAN', meetings: 8 },
-    { name: 'IELTS 2X WEEKEND', price: 1300000, duration: '1 BULAN', meetings: 8 },
-    { name: 'IELTS 1 BULAN', price: 2750000, duration: '1 BULAN', meetings: 20 },
-    { name: 'IELTS 2 BULAN', price: 4750000, duration: '2 BULAN', meetings: 40 },
-    { name: 'IELTS 3 BULAN', price: 6750000, duration: '3 BULAN', meetings: 60 }
-  ],
-  'SMART KIDS': [luxuryPackage, ...kidsPackages],
-  'SUPER KIDS': [luxuryPackage, ...kidsPackages],
-  'GENIUS TEEN': [luxuryPackage, ...kidsPackages]
-};
+// Sumber tunggal paket harga dari server (utils/priceList.js) — sama dengan form renewal.
+const priceList = <%- JSON.stringify(priceList) %>;
 
 // Sumber tunggal dari server (utils/catalog.js) — sama dengan tabel programs & plot jadwal.
 const programOptions = <%- JSON.stringify(programCatalog) %>;
@@ -507,7 +418,7 @@ function getSelectedPackage() {
 function getPackageGroup(item) {
   if (item.name.includes('LUXURY')) return 'Luxury';
   if (item.name.includes('IELTS')) return 'IELTS';
-  if (item.name === 'BTS') return 'BTS';
+  if (item.name.includes('BTS')) return 'BTS';
   if (item.name.includes('SEMI')) return 'Semi Private';
   if (item.name.includes('PRIVATE')) return 'Private';
   return 'VIP';
@@ -560,7 +471,7 @@ function renderPackageOptions() {
   const packages = getFilteredPackages();
   packageType.innerHTML = '<option value="">Pilih paket</option>';
   packages.forEach((item) => {
-    packageType.insertAdjacentHTML('beforeend', `<option value="${item.index}">${escapeHtml(item.name)} - ${rupiah(item.price)}</option>`);
+    packageType.insertAdjacentHTML('beforeend', `<option value="${item.index}">${escapeHtml(item.name)}</option>`);
   });
   if (packageType.options.length > 1) packageType.selectedIndex = 1;
   updatePayment();
@@ -572,18 +483,70 @@ function setProgramDetailRequired(isRequired) {
   });
 }
 
-function renderStudyTimes() {
+const privateStudyTimes = ['16.00 WIB - 17.00 WIB', '19.00 WIB - 20.00 WIB', '20.00 WIB - 21.00 WIB'];
+const semiPrivateStudyTimes = ['19.00 WIB - 20.00 WIB'];
+
+function renderStudyTimes(group) {
+  let times = defaultStudyTimes;
+  let label = 'Pilihan Jam Belajar';
+  if (group === 'Private' || group === 'BTS') {
+    times = privateStudyTimes;
+    label = `Pilihan Jam Belajar ${group === 'BTS' ? 'BTS' : 'Private'}`;
+  } else if (group === 'Semi Private') {
+    times = semiPrivateStudyTimes;
+    label = 'Pilihan Jam Belajar Semi Private';
+  }
+
+  if (studyTimeLabel) studyTimeLabel.textContent = label;
   studyTime.innerHTML = '<option value="">Pilih jam</option>';
-  defaultStudyTimes.forEach((time) => {
+  times.forEach((time) => {
     studyTime.insertAdjacentHTML('beforeend', `<option>${escapeHtml(time)}</option>`);
   });
 }
 
+function friendRows() {
+  return friendList.querySelectorAll('.friend-row');
+}
+
+function syncFriendUI() {
+  friendList.querySelectorAll('.friend-input').forEach((input, index) => {
+    input.required = friendRequired && index === 0;
+  });
+  addFriendBtn.hidden = friendRows().length >= MAX_FRIENDS;
+}
+
+function addFriendRow() {
+  if (friendRows().length >= MAX_FRIENDS) return;
+  const row = document.createElement('div');
+  row.className = 'friend-row';
+  row.innerHTML = `
+    <input type="text" name="friend_name" class="friend-input" placeholder="Nama teman yang ikut mendaftar">
+    <button type="button" class="friend-remove-btn" aria-label="Hapus teman"><i class="fas fa-times"></i></button>`;
+  friendList.appendChild(row);
+  syncFriendUI();
+}
+
+function resetFriendRows() {
+  friendList.innerHTML = `
+    <div class="friend-row">
+      <input type="text" name="friend_name" class="friend-input" placeholder="Nama teman yang ikut mendaftar">
+    </div>`;
+}
+
+addFriendBtn.addEventListener('click', addFriendRow);
+friendList.addEventListener('click', (event) => {
+  const removeBtn = event.target.closest('.friend-remove-btn');
+  if (!removeBtn) return;
+  removeBtn.closest('.friend-row').remove();
+  syncFriendUI();
+});
+
 function updateFriendRequirement(selectedPackage) {
-  const needsFriend = (selectedPackage.note || '').includes('HARUS MENDAFTAR 2 ORANG');
+  const needsFriend = (selectedPackage.note || '').includes('HARUS MENDAFTAR');
   friendField.hidden = !needsFriend;
-  friendName.required = needsFriend;
-  if (!needsFriend) friendName.value = '';
+  friendRequired = needsFriend;
+  if (!needsFriend) resetFriendRows();
+  syncFriendUI();
 }
 
 function updateLuxuryTutorRequirement(selectedPackage) {
@@ -621,9 +584,13 @@ function updatePayment() {
   packageGroupValue.value = selectedGroup;
   packagePrice.value = selectedPackage.price;
   packageNote.value = selectedPackage.note || '';
-  renderStudyTimes();
+  renderStudyTimes(selectedGroup);
   updateFriendRequirement(selectedPackage);
   updateLuxuryTutorRequirement(selectedPackage);
+
+  const uniqueRaw = String(phoneLastThree && phoneLastThree.value || '').trim();
+  const uniqueCode = /^\d{3}$/.test(uniqueRaw) ? uniqueRaw : '';
+  const totalTransfer = selectedPackage.price + (uniqueCode ? Number(uniqueCode) : 0);
 
   paymentSummary.innerHTML = `
     <div class="summary-heading">
@@ -639,10 +606,19 @@ function updatePayment() {
       <span><i class="fas fa-calendar-check"></i>${selectedPackage.meetings} pertemuan</span>
     </div>
     ${selectedPackage.note ? `<div class="summary-note">${escapeHtml(selectedPackage.note)}</div>` : ''}
-    <div class="summary-total">
-      <span>Total</span>
+    <div class="summary-row">
+      <span>Harga Paket</span>
       <strong>${rupiah(selectedPackage.price)}</strong>
     </div>
+    <div class="summary-row">
+      <span>Kode Unik</span>
+      <strong>${uniqueCode ? '+ ' + uniqueCode : 'Isi 3 Digit HP'}</strong>
+    </div>
+    <div class="summary-total">
+      <span>Total Transfer</span>
+      <strong>${rupiah(totalTransfer)}</strong>
+    </div>
+    <div class="summary-note">Transfer tepat sampai 3 digit terakhir (jangan dibulatkan) agar pembayaran mudah kami verifikasi.</div>
   `;
 }
 
@@ -659,6 +635,7 @@ classOptions.addEventListener('change', renderPackageGroups);
 packageGroup.addEventListener('change', renderDurationOptions);
 duration.addEventListener('change', renderPackageOptions);
 packageType.addEventListener('change', updatePayment);
+if (phoneLastThree) phoneLastThree.addEventListener('input', updatePayment);
 
 function openTutorModal(button) {
   const name = button.dataset.name || 'Detail Tutor';
@@ -666,6 +643,7 @@ function openTutorModal(button) {
   const photo = button.dataset.photo || '';
   const initials = button.dataset.initials || '';
   const desc = button.dataset.desc || 'Belum ada deskripsi tutor.';
+  modalTutorId = button.dataset.id || null;
   tutorModalName.textContent = name;
   tutorModalGrade.textContent = `Grade ${grade} Tutor`;
   tutorModalDesc.textContent = desc;
@@ -673,6 +651,14 @@ function openTutorModal(button) {
     ? `<img src="${escapeHtml(photo)}" alt="${escapeHtml(name)}">`
     : `<span>${escapeHtml(initials)}</span>`;
   tutorDetailModal.hidden = false;
+}
+
+function selectModalTutor() {
+  if (modalTutorId) {
+    const radio = document.querySelector(`input[name="preferred_tutor_id"][value="${modalTutorId}"]`);
+    if (radio) radio.checked = true;
+  }
+  closeTutorModal();
 }
 
 function closeTutorModal() {
@@ -689,6 +675,7 @@ document.querySelectorAll('[data-tutor-detail]').forEach(function (button) {
 document.querySelectorAll('[data-close-tutor-modal]').forEach(function (button) {
   button.addEventListener('click', closeTutorModal);
 });
+if (tutorModalSelect) tutorModalSelect.addEventListener('click', selectModalTutor);
 document.addEventListener('keydown', function (event) {
   if (event.key === 'Escape' && !tutorDetailModal.hidden) closeTutorModal();
 });

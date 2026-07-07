@@ -26,6 +26,10 @@
         <div><strong><%= stats.active %></strong><small>Aktif</small></div>
       </div>
       <div class="at-stat">
+        <span class="at-stat-icon" style="--c:#EA580C"><i class="fas fa-hourglass-half"></i></span>
+        <div><strong><%= stats.expiring || 0 %></strong><small>Akan berakhir (≤14 hari)</small></div>
+      </div>
+      <div class="at-stat">
         <span class="at-stat-icon" style="--c:#D97706"><i class="fas fa-pause-circle"></i></span>
         <div><strong><%= stats.suspended %></strong><small>Suspended</small></div>
       </div>
@@ -131,21 +135,42 @@
         <div class="empty-state"><i class="fas fa-id-card"></i><p>Tidak ada enrollment yang cocok.</p></div>
       <% } else { %>
       <div class="table-wrapper">
-        <table class="data-table">
+        <table class="data-table enroll-table">
           <thead>
-            <tr><th>Member</th><th>Email</th><th>Program</th><th>Mulai</th><th>Berakhir</th><th>Status</th><th>Aksi</th></tr>
+            <tr><th>Member</th><th>Program</th><th>Mulai</th><th>Berakhir</th><th>Sisa</th><th>Status</th><th class="col-actions">Aksi</th></tr>
           </thead>
           <tbody>
             <% enrollments.forEach(e => { %>
             <tr class="<%= e.status === 'active' ? '' : 'is-off' %>">
-              <td><strong><%= e.member_name %></strong></td>
-              <td><%= e.email %></td>
+              <td>
+                <div class="member-name-cell">
+                  <div class="table-avatar-init"><%= getInitials(e.member_name) %></div>
+                  <div class="user-name-block">
+                    <strong><%= e.member_name %></strong>
+                    <small><%= e.email %></small>
+                  </div>
+                </div>
+              </td>
               <td><%= e.program_name %></td>
-              <td><%= formatDate(e.start_date) %></td>
-              <td><%= formatDate(e.end_date) %></td>
+              <td class="muted"><%= formatDate(e.start_date) %></td>
+              <td class="muted"><%= formatDate(e.end_date) %></td>
+              <td>
+                <% if (e.days_left === null) { %>
+                  <span class="dl-pill dl-none">-</span>
+                <% } else if (e.days_left < 0) { %>
+                  <span class="dl-pill dl-expired">Lewat <%= Math.abs(e.days_left) %> hari</span>
+                <% } else { %>
+                  <span class="dl-pill dl-<%= e.urgency %>"><%= e.days_left %> hari</span>
+                <% } %>
+              </td>
               <td><span class="badge-pill <%= statusBadge(e.status) %>"><%= e.status %></span></td>
               <td>
                 <div class="row-actions">
+                  <form action="/admin/enrollments/<%= e.id %>/extend" method="POST" style="display:inline"
+                        data-confirm="Perpanjang enrollment <%= e.member_name %> - <%= e.program_name %> selama 1 bulan?">
+                    <input type="hidden" name="months" value="1">
+                    <button class="btn-icon btn-extend-icon" title="Perpanjang 1 bulan"><i class="fas fa-calendar-plus"></i></button>
+                  </form>
                   <button type="button" class="btn-icon btn-edit-icon" title="Edit"
                     data-edit-enroll
                     data-id="<%= e.id %>"
@@ -189,10 +214,11 @@
         </div>
         <div class="form-group">
           <label class="form-label">Program</label>
-          <select name="program_id" class="form-input" required>
+          <select name="program_id" id="createEnrollProgram" class="form-input" required>
             <option value="">-- Pilih Program --</option>
-            <% programs.forEach(p => { %><option value="<%= p.id %>"><%= p.name %></option><% }) %>
+            <% programs.forEach(p => { %><option value="<%= p.id %>" data-duration="<%= p.duration_months || 1 %>"><%= p.name %></option><% }) %>
           </select>
+          <p class="field-hint">Tanggal berakhir otomatis dihitung dari durasi program (bisa diubah).</p>
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -269,6 +295,25 @@
 <script>
 (function () {
   window.openCreateEnroll = function () { toggleModal('enrollModal'); };
+
+  // Auto-calculate the end date from the program duration on the create form.
+  var createForm = document.querySelector('#enrollModal form');
+  if (createForm) {
+    var cProg = document.getElementById('createEnrollProgram');
+    var cStart = createForm.querySelector('[name="start_date"]');
+    var cEnd = createForm.querySelector('[name="end_date"]');
+    var calcEnd = function () {
+      var opt = cProg.options[cProg.selectedIndex];
+      var months = opt ? Number(opt.dataset.duration || 0) : 0;
+      if (!cStart.value || !months) return;
+      var d = new Date(cStart.value + 'T00:00:00');
+      d.setMonth(d.getMonth() + months);
+      d.setDate(d.getDate() - 1);
+      cEnd.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    };
+    if (cProg) cProg.addEventListener('change', calcEnd);
+    if (cStart) cStart.addEventListener('change', calcEnd);
+  }
 
   var form = document.getElementById('editEnrollForm');
   document.querySelectorAll('[data-edit-enroll]').forEach(function (btn) {
