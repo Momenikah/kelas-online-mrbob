@@ -67,6 +67,43 @@ dibuat juga dikirim ke tab **"Jadwal"** (1 baris per `schedule_id`, upsert).
 > Penanganan event `jadwal` baru ditambahkan ke Apps Script, jadi **deploy ulang** web app
 > (Manage deployments → Edit → Version: New version) agar tab "Jadwal" aktif.
 
+## Sertifikat & Personal Report (tab "Sertifikat")
+
+Saat admin menerbitkan/menyunting sertifikat, datanya (termasuk skor Personal Report)
+dikirim ke tab **"Sertifikat"** (1 baris per `certificate_id`, upsert).
+
+- Default memakai `SHEET_WEBHOOK_URL`; bisa dipisah via `CERTIFICATE_WEBHOOK_URL`.
+
+## Renewal (tab "Renewal")
+
+Setiap pengajuan renewal dari member dikirim ke tab **"Renewal"**
+(1 baris per `renewal_id`, upsert).
+
+- Default memakai `SHEET_WEBHOOK_URL`; bisa dipisah via `RENEWAL_WEBHOOK_URL`.
+
+> Handler event `sertifikat` & `renewal` sekarang sudah ada di Apps Script, jadi
+> **deploy ulang** web app (Manage deployments → Edit → Version: New version).
+
+## Memisah tiap data ke spreadsheet berbeda
+
+Satu file [`spreadsheet-sync-apps-script.gs`](spreadsheet-sync-apps-script.gs) menangani
+SEMUA event. Untuk memisah, **tempel script yang sama** ke tiap spreadsheet, deploy
+masing-masing sebagai Web App, lalu arahkan env var ke URL-nya. Karena tiap event hanya
+dikirim ke URL yang ditunjuk env var-nya, spreadsheet lain tidak menerima event itu.
+
+| Data | Arah | Env var | Tab |
+| --- | --- | --- | --- |
+| Pendaftaran + konfirmasi | app → sheet | `SHEET_WEBHOOK_URL` | `Pendaftaran` |
+| Available time tutor | app → sheet | `AVAILABLE_TIME_WEBHOOK_URL` | `AvailableTime` |
+| Jadwal hasil plot | app → sheet | `SCHEDULE_WEBHOOK_URL` | `Jadwal` |
+| Sertifikat + report | app → sheet | `CERTIFICATE_WEBHOOK_URL` | `Sertifikat` |
+| Renewal | app → sheet | `RENEWAL_WEBHOOK_URL` | `Renewal` |
+| Master jadwal (import) | **sheet → app** | `SCHEDULE_SOURCE_URL` | `Master Jadwal` |
+
+- Env var yang **dibiarkan kosong** otomatis jatuh ke `SHEET_WEBHOOK_URL`.
+- Pendaftaran & konfirmasi selalu satu spreadsheet (tidak bisa dipisah — supaya 1
+  pendaftar = 1 baris yang di-update).
+
 ## Catatan
 
 - Jika `SHEET_WEBHOOK_URL` kosong, sinkronisasi dilewati (aplikasi tetap jalan normal).

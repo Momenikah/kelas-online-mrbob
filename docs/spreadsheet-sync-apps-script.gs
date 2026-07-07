@@ -14,11 +14,16 @@
  *   CATATAN: setiap kali kode ini diubah, lakukan Deploy ulang
  *   (Manage deployments > Edit > Version: New version).
  *
- * Menangani tiga jenis data (otomatis berdasarkan field "event"):
- *   - Pendaftaran / konfirmasi  -> tab "Pendaftaran" (1 baris per registration_code).
- *   - Available time tutor       -> tab "AvailableTime" (snapshot: semua baris milik
- *     tutor diganti tiap kali ada perubahan, jadi selalu sinkron dengan aplikasi).
- *   - Jadwal hasil plot          -> tab "Jadwal" (1 baris per schedule_id, upsert).
+ * Satu file ini menangani SEMUA event (routing otomatis via field "event").
+ * Boleh ditempel sama persis di beberapa spreadsheet terpisah — tiap spreadsheet
+ * hanya menerima event yang diarahkan ke URL Web App-nya lewat env var, jadi tidak
+ * saling tabrakan.
+ *   - Pendaftaran / konfirmasi     -> tab "Pendaftaran"   (1 baris per registration_code)
+ *   - Available time tutor          -> tab "AvailableTime" (snapshot per tutor_id)
+ *   - Jadwal hasil plot             -> tab "Jadwal"        (1 baris per schedule_id, upsert)
+ *   - Sertifikat + Personal Report  -> tab "Sertifikat"    (1 baris per certificate_id, upsert)
+ *   - Renewal                       -> tab "Renewal"       (1 baris per renewal_id, upsert)
+ * Selain itu, doGet melayani import "Master Jadwal" (dipakai SCHEDULE_SOURCE_URL).
  */
 
 var SHEET_NAME = 'Pendaftaran';
@@ -42,6 +47,24 @@ var JADWAL_HEADERS = [
   'tutor_name', 'tutor_email', 'location', 'meeting_link', 'status', 'member_count', 'member_names'
 ];
 
+var SERTIFIKAT_SHEET_NAME = 'Sertifikat';
+var SERTIFIKAT_HEADERS = [
+  'timestamp', 'certificate_id', 'certificate_number', 'issued_date', 'title',
+  'member_name', 'member_email', 'program_name', 'program_label', 'tutor_name',
+  'period_label', 'category', 'grade', 'status',
+  'speaking_score', 'pronunciation_score', 'vocabulary_score', 'grammar_score',
+  'understanding_score', 'cefr_score', 'listening_score', 'structure_score',
+  'reading_score', 'writing_score', 'total_score',
+  'improvement_before', 'improvement_after', 'print_url'
+];
+
+var RENEWAL_SHEET_NAME = 'Renewal';
+var RENEWAL_HEADERS = [
+  'timestamp', 'renewal_id', 'request_type', 'member_name', 'member_email', 'phone',
+  'program_name', 'selected_class', 'package_name', 'package_price',
+  'preferred_start_date', 'study_time', 'status', 'notes', 'transfer_proof_url'
+];
+
 function doPost(e) {
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -52,6 +75,12 @@ function doPost(e) {
     }
     if (data.event === 'jadwal') {
       return handleSchedule(data);
+    }
+    if (data.event === 'sertifikat') {
+      return handleUpsert(data, SERTIFIKAT_SHEET_NAME, SERTIFIKAT_HEADERS, 'certificate_id');
+    }
+    if (data.event === 'renewal') {
+      return handleUpsert(data, RENEWAL_SHEET_NAME, RENEWAL_HEADERS, 'renewal_id');
     }
     return handleRegistration(data);
   } catch (err) {
@@ -160,6 +189,22 @@ function handleSchedule(data) {
   var existingRow = findRowByValue(sheet, idCol, data.schedule_id);
   if (existingRow > 0) {
     sheet.getRange(existingRow, 1, 1, JADWAL_HEADERS.length).setValues([row]);
+  } else {
+    sheet.appendRow(row);
+  }
+  return jsonOutput({ ok: true });
+}
+
+// ---- Generic upsert by an id column (dipakai Sertifikat & Renewal) ----
+function handleUpsert(data, sheetName, headers, idKey) {
+  var sheet = getSheet(sheetName, headers);
+  var row = headers.map(function (key) {
+    return data[key] !== undefined && data[key] !== null ? data[key] : '';
+  });
+  var idCol = headers.indexOf(idKey) + 1;
+  var existingRow = findRowByValue(sheet, idCol, data[idKey]);
+  if (existingRow > 0) {
+    sheet.getRange(existingRow, 1, 1, headers.length).setValues([row]);
   } else {
     sheet.appendRow(row);
   }
