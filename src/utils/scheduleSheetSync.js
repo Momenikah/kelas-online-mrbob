@@ -5,12 +5,18 @@
 // disappeared from the sheet are CANCELLED (history kept). Only schedules with
 // source='sheet' are managed here — Plot-created schedules are never touched.
 //
-// Sheet "Master Jadwal" columns (header row, case-insensitive):
-//   id, tutor_email, program_name, title, date (YYYY-MM-DD),
-//   start_time (HH:mm), end_time (HH:mm), location, meeting_link, notes,
-//   member_emails (optional, comma-separated)
+// Sheet "Master Jadwal" = 1 baris booking member -> 1 jadwal kelas.
+// Kolom (header row, case-insensitive, boleh Bahasa Indonesia):
+//   EMAIL      -> member (dilampirkan bila terdaftar)
+//   PROGRAM    -> nama program (harus cocok dgn tabel programs)
+//   PAKET      -> dipakai untuk judul jadwal (opsional)
+//   PERIODE    -> tanggal, mis. "13 Juli 2026" atau "2026-07-13"
+//   JAM BELAJAR-> rentang, mis. "16.00 WIB - 17.00 WIB"
+//   TUTOR      -> sel bebas, mis. "Sist Nani - 13 Ju..."; app mencari tutor yang
+//                 NAMANYA terkandung (include) di dalam teks ini (match terpanjang)
 // =============================================
 
+const crypto = require('crypto');
 const { pool, query } = require('../config/database');
 
 const sourceUrl = () => process.env.SCHEDULE_SOURCE_URL || '';
@@ -41,6 +47,8 @@ async function ensureScheduleSyncSchema(q = query) {
 // ---- helpers ---------------------------------------------------------------
 const normKey = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, '_');
 const normEmail = (s) => String(s || '').trim().toLowerCase();
+// Untuk pencocokan tutor "include": lowercase + rapikan spasi (pertahankan kata).
+const normName = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
 
 function normDate(v) {
   if (!v) return '';
@@ -61,6 +69,27 @@ function normTime(v) {
 }
 const toMinutes = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
 const isValidDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(new Date(s).getTime());
+
+// Parse an Indonesian date like "13 Juli 2026" (falls back to ISO/Date).
+const ID_MONTHS = {
+  januari: 1, februari: 2, maret: 3, april: 4, mei: 5, juni: 6, juli: 7,
+  agustus: 8, september: 9, oktober: 10, november: 11, desember: 12,
+};
+function normDateID(v) {
+  const s = String(v || '').trim();
+  if (!s) return '';
+  const m = s.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+  if (m) {
+    const mon = ID_MONTHS[m[2].toLowerCase()];
+    if (mon) return `${m[3]}-${String(mon).padStart(2, '0')}-${String(Number(m[1])).padStart(2, '0')}`;
+  }
+  return normDate(s);
+}
+// "16.00 WIB - 17.00 WIB" -> ['16:00', '17:00']
+function parseJamRange(v) {
+  const parts = String(v || '').split(/\s*[-–—]\s*/);
+  return [normTime(parts[0] || ''), normTime(parts[1] || '')];
+}
 
 // ---- fetch -----------------------------------------------------------------
 async function fetchSheetRows() {
@@ -86,7 +115,7 @@ async function fetchSheetRows() {
 
 // ---- reconcile -------------------------------------------------------------
 async function syncSchedulesFromSheet({ triggeredBy = 'manual' } = {}) {
-  const summary = { ok: false, added: 0, updated: 0, cancelled: 0, errorCount: 0, totalRows: 0, errors: [], message: '' };
+  const summary = { ok: false, added: 0, updated: 0, cancelled: 0, skipped: 0, errorCount: 0, totalRows: 0, errors: [], message: '' };
   if (!isConfigured()) {
     summary.message = 'SCHEDULE_SOURCE_URL belum dikonfigurasi.';
     return summary;
@@ -104,15 +133,31 @@ async function syncSchedulesFromSheet({ triggeredBy = 'manual' } = {}) {
 
   // Preload lookup maps
   const [usersRes, programsRes] = await Promise.all([
-    query("SELECT id, email, role FROM users WHERE is_active = true"),
+    query("SELECT id, name, email, role FROM users WHERE is_active = true"),
     query('SELECT id, name FROM programs WHERE is_active = true'),
   ]);
   const tutorByEmail = new Map();
+  const tutors = []; // { id, name } — dipakai untuk pencocokan "include"
   const memberByEmail = new Map();
   usersRes.rows.forEach((u) => {
-    if (u.role === 'tutor') tutorByEmail.set(normEmail(u.email), u.id);
+    if (u.role === 'tutor') {
+      tutorByEmail.set(normEmail(u.email), u.id);
+      const nm = normName(u.name);
+      if (nm) tutors.push({ id: u.id, name: nm });
+    }
     if (u.role === 'member') memberByEmail.set(normEmail(u.email), u.id);
   });
+  // Cari tutor yang NAMANYA terkandung di sel TUTOR sheet; pilih nama terpanjang
+  // (paling spesifik) untuk menghindari salah kena nama pendek.
+  const findTutorByInclude = (rawTutor) => {
+    const hay = normName(rawTutor);
+    if (!hay) return null;
+    let best = null;
+    for (const t of tutors) {
+      if (hay.includes(t.name) && (!best || t.name.length > best.name.length)) best = t;
+    }
+    return best ? best.id : null;
+  };
   const programByName = new Map();
   programsRes.rows.forEach((p) => programByName.set(normKey(p.name), p.id));
 
@@ -122,33 +167,44 @@ async function syncSchedulesFromSheet({ triggeredBy = 'manual' } = {}) {
     const seenIds = [];
 
     for (const row of rows) {
-      const id = String(row.id || '').trim();
       const rowErrors = [];
-      if (!id) { summary.errorCount += 1; summary.errors.push('Baris tanpa kolom ID dilewati.'); continue; }
+      // Hanya proses baris berstatus "booked" (kolom STATUS BOOKED). Sisanya
+      // dilewati — jika sebelumnya pernah tersinkron, jadwalnya ikut dibatalkan
+      // lewat logika "vanished" di bawah (karena tidak masuk seenIds).
+      if (normName(row.status_booked) !== 'booked') { summary.skipped += 1; continue; }
 
-      const tutorEmail = normEmail(row.tutor_email);
-      const programName = String(row.program_name || '').trim();
-      const title = String(row.title || '').trim();
-      const date = normDate(row.date);
-      const start = normTime(row.start_time);
-      const end = normTime(row.end_time);
-      const location = String(row.location || '').trim() || null;
-      const meetingLink = String(row.meeting_link || '').trim() || null;
-      const notes = String(row.notes || '').trim() || null;
+      const email = normEmail(row.email);
+      const programName = String(row.program || '').trim();
+      const paket = String(row.paket || '').trim();
+      const periode = String(row.periode || '').trim();
+      const jam = String(row.jam_belajar || '').trim();
+      const tutorRaw = String(row.tutor || '').trim();
 
-      const tutorId = tutorByEmail.get(tutorEmail);
+      const date = normDateID(periode);
+      const [start, end] = parseJamRange(jam);
+      // Cocokkan tutor secara "include": nama tutor terkandung di sel TUTOR sheet.
+      const tutorId = findTutorByInclude(tutorRaw);
       const programId = programByName.get(normKey(programName));
-      if (!tutorId) rowErrors.push(`tutor ${tutorEmail || '(kosong)'} tidak ditemukan`);
-      if (!programId) rowErrors.push(`program "${programName}" tidak ditemukan`);
-      if (!title) rowErrors.push('title kosong');
-      if (!isValidDate(date)) rowErrors.push('date harus YYYY-MM-DD');
-      if (!start) rowErrors.push('start_time harus HH:mm');
-      if (!end) rowErrors.push('end_time harus HH:mm');
-      if (start && end && toMinutes(end) <= toMinutes(start)) rowErrors.push('end_time <= start_time');
+      const title = paket ? `${programName} — ${paket}` : programName;
+      const location = null;
+      const meetingLink = null;
+      const notes = null;
+
+      if (!email) rowErrors.push('EMAIL kosong');
+      if (!programId) rowErrors.push(`PROGRAM "${programName}" tidak ditemukan`);
+      if (!tutorId) rowErrors.push(`TUTOR "${tutorRaw || '(kosong)'}" tidak cocok dgn tutor terdaftar`);
+      if (!isValidDate(date)) rowErrors.push(`PERIODE "${periode}" tidak valid (mis. 13 Juli 2026)`);
+      if (!start) rowErrors.push(`JAM BELAJAR "${jam}" tidak valid`);
+      if (!end) rowErrors.push('jam akhir tidak valid');
+      if (start && end && toMinutes(end) <= toMinutes(start)) rowErrors.push('jam akhir <= jam mulai');
+
+      // Sheet punya kolom id? tidak — buat id stabil dari identitas booking.
+      const id = 'bk-' + crypto.createHash('sha1')
+        .update([email, normKey(programName), date, start].join('|')).digest('hex').slice(0, 24);
 
       if (rowErrors.length) {
         summary.errorCount += 1;
-        summary.errors.push(`ID ${id}: ${rowErrors.join(', ')}`);
+        summary.errors.push(`${email || '(baris)'}: ${rowErrors.join(', ')}`);
         continue;
       }
 
@@ -183,12 +239,13 @@ async function syncSchedulesFromSheet({ triggeredBy = 'manual' } = {}) {
         summary.added += 1;
       }
 
-      // Additive member attach (never auto-removes, to preserve attendance).
-      const memberEmails = String(row.member_emails || '')
-        .split(/[,;]+/).map(normEmail).filter(Boolean);
+      // 1 baris = 1 booking member -> lampirkan member ini (by EMAIL). Additive
+      // (tidak pernah auto-hapus, agar presensi terjaga). Jadwal tetap dibuat
+      // meski member belum terdaftar di app.
+      const memberEmails = email ? [email] : [];
       for (const em of memberEmails) {
         const mid = memberByEmail.get(em);
-        if (!mid) { summary.errors.push(`ID ${id}: member ${em} tidak ditemukan (dilewati)`); continue; }
+        if (!mid) { summary.errors.push(`${em}: member belum terdaftar (jadwal dibuat tanpa member)`); continue; }
         await client.query(
           `INSERT INTO schedule_members (schedule_id, member_id) VALUES ($1,$2)
            ON CONFLICT (schedule_id, member_id) DO NOTHING`, [scheduleId, mid]
@@ -216,6 +273,7 @@ async function syncSchedulesFromSheet({ triggeredBy = 'manual' } = {}) {
     await client.query('COMMIT');
     summary.ok = true;
     summary.message = `+${summary.added} baru · ${summary.updated} update · ${summary.cancelled} dibatalkan`
+      + (summary.skipped ? ` · ${summary.skipped} non-booked dilewati` : '')
       + (summary.errorCount ? ` · ${summary.errorCount} error` : '');
   } catch (err) {
     await client.query('ROLLBACK');

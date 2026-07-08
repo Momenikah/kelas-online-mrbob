@@ -92,9 +92,9 @@ function doPost(e) {
 
 // ---- INBOUND: app menarik master jadwal (Sheet = sumber kebenaran) ----
 // Aplikasi memanggil GET URL ini (SCHEDULE_SOURCE_URL) dan menerima seluruh baris
-// tab "Master Jadwal" sebagai JSON. Kolom header (baris 1):
-//   id, tutor_email, program_name, title, date, start_time, end_time,
-//   location, meeting_link, notes, member_emails
+// tab "Master Jadwal" sebagai JSON. Header (baris 1, boleh Bahasa Indonesia) — 1 baris
+// booking member = 1 jadwal. Yang dipakai app: EMAIL, PROGRAM, PAKET, PERIODE,
+// JAM BELAJAR, TUTOR. Kolom lain (KOTA, WA, HARGA, dll.) diabaikan.
 var MASTER_SHEET_NAME = 'Master Jadwal';
 
 function doGet(e) {
@@ -122,7 +122,8 @@ function doGet(e) {
       for (var j = 0; j < headers.length; j++) {
         obj[headers[j]] = formatMasterCell(headers[j], raw[j], tz);
       }
-      if (String(obj.id || '').trim() === '') continue; // baris tanpa ID diabaikan
+      // Lewati baris yang bukan data booking (tak ada EMAIL maupun PROGRAM).
+      if (String(obj.email || '').trim() === '' && String(obj.program || '').trim() === '') continue;
       rows.push(obj);
     }
     return jsonOutput({ ok: true, rows: rows });
