@@ -32,6 +32,10 @@
           <option value="">Semua Program</option>
           <% programs.forEach(p => { %><option value="<%= p.id %>" <%= filters.programId == p.id ? 'selected' : '' %>><%= p.name %></option><% }) %>
         </select>
+        <select name="period" class="form-input" onchange="this.form.submit()">
+          <option value="">Semua Periode</option>
+          <% periods.forEach(pr => { %><option value="<%= pr.value %>" <%= filters.period === pr.value ? 'selected' : '' %>><%= pr.label %></option><% }) %>
+        </select>
         <a href="/admin/report" class="btn btn-outline">Reset</a>
       </form>
     </div>

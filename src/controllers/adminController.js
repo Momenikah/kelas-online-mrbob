@@ -2173,12 +2173,14 @@ exports.report = async (req, res) => {
     await ensureMemberReportsTable(query);
     const tutorId = req.query.tutor_id || '';
     const programId = req.query.program_id || '';
+    const period = req.query.period || '';
     const where = ['1=1'];
     const params = [];
     if (tutorId) { params.push(Number(tutorId)); where.push(`mr.tutor_id = $${params.length}`); }
     if (programId) { params.push(Number(programId)); where.push(`mr.program_id = $${params.length}`); }
+    if (period) { params.push(period); where.push(`mr.period_start = $${params.length}`); }
 
-    const [reportsRes, tutorsRes, programsRes, statsRes] = await Promise.all([
+    const [reportsRes, tutorsRes, programsRes, periodsRes, statsRes] = await Promise.all([
       query(`
         SELECT mr.*, m.name as member_name, t.name as tutor_name, p.name as program_name
         FROM member_reports mr
@@ -2190,8 +2192,14 @@ exports.report = async (req, res) => {
       `, params),
       query("SELECT id, name FROM users WHERE role = 'tutor' AND is_active = true ORDER BY name"),
       query('SELECT id, name FROM programs WHERE is_active = true ORDER BY name'),
+      query('SELECT DISTINCT period_start FROM member_reports WHERE period_start IS NOT NULL ORDER BY period_start DESC'),
       query(`SELECT COUNT(*) AS total, COUNT(DISTINCT member_id) AS members FROM member_reports`),
     ]);
+
+    const periods = periodsRes.rows.map((r) => {
+      const iso = at.toISODate(r.period_start);
+      return { value: iso, label: at.formatPeriodLabel(iso) };
+    });
 
     res.render('admin/report', {
       title: 'Member Report',
@@ -2199,7 +2207,8 @@ exports.report = async (req, res) => {
       reports: reportsRes.rows,
       tutors: tutorsRes.rows,
       programs: programsRes.rows,
-      filters: { tutorId, programId },
+      periods,
+      filters: { tutorId, programId, period },
       stats: statsRes.rows[0],
       error: req.flash('error'),
       success: req.flash('success'),
