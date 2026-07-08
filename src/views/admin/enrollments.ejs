@@ -137,7 +137,7 @@
       <div class="table-wrapper">
         <table class="data-table enroll-table">
           <thead>
-            <tr><th>Member</th><th>Program</th><th>Mulai</th><th>Berakhir</th><th>Sisa</th><th>Status</th><th class="col-actions">Aksi</th></tr>
+            <tr><th>Member</th><th>Program</th><th>Mulai</th><th>Status</th><th class="col-actions">Aksi</th></tr>
           </thead>
           <tbody>
             <% enrollments.forEach(e => { %>
@@ -153,16 +153,6 @@
               </td>
               <td><%= e.program_name %></td>
               <td class="muted"><%= formatDate(e.start_date) %></td>
-              <td class="muted"><%= formatDate(e.end_date) %></td>
-              <td>
-                <% if (e.days_left === null) { %>
-                  <span class="dl-pill dl-none">-</span>
-                <% } else if (e.days_left < 0) { %>
-                  <span class="dl-pill dl-expired">Lewat <%= Math.abs(e.days_left) %> hari</span>
-                <% } else { %>
-                  <span class="dl-pill dl-<%= e.urgency %>"><%= e.days_left %> hari</span>
-                <% } %>
-              </td>
               <td><span class="badge-pill <%= statusBadge(e.status) %>"><%= e.status %></span></td>
               <td>
                 <div class="row-actions">
