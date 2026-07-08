@@ -20,6 +20,13 @@ const classPhotoUpload = (req, res, next) => {
     return res.redirect(`/tutor/presence?schedule_id=${req.params.schedule_id}#foto-kelas`);
   });
 };
+const screenshotUpload = (req, res, next) => {
+  upload.single('class_screenshot')(req, res, (err) => {
+    if (!err) return next();
+    req.flash('error', err.message || 'Screenshot gagal diupload.');
+    return res.redirect('/tutor/presence#riwayat-presensi');
+  });
+};
 
 router.get('/', isTutor, tutorController.dashboard);
 router.get('/schedule', isTutor, tutorController.schedule);
@@ -32,6 +39,7 @@ router.post('/available-time/:id/delete', isTutor, tutorController.deleteAvailab
 router.post('/available-time/:id/toggle', isTutor, tutorController.toggleAvailableTime);
 router.post('/available-time/period/:period/delete', isTutor, tutorController.deleteAvailablePeriod);
 router.get('/presence', isTutor, tutorController.presence);
+router.post('/presence/submit', isTutor, screenshotUpload, tutorController.submitPresence);
 router.post('/presence/:schedule_id', isTutor, tutorController.updatePresence);
 router.post('/presence/:schedule_id/class-proof', isTutor, classPhotoUpload, tutorController.uploadClassProof);
 router.post('/presence/class-proof/:id/delete', isTutor, tutorController.deleteClassProof);

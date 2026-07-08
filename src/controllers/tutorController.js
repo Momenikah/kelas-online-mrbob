@@ -509,7 +509,7 @@ exports.deleteAvailablePeriod = async (req, res) => {
 exports.presence = async (req, res) => {
   try {
     const tutorId = req.session.user.id;
-    const [schedResult, submissionsResult] = await Promise.all([
+    const [schedResult, submissionsResult, myPresResult, programsResult, periodsResult] = await Promise.all([
       query(
         `SELECT s.*, p.name as program_name FROM schedules s JOIN programs p ON s.program_id = p.id
          WHERE s.tutor_id = $1 ORDER BY s.date DESC`, [tutorId]
@@ -519,10 +519,22 @@ exports.presence = async (req, res) => {
         FROM member_presences mp
         JOIN users m ON mp.member_id = m.id
         LEFT JOIN programs p ON mp.program_id = p.id
-        WHERE mp.tutor_id = $1
+        WHERE mp.tutor_id = $1 AND mp.member_id <> $1
         ORDER BY mp.created_at DESC
         LIMIT 25
       `, [tutorId]),
+      // Tutor's own presence submissions (same flow as members).
+      query(`
+        SELECT mp.*, p.name as program_name
+        FROM member_presences mp
+        LEFT JOIN programs p ON mp.program_id = p.id
+        WHERE mp.member_id = $1
+        ORDER BY mp.created_at DESC
+        LIMIT 25
+      `, [tutorId]),
+      query(`SELECT DISTINCT p.id, p.name FROM schedules s JOIN programs p ON s.program_id = p.id
+             WHERE s.tutor_id = $1 ORDER BY p.name`, [tutorId]),
+      query('SELECT period_start, label FROM periods ORDER BY period_start'),
     ]);
 
     const selectedId = req.query.schedule_id;
@@ -554,6 +566,15 @@ exports.presence = async (req, res) => {
       ...s,
       period_label: s.period_start ? at.formatPeriodLabel(s.period_start) : '-',
     }));
+    const myPresences = myPresResult.rows.map((s) => ({
+      ...s,
+      period_label: s.period_start ? at.formatPeriodLabel(s.period_start) : '-',
+    }));
+    const periods = periodsResult.rows.map((p) => ({
+      value: at.toISODate(p.period_start),
+      label: p.label || at.formatPeriodLabel(p.period_start),
+    }));
+    const meetings = Array.from({ length: 24 }, (_, i) => i + 1);
 
     res.render('tutor/presence', {
       title: 'Kelola Presensi',
@@ -563,6 +584,10 @@ exports.presence = async (req, res) => {
       selectedSchedule,
       selectedId,
       submissions,
+      myPresences,
+      programs: programsResult.rows,
+      periods,
+      meetings,
       classProofs,
       error: req.flash('error'),
       success: req.flash('success'),
@@ -570,6 +595,41 @@ exports.presence = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.render('error', { title: 'Error', message: err.message, user: req.session.user });
+  }
+};
+
+// Tutor submits their own teaching presence + proof — same flow as members.
+// Stored in member_presences with member_id = tutor (submitter) and tutor_id = self.
+exports.submitPresence = async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    const periodStart = req.body.period_start || null;
+    const programId = Number(req.body.program_id) || null;
+    const meeting = Number(req.body.meeting_number) || null;
+
+    if (!periodStart || !programId || !meeting) {
+      removeUploadedFile(req.file);
+      req.flash('error', 'Lengkapi periode, program, dan meeting.');
+      return res.redirect('/tutor/presence#riwayat-presensi');
+    }
+    if (!req.file) {
+      req.flash('error', 'Screenshot kelas wajib diunggah.');
+      return res.redirect('/tutor/presence#riwayat-presensi');
+    }
+
+    const screenshot = `/uploads/${req.file.filename}`;
+    await query(
+      `INSERT INTO member_presences (member_id, tutor_id, period_start, program_id, meeting_number, screenshot)
+       VALUES ($1,$1,$2,$3,$4,$5)`,
+      [userId, periodStart, programId, meeting, screenshot]
+    );
+    req.flash('success', 'Presensi berhasil dikirim. Terima kasih!');
+    res.redirect('/tutor/presence#riwayat-presensi');
+  } catch (err) {
+    console.error(err);
+    removeUploadedFile(req.file);
+    req.flash('error', 'Gagal mengirim presensi.');
+    res.redirect('/tutor/presence#riwayat-presensi');
   }
 };
 
@@ -1332,22 +1392,6 @@ exports.issueCertificate = async (req, res) => {
     const { member_id, program_id, title } = req.body;
     if (!member_id || !program_id) {
       req.flash('error', 'Pilih member dan program terlebih dahulu.');
-      return res.redirect('/tutor/certificate');
-    }
-
-    // Eligibility: member must have attended at least MIN_CERT_MEETINGS sessions
-    // (present/late) in this program — no need to complete the full 10.
-    const MIN_CERT_MEETINGS = 7;
-    const attendedRes = await query(
-      `SELECT COUNT(*)::int AS n
-       FROM presences pr
-       JOIN schedules s ON s.id = pr.schedule_id
-       WHERE pr.member_id = $1 AND s.program_id = $2 AND pr.status IN ('present', 'late')`,
-      [member_id, program_id]
-    );
-    const attended = attendedRes.rows[0].n;
-    if (attended < MIN_CERT_MEETINGS) {
-      req.flash('error', `Member baru menghadiri ${attended} pertemuan. Minimal ${MIN_CERT_MEETINGS} pertemuan untuk menerbitkan sertifikat.`);
       return res.redirect('/tutor/certificate');
     }
 

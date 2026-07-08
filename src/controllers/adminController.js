@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const at = require('../utils/availableTime');
 const { parseCsv, rowsToObjects, toCsv } = require('../utils/csv');
-const { syncSchedule, syncCertificate } = require('../utils/spreadsheetSync');
+const { syncSchedule, syncCertificate, syncRenewal } = require('../utils/spreadsheetSync');
 const {
   syncSchedulesFromSheet,
   getLastSyncRun,
@@ -857,6 +857,8 @@ exports.updateRenewalRequest = async (req, res) => {
         SET status='approved', admin_notes=$1, processed_at=NOW(), updated_at=NOW()
         WHERE id=$2
       `, [adminNotes || null, id]);
+      // Push the new status to the spreadsheet (upsert by renewal_id).
+      syncRenewal(id).catch((e) => console.error('Gagal sinkronisasi renewal ke spreadsheet:', e.message));
       req.flash('success', `Request renewal ${request.program_name} disetujui dan enrollment diperbarui.`);
       return res.redirect('/admin/enrollments');
     }
@@ -867,6 +869,7 @@ exports.updateRenewalRequest = async (req, res) => {
       SET status=$1, admin_notes=$2, processed_at=NOW(), updated_at=NOW()
       WHERE id=$3
     `, [nextStatus, adminNotes || null, id]);
+    syncRenewal(id).catch((e) => console.error('Gagal sinkronisasi renewal ke spreadsheet:', e.message));
     req.flash('success', `Request renewal berhasil diubah menjadi ${nextStatus}.`);
     return res.redirect('/admin/enrollments');
   } catch (err) {

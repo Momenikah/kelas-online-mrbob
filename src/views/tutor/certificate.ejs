@@ -104,7 +104,7 @@
           </select>
           <input type="hidden" name="program_id" id="programIdHidden">
           <input type="hidden" name="program_label" id="programLabelHidden">
-          <small class="field-hint" id="attendedHint">Minimal 7 pertemuan (Hadir/Terlambat) untuk menerbitkan sertifikat.</small>
+          <small class="field-hint" id="attendedHint">Jumlah pertemuan yang dihadiri member ditampilkan di daftar (informasi saja).</small>
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -261,32 +261,12 @@
 </div>
 
 <script>
-const MIN_CERT_MEETINGS = 7;
 function updateProgramFromMember(select) {
   const opt = select.options[select.selectedIndex];
   document.getElementById('programIdHidden').value = opt.dataset.program || '';
   document.getElementById('programLabelHidden').value = opt.dataset.programName || '';
   document.getElementById('memberEmail').value = opt.dataset.email || '';
-  updateAttendanceEligibility(opt);
   updateCertificatePreview();
-}
-function updateAttendanceEligibility(opt) {
-  const hint = document.getElementById('attendedHint');
-  const submitBtn = document.querySelector('#certForm button[type="submit"]');
-  const attended = opt && opt.value ? Number(opt.dataset.attended || 0) : null;
-  if (attended === null) {
-    hint.textContent = `Minimal ${MIN_CERT_MEETINGS} pertemuan (Hadir/Terlambat) untuk menerbitkan sertifikat.`;
-    hint.classList.remove('is-error', 'is-ok');
-    if (submitBtn) submitBtn.disabled = false;
-    return;
-  }
-  const eligible = attended >= MIN_CERT_MEETINGS;
-  hint.textContent = eligible
-    ? `✓ ${attended} pertemuan — memenuhi syarat (min. ${MIN_CERT_MEETINGS}).`
-    : `✗ Baru ${attended} pertemuan — butuh minimal ${MIN_CERT_MEETINGS} untuk menerbitkan sertifikat.`;
-  hint.classList.toggle('is-ok', eligible);
-  hint.classList.toggle('is-error', !eligible);
-  if (submitBtn) submitBtn.disabled = !eligible;
 }
 function updateCertificateSections() {
   const category = document.querySelector('input[name="category"]:checked')?.value || '';
