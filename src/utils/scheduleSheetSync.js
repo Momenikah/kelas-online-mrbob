@@ -7,7 +7,8 @@
 //
 // Sheet "Master Jadwal" = 1 baris booking member -> 1 jadwal kelas.
 // Kolom (header row, case-insensitive, boleh Bahasa Indonesia):
-//   EMAIL      -> member (dilampirkan bila terdaftar)
+//   NAMA LENGKAP -> peserta (dicocokkan ke member terdaftar by nama; fallback EMAIL)
+//   EMAIL      -> fallback peserta bila nama tak cocok
 //   PROGRAM    -> nama program (harus cocok dgn tabel programs)
 //   PAKET      -> dipakai untuk judul jadwal (opsional)
 //   PERIODE    -> tanggal, mis. "13 Juli 2026" atau "2026-07-13"
@@ -139,13 +140,18 @@ async function syncSchedulesFromSheet({ triggeredBy = 'manual' } = {}) {
   const tutorByEmail = new Map();
   const tutors = []; // { id, name } — dipakai untuk pencocokan "include"
   const memberByEmail = new Map();
+  const memberByName = new Map(); // nama_lengkap -> member id
   usersRes.rows.forEach((u) => {
     if (u.role === 'tutor') {
       tutorByEmail.set(normEmail(u.email), u.id);
       const nm = normName(u.name);
       if (nm) tutors.push({ id: u.id, name: nm });
     }
-    if (u.role === 'member') memberByEmail.set(normEmail(u.email), u.id);
+    if (u.role === 'member') {
+      memberByEmail.set(normEmail(u.email), u.id);
+      const nm = normName(u.name);
+      if (nm) memberByName.set(nm, u.id);
+    }
   });
   // Cari tutor yang NAMANYA terkandung di sel TUTOR sheet; pilih nama terpanjang
   // (paling spesifik) untuk menghindari salah kena nama pendek.
@@ -174,6 +180,7 @@ async function syncSchedulesFromSheet({ triggeredBy = 'manual' } = {}) {
       if (normName(row.status_booked) !== 'booked') { summary.skipped += 1; continue; }
 
       const email = normEmail(row.email);
+      const memberName = String(row.nama_lengkap || '').trim();
       const programName = String(row.program || '').trim();
       const paket = String(row.paket || '').trim();
       const periode = String(row.periode || '').trim();
@@ -239,13 +246,11 @@ async function syncSchedulesFromSheet({ triggeredBy = 'manual' } = {}) {
         summary.added += 1;
       }
 
-      // 1 baris = 1 booking member -> lampirkan member ini (by EMAIL). Additive
-      // (tidak pernah auto-hapus, agar presensi terjaga). Jadwal tetap dibuat
-      // meski member belum terdaftar di app.
-      const memberEmails = email ? [email] : [];
-      for (const em of memberEmails) {
-        const mid = memberByEmail.get(em);
-        if (!mid) { summary.errors.push(`${em}: member belum terdaftar (jadwal dibuat tanpa member)`); continue; }
+      // Peserta diambil dari kolom NAMA LENGKAP (cocokkan ke member terdaftar by
+      // nama), fallback ke EMAIL. Additive (tidak pernah auto-hapus, agar presensi
+      // terjaga). Jadwal tetap dibuat meski peserta belum terdaftar di app.
+      const mid = memberByName.get(normName(memberName)) || memberByEmail.get(email) || null;
+      if (mid) {
         await client.query(
           `INSERT INTO schedule_members (schedule_id, member_id) VALUES ($1,$2)
            ON CONFLICT (schedule_id, member_id) DO NOTHING`, [scheduleId, mid]
@@ -254,6 +259,8 @@ async function syncSchedulesFromSheet({ triggeredBy = 'manual' } = {}) {
           `INSERT INTO presences (schedule_id, member_id, status, source) VALUES ($1,$2,'absent','sheet')
            ON CONFLICT (schedule_id, member_id) DO NOTHING`, [scheduleId, mid]
         );
+      } else {
+        summary.errors.push(`${memberName || email || '(baris)'}: peserta belum terdaftar (jadwal dibuat tanpa peserta)`);
       }
     }
 
