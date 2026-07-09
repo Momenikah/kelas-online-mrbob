@@ -6303,6 +6303,39 @@ h1, h2, h3, h4, h5, h6 { line-height: 1.3; color: var(--gray-900); font-weight: 
 }
 .schedule-filter-field label i { color: var(--brand-500); }
 .schedule-filter-field .form-input { width: 100%; }
+
+/* Period picker styled like the registration form field (bigger, rounded, custom chevron). */
+.schedule-filter-field label {
+  color: var(--gray-700);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.schedule-filter-field select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  min-height: 46px;
+  padding: 11px 42px 11px 14px;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--radius);
+  background-color: #fff;
+  color: var(--gray-800);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px 16px;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.schedule-filter-field select:hover { border-color: var(--gray-300); }
+.schedule-filter-field select:focus {
+  outline: none;
+  border-color: var(--brand-500);
+  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.12);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23A855F7' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
 .schedule-filter-reset {
   flex-shrink: 0;
   white-space: nowrap;
@@ -6580,6 +6613,16 @@ h1, h2, h3, h4, h5, h6 { line-height: 1.3; color: var(--gray-900); font-weight: 
 }
 .period-session-row .ps-link i { color: #fff; margin-right: 0; }
 .period-session-row .ps-link:hover { background: var(--brand-700); }
+
+/* Zoom & WhatsApp action buttons on schedule cards */
+.btn-zoom {
+  background: #2d8cff; color: #fff; border: 1.5px solid #2d8cff;
+}
+.btn-zoom:hover { background: #1a7ae0; border-color: #1a7ae0; color: #fff; }
+.btn-wa {
+  background: #25d366; color: #fff; border: 1.5px solid #25d366;
+}
+.btn-wa:hover { background: #1ebe5a; border-color: #1ebe5a; color: #fff; }
 
 /* ============ RESPONSIVE ============ */
 .form-input,

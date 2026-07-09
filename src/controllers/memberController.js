@@ -161,7 +161,7 @@ exports.schedule = async (req, res) => {
 
     const [result, statsResult, periodsResult, regResult] = await Promise.all([
       query(`
-        SELECT s.*, u.name as tutor_name, p.name as program_name,
+        SELECT s.*, u.name as tutor_name, u.phone as tutor_phone, p.name as program_name,
                COALESCE(pr.status, 'absent') as presence_status,
                pr.check_in_time, pr.notes as presence_notes
         FROM schedule_members sm
@@ -243,11 +243,18 @@ exports.schedule = async (req, res) => {
       .map((g) => {
         const firstProg = Array.from(g.programs)[0] || '';
         const reg = regByProgram.get(firstProg.toLowerCase()) || regDefault || {};
+        const zoomLink = (g.next && g.next.meeting_link)
+          || (g.sessions.find((s) => s.meeting_link) || {}).meeting_link || '';
+        const tutorPhone = (g.next && g.next.tutor_phone)
+          || (g.sessions[0] && g.sessions[0].tutor_phone) || '';
         return {
           period_start: g.period_start,
           label: g.label,
           programs: Array.from(g.programs),
           tutors: Array.from(g.tutors),
+          tutor_name: Array.from(g.tutors)[0] || '',
+          tutor_phone: tutorPhone,
+          zoom_link: zoomLink,
           location: Array.from(g.locations)[0] || '',
           paket: reg.paket || '-',
           kategori: reg.kategori || '-',
@@ -352,7 +359,7 @@ exports.presence = async (req, res) => {
              LEFT JOIN programs p ON mp.program_id = p.id
              WHERE mp.member_id = $1 ORDER BY mp.created_at DESC`, [userId]),
       query(`
-        SELECT s.*, u.name as tutor_name, p.name as program_name,
+        SELECT s.*, u.name as tutor_name, u.phone as tutor_phone, p.name as program_name,
                COALESCE(pr.status, 'absent') as presence_status,
                pr.check_in_time, pr.notes as presence_notes
         FROM schedule_members sm

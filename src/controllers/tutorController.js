@@ -198,6 +198,8 @@ exports.schedule = async (req, res) => {
           regByMember.get(g.member.id + '|' + firstProg.toLowerCase()) ||
           regDefaultByMember.get(g.member.id)
         )) || {};
+        const zoomLink = (g.next && g.next.meeting_link)
+          || (g.sessions.find((s) => s.meeting_link) || {}).meeting_link || '';
         return {
           period_start: g.period_start,
           label: g.label,
@@ -213,6 +215,7 @@ exports.schedule = async (req, res) => {
           status: g.counts.upcoming > 0 ? 'upcoming' : (g.counts.completed > 0 ? 'completed' : 'cancelled'),
           next: g.next,
           presence_session_id: (g.next && g.next.id) || g.firstSessionId,
+          zoom_link: zoomLink,
           sessions: g.sessions,
         };
       })

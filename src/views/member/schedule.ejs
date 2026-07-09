@@ -149,11 +149,25 @@
 
           <div class="period-card-footer">
             <a href="/member/presence" class="btn btn-primary btn-sm period-btn-main"><i class="fas fa-user-check"></i> Lihat Presensi</a>
-            <% if (g.next && g.next.meeting_link) { %>
             <div class="period-actions">
-              <a href="<%= g.next.meeting_link %>" target="_blank" rel="noopener" class="btn btn-outline btn-sm"><i class="fas fa-video"></i> Join Meeting</a>
+              <% if (g.zoom_link) { %>
+              <a href="<%= g.zoom_link %>" target="_blank" rel="noopener" class="btn btn-zoom btn-sm"><i class="fas fa-video"></i> Zoom</a>
+              <% } %>
+              <% if (g.tutor_phone) {
+                   let wp = String(g.tutor_phone).replace(/\D/g, '');
+                   if (wp.startsWith('0')) wp = '62' + wp.slice(1);
+                   else if (wp.startsWith('8')) wp = '62' + wp;
+                   const waText = encodeURIComponent([
+                     `Halo Kak ${g.tutor_name || ''}, saya ${user.name} peserta kelas ${g.programs.join(', ') || ''}.`,
+                     g.next ? `Ingin menanyakan jadwal ${formatDate(g.next.date)} (${formatTime(g.next.start_time)} - ${formatTime(g.next.end_time)} WIB).` : ''
+                   ].filter(Boolean).join('\n'));
+                   const waHref = wp ? `https://wa.me/${wp}?text=${waText}` : '';
+              %>
+                <% if (waHref) { %>
+                <a href="<%= waHref %>" target="_blank" rel="noopener" class="btn btn-wa btn-sm"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+                <% } %>
+              <% } %>
             </div>
-            <% } %>
           </div>
         </div>
         <% }) %>

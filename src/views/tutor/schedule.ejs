@@ -152,11 +152,25 @@
 
           <div class="period-card-footer">
             <a href="/tutor/presence?schedule_id=<%= g.presence_session_id %>" class="btn btn-primary btn-sm period-btn-main"><i class="fas fa-user-check"></i> Kelola Presensi</a>
-            <% if (g.next && g.next.meeting_link) { %>
             <div class="period-actions">
-              <a href="<%= g.next.meeting_link %>" target="_blank" rel="noopener" class="btn btn-outline btn-sm"><i class="fas fa-video"></i> Join Meeting</a>
+              <% if (g.zoom_link) { %>
+              <a href="<%= g.zoom_link %>" target="_blank" rel="noopener" class="btn btn-zoom btn-sm"><i class="fas fa-video"></i> Zoom</a>
+              <% } %>
+              <% if (g.member && g.member.phone) {
+                   const waHref = waReminderHref(g.member.phone, [
+                     `Halo ${g.member.name}, mengingatkan jadwal kelas kamu 📣`,
+                     `📚 ${g.programs.join(', ') || 'Kelas'}`,
+                     g.next ? `🗓️ ${formatDate(g.next.date)}` : '',
+                     g.next ? `⏰ ${formatTime(g.next.start_time)} - ${formatTime(g.next.end_time)} WIB` : '',
+                     `👨‍🏫 Tutor: ${user.name}`,
+                     g.location ? `📍 ${g.location}` : '',
+                     g.zoom_link ? `🔗 Link Zoom: ${g.zoom_link}` : '',
+                     `Mohon hadir tepat waktu ya 🙏`
+                   ]);
+              %>
+              <a href="<%= waHref %>" target="_blank" rel="noopener" class="btn btn-wa btn-sm"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+              <% } %>
             </div>
-            <% } %>
           </div>
         </div>
         <% }) %>
