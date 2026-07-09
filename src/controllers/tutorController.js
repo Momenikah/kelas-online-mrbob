@@ -119,57 +119,109 @@ exports.schedule = async (req, res) => {
       `, [tutorId]),
     ]);
 
-    // Group the tutor's sessions by weekly period.
+    // Group the tutor's sessions by weekly period AND per member —
+    // satu kartu untuk tiap member di tiap periode (terpisah antar member).
     const today = at.toISODate(new Date());
     const groups = new Map();
     schedResult.rows.forEach((s) => {
-      const key = at.mondayOf(s.date);
-      if (!groups.has(key)) {
-        groups.set(key, {
-          period_start: key,
-          label: at.formatPeriodRange(key),
-          programs: new Set(),
-          locations: new Set(),
-          members: new Map(),
-          counts: { total: 0, upcoming: 0, completed: 0, cancelled: 0 },
-          present_total: 0,
-          slot_total: 0,
-          next: null,
-          firstSessionId: null,
+      const periodKey = at.mondayOf(s.date);
+      const memberList = Array.isArray(s.members) ? s.members : [];
+      const targets = memberList.length ? memberList : [null]; // sesi tanpa peserta tetap tampil
+      targets.forEach((m) => {
+        const key = periodKey + '|' + (m && m.id ? m.id : 0);
+        if (!groups.has(key)) {
+          groups.set(key, {
+            period_start: periodKey,
+            label: at.formatPeriodRange(periodKey),
+            member: m && m.id ? { id: m.id, name: m.name, phone: m.phone || '' } : null,
+            programs: new Set(),
+            locations: new Set(),
+            counts: { total: 0, upcoming: 0, completed: 0, cancelled: 0 },
+            present_total: 0,
+            next: null,
+            firstSessionId: null,
+            sessions: [],
+          });
+        }
+        const g = groups.get(key);
+        if (s.program_name) g.programs.add(s.program_name);
+        if (s.location) g.locations.add(s.location);
+        g.counts.total += 1;
+        if (m && m.presence_status === 'present') g.present_total += 1;
+        const isFuture = s.status !== 'cancelled' && at.toISODate(s.date) >= today;
+        if (s.status === 'cancelled') g.counts.cancelled += 1;
+        else if (isFuture) g.counts.upcoming += 1;
+        else g.counts.completed += 1;
+        if (g.firstSessionId === null) g.firstSessionId = s.id;
+        if (isFuture && !g.next) g.next = s;
+        g.sessions.push({
+          date: s.date, start_time: s.start_time, end_time: s.end_time,
+          program_name: s.program_name, location: s.location || '',
+          meeting_link: s.meeting_link || '', status: s.status,
+          presence_status: m ? m.presence_status : null,
         });
-      }
-      const g = groups.get(key);
-      if (s.program_name) g.programs.add(s.program_name);
-      if (s.location) g.locations.add(s.location);
-      (Array.isArray(s.members) ? s.members : []).forEach((m) => {
-        if (m && m.id && !g.members.has(m.id)) g.members.set(m.id, { id: m.id, name: m.name, phone: m.phone || '' });
       });
-      g.counts.total += 1;
-      g.present_total += Number(s.present_count) || 0;
-      g.slot_total += Number(s.registered_count) || 0;
-      const isFuture = s.status !== 'cancelled' && at.toISODate(s.date) >= today;
-      if (s.status === 'cancelled') g.counts.cancelled += 1;
-      else if (isFuture) g.counts.upcoming += 1;
-      else g.counts.completed += 1;
-      if (g.firstSessionId === null) g.firstSessionId = s.id;
-      if (isFuture && !g.next) g.next = s;
     });
 
+    // Kategori/Paket/Durasi per member — diambil dari pendaftaran (member_registrations).
+    const memberIds = Array.from(
+      new Set(Array.from(groups.values()).filter((g) => g.member).map((g) => g.member.id))
+    );
+    const regByMember = new Map(); // `${memberId}|${programLower}` -> info
+    const regDefaultByMember = new Map(); // memberId -> first info
+    if (memberIds.length) {
+      const KAT = { adult: 'Adult', kids: 'Kids' };
+      const regRows = await query(
+        `SELECT user_id, selected_class, package_name, package_group, program_type, duration
+         FROM member_registrations WHERE user_id = ANY($1) ORDER BY created_at DESC`,
+        [memberIds]
+      );
+      regRows.rows.forEach((r) => {
+        const info = {
+          paket: r.package_name || r.package_group || '-',
+          kategori: KAT[r.program_type] || r.program_type || '-',
+          durasi: r.duration || '-',
+        };
+        if (!regDefaultByMember.has(r.user_id)) regDefaultByMember.set(r.user_id, info);
+        const k = String(r.selected_class || '').trim().toLowerCase();
+        if (k) {
+          const mk = r.user_id + '|' + k;
+          if (!regByMember.has(mk)) regByMember.set(mk, info);
+        }
+      });
+    }
+
     const periodGroups = Array.from(groups.values())
-      .map((g) => ({
-        period_start: g.period_start,
-        label: g.label,
-        programs: Array.from(g.programs),
-        location: Array.from(g.locations)[0] || '',
-        members: Array.from(g.members.values()),
-        counts: g.counts,
-        present_total: g.present_total,
-        slot_total: g.slot_total,
-        status: g.counts.upcoming > 0 ? 'upcoming' : (g.counts.completed > 0 ? 'completed' : 'cancelled'),
-        next: g.next,
-        presence_session_id: (g.next && g.next.id) || g.firstSessionId,
-      }))
-      .sort((a, b) => (a.period_start < b.period_start ? 1 : -1));
+      .map((g) => {
+        const firstProg = Array.from(g.programs)[0] || '';
+        const reg = (g.member && (
+          regByMember.get(g.member.id + '|' + firstProg.toLowerCase()) ||
+          regDefaultByMember.get(g.member.id)
+        )) || {};
+        return {
+          period_start: g.period_start,
+          label: g.label,
+          member: g.member,
+          members: g.member ? [g.member] : [],
+          programs: Array.from(g.programs),
+          location: Array.from(g.locations)[0] || '',
+          paket: reg.paket || '-',
+          kategori: reg.kategori || '-',
+          durasi: reg.durasi || '-',
+          counts: g.counts,
+          present_total: g.present_total,
+          status: g.counts.upcoming > 0 ? 'upcoming' : (g.counts.completed > 0 ? 'completed' : 'cancelled'),
+          next: g.next,
+          presence_session_id: (g.next && g.next.id) || g.firstSessionId,
+          sessions: g.sessions,
+        };
+      })
+      .sort((a, b) => {
+        if (a.period_start !== b.period_start) return a.period_start < b.period_start ? 1 : -1;
+        const an = a.member ? a.member.name : '~';
+        const bn = b.member ? b.member.name : '~';
+        return an.localeCompare(bn);
+      });
 
     const periods = periodsResult.rows.map((r) => ({
       value: at.toISODate(r.period_start),

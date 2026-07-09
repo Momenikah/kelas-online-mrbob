@@ -159,7 +159,7 @@ exports.schedule = async (req, res) => {
     let periodFilter = '';
     if (period) { params.push(period); periodFilter = ` AND date_trunc('week', s.date)::date = $${params.length}::date`; }
 
-    const [result, statsResult, periodsResult] = await Promise.all([
+    const [result, statsResult, periodsResult, regResult] = await Promise.all([
       query(`
         SELECT s.*, u.name as tutor_name, p.name as program_name,
                COALESCE(pr.status, 'absent') as presence_status,
@@ -185,7 +185,24 @@ exports.schedule = async (req, res) => {
         WHERE sm.member_id = $1
         ORDER BY period_start DESC
       `, [userId]),
+      query(`SELECT selected_class, package_name, package_group, program_type, duration
+             FROM member_registrations WHERE user_id = $1 ORDER BY created_at DESC`, [userId]),
     ]);
+
+    // Kategori/Paket/Durasi diambil dari pendaftaran member, dipetakan per program.
+    const KAT = { adult: 'Adult', kids: 'Kids' };
+    const regByProgram = new Map();
+    let regDefault = null;
+    regResult.rows.forEach((r) => {
+      const info = {
+        paket: r.package_name || r.package_group || '-',
+        kategori: KAT[r.program_type] || r.program_type || '-',
+        durasi: r.duration || '-',
+      };
+      if (!regDefault) regDefault = info;
+      const k = String(r.selected_class || '').trim().toLowerCase();
+      if (k && !regByProgram.has(k)) regByProgram.set(k, info);
+    });
 
     // Group the member's sessions by weekly period (Monday-start).
     const today = at.toISODate(new Date());
@@ -223,18 +240,31 @@ exports.schedule = async (req, res) => {
     });
 
     const periodGroups = Array.from(groups.values())
-      .map((g) => ({
-        period_start: g.period_start,
-        label: g.label,
-        programs: Array.from(g.programs),
-        tutors: Array.from(g.tutors),
-        location: Array.from(g.locations)[0] || '',
-        counts: g.counts,
-        attendance: g.attendance,
-        attended: g.attendance.present + g.attendance.late,
-        status: g.counts.upcoming > 0 ? 'upcoming' : (g.counts.completed > 0 ? 'completed' : 'cancelled'),
-        next: g.next,
-      }))
+      .map((g) => {
+        const firstProg = Array.from(g.programs)[0] || '';
+        const reg = regByProgram.get(firstProg.toLowerCase()) || regDefault || {};
+        return {
+          period_start: g.period_start,
+          label: g.label,
+          programs: Array.from(g.programs),
+          tutors: Array.from(g.tutors),
+          location: Array.from(g.locations)[0] || '',
+          paket: reg.paket || '-',
+          kategori: reg.kategori || '-',
+          durasi: reg.durasi || '-',
+          counts: g.counts,
+          attendance: g.attendance,
+          attended: g.attendance.present + g.attendance.late,
+          status: g.counts.upcoming > 0 ? 'upcoming' : (g.counts.completed > 0 ? 'completed' : 'cancelled'),
+          next: g.next,
+          sessions: g.sessions.map((s) => ({
+            date: s.date, start_time: s.start_time, end_time: s.end_time,
+            program_name: s.program_name, tutor_name: s.tutor_name,
+            location: s.location || '', meeting_link: s.meeting_link || '',
+            status: s.status, presence_status: s.presence_status,
+          })),
+        };
+      })
       .sort((a, b) => (a.period_start < b.period_start ? 1 : -1));
 
     const periods = periodsResult.rows.map((r) => ({

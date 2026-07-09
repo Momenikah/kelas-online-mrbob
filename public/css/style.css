@@ -6559,6 +6559,28 @@ h1, h2, h3, h4, h5, h6 { line-height: 1.3; color: var(--gray-900); font-weight: 
 .btn-extend-icon { color: var(--brand-700); }
 .btn-extend-icon:hover { background: var(--brand-50); color: var(--brand-900); }
 
+/* ---- Schedule: per-session detail list (data lengkap) ---- */
+.period-sessions { margin-top: 12px; border-top: 1px dashed var(--gray-200); padding-top: 10px; }
+.period-sessions > summary {
+  cursor: pointer; font-size: 13px; font-weight: 700; color: var(--brand-700);
+  list-style: none; display: inline-flex; align-items: center; gap: 7px;
+}
+.period-sessions > summary::-webkit-details-marker { display: none; }
+.period-session-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.period-session-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+  padding: 9px 12px; border: 1px solid var(--gray-150); border-radius: var(--radius);
+  background: var(--gray-50); font-size: 12.5px; color: var(--gray-700);
+}
+.period-session-row > span i { color: var(--brand-500); margin-right: 3px; }
+.period-session-row .ps-link {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px; border-radius: var(--radius-full); background: var(--brand-600);
+  color: #fff; font-weight: 700; text-decoration: none; white-space: nowrap;
+}
+.period-session-row .ps-link i { color: #fff; margin-right: 0; }
+.period-session-row .ps-link:hover { background: var(--brand-700); }
+
 /* ============ RESPONSIVE ============ */
 .form-input,
 .form-textarea,
