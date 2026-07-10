@@ -5,38 +5,16 @@
   <%- include('../partials/flash') %>
   <div class="sub-banner">
     <a href="/tutor" class="back-link"><i class="fas fa-arrow-left"></i></a>
-    <h1>Jadwal Mengajar</h1>
+    <div class="sub-banner-titles">
+      <h1>Schedule</h1>
+      <p class="sub-banner-sub"><%= user.name %></p>
+    </div>
     <span class="schedule-managed-note"><i class="fas fa-circle-info"></i> Jadwal dibuat oleh admin</span>
   </div>
 
   <div class="container">
-    <!-- Filter + view toggle -->
-    <div class="section-card">
-      <div class="schedule-toolbar">
-        <form method="GET" action="/tutor/schedule" class="schedule-filter">
-          <div class="schedule-filter-field">
-            <label><i class="far fa-calendar-alt"></i> Periode</label>
-            <select name="period" class="form-input" onchange="this.form.submit()">
-              <option value="">Semua Periode</option>
-              <% periods.forEach(p => { %>
-                <option value="<%= p.value %>" <%= filters.period === p.value ? 'selected' : '' %>><%= p.label %></option>
-              <% }) %>
-            </select>
-          </div>
-          <% if (filters.period) { %>
-            <a href="/tutor/schedule" class="btn btn-outline schedule-filter-reset"><i class="fas fa-rotate-left"></i> Reset</a>
-          <% } %>
-        </form>
-        <div class="schedule-view-toggle" role="group" aria-label="Pilih tampilan">
-          <button type="button" data-view="grid" class="is-active" title="Tampilan grid"><i class="fas fa-table-cells-large"></i></button>
-          <button type="button" data-view="list" title="Tampilan list"><i class="fas fa-list"></i></button>
-        </div>
-      </div>
-      <p class="schedule-filter-note"><i class="fas fa-circle-info"></i> Jadwal dikelompokkan per periode. Presensi &amp; detail tiap sesi ada di halaman <a href="/tutor/presence">Presensi</a>.</p>
-    </div>
-
     <%
-      // WhatsApp reminder link toward a member for the nearest session in a period.
+      // WhatsApp reminder link toward a member for a given session.
       function waReminderHref(phone, lines) {
         const digits = String(phone || '').replace(/\D/g, '');
         let p = digits;
@@ -47,154 +25,109 @@
       }
     %>
 
-    <% if (periodGroups.length === 0) { %>
-      <div class="empty-state"><i class="fas fa-calendar-times"></i><p><%= filters.period ? 'Tidak ada jadwal pada periode ini.' : 'Belum ada jadwal.' %></p></div>
-    <% } else { %>
-      <div class="period-cards" id="periodCards">
-        <% periodGroups.forEach(g => { %>
-        <div class="period-card <%= g.status %>">
-          <div class="period-card-header">
-            <div class="period-range">
-              <span class="period-range-icon"><i class="fas fa-user"></i></span>
-              <div>
-                <span class="period-range-kicker"><i class="fas fa-calendar-week"></i> <%= g.label %></span>
-                <strong class="period-range-label"><%= g.member ? g.member.name : 'Tanpa peserta' %></strong>
-              </div>
-            </div>
-            <% if (g.status === 'completed') { %>
-              <span class="badge-pill badge-completed"><i class="fas fa-check"></i> Selesai</span>
-            <% } else if (g.status === 'cancelled') { %>
-              <span class="badge-pill badge-cancelled"><i class="fas fa-times"></i> Dibatalkan</span>
-            <% } else { %>
-              <span class="badge-pill badge-upcoming"><i class="fas fa-clock"></i> Akan Datang</span>
-            <% } %>
+    <div class="section-card">
+      <div class="schedule-toolbar">
+        <p class="schedule-filter-note schedule-filter-note--flat"><i class="fas fa-circle-info"></i> Presensi tiap sesi dikelola di halaman <a href="/tutor/presence">Presensi</a>.</p>
+        <form method="GET" action="/tutor/schedule" class="schedule-filter schedule-filter-inline">
+          <div class="schedule-filter-field">
+            <label><i class="far fa-calendar-alt"></i> Periode</label>
+            <select name="period" class="form-input" onchange="this.form.submit()">
+              <option value="">All</option>
+              <% periods.forEach(p => { %>
+                <option value="<%= p.value %>" <%= filters.period === p.value ? 'selected' : '' %>><%= p.label %></option>
+              <% }) %>
+            </select>
           </div>
-
-          <div class="period-card-body">
-            <div class="period-meta">
-              <span><i class="fas fa-book"></i> <%= g.programs.join(', ') || '-' %></span>
-              <span><i class="fas fa-layer-group"></i> <%= g.kategori %> · <%= g.paket %></span>
-              <span><i class="fas fa-hourglass-half"></i> <%= g.durasi %></span>
-              <% if (g.location) { %><span><i class="fas fa-map-marker-alt"></i> <%= g.location %></span><% } %>
-            </div>
-
-            <div class="period-stats">
-              <div class="period-stat">
-                <span class="period-stat-value"><%= g.counts.total %></span>
-                <span class="period-stat-label">Sesi</span>
-              </div>
-              <div class="period-stat">
-                <span class="period-stat-value"><%= g.members.length %></span>
-                <span class="period-stat-label">Peserta</span>
-              </div>
-              <div class="period-stat period-stat-ok">
-                <span class="period-stat-value"><%= g.present_total %></span>
-                <span class="period-stat-label">Hadir</span>
-              </div>
-              <div class="period-stat">
-                <span class="period-stat-value"><%= g.counts.upcoming %></span>
-                <span class="period-stat-label">Akan Datang</span>
-              </div>
-            </div>
-
-            <% if (g.next) { %>
-            <div class="period-next">
-              <i class="fas fa-arrow-right"></i>
-              <span>Sesi terdekat: <strong><%= formatDate(g.next.date) %></strong> · <%= formatTime(g.next.start_time) %> - <%= formatTime(g.next.end_time) %></span>
-            </div>
-            <% } %>
-
-            <% if (g.sessions && g.sessions.length) { %>
-            <details class="period-sessions"<%= g.status === 'upcoming' ? ' open' : '' %>>
-              <summary><i class="fas fa-list-ul"></i> Detail Sesi (<%= g.sessions.length %>)</summary>
-              <div class="period-session-list">
-                <% g.sessions.forEach(s => { %>
-                  <div class="period-session-row">
-                    <span class="ps-date"><i class="far fa-calendar"></i> <%= formatDate(s.date) %></span>
-                    <span class="ps-time"><i class="far fa-clock"></i> <%= formatTime(s.start_time) %> - <%= formatTime(s.end_time) %></span>
-                    <% if (s.location) { %><span class="ps-room"><i class="fas fa-door-open"></i> <%= s.location %></span><% } %>
-                    <% if (s.meeting_link) { %><a href="<%= s.meeting_link %>" target="_blank" rel="noopener" class="ps-link"><i class="fas fa-video"></i> Link Zoom</a><% } %>
-                  </div>
-                <% }) %>
-              </div>
-            </details>
-            <% } %>
-
-            <% if (g.members.length) { %>
-            <div class="period-members">
-              <span class="period-members-title"><i class="fas fa-user-group"></i> Peserta</span>
-              <div class="period-member-chips">
-                <% g.members.forEach(m => { %>
-                  <div class="period-member-chip">
-                    <span><%= m.name %></span>
-                    <% if (g.next && m.phone) {
-                         const waHref = waReminderHref(m.phone, [
-                           `Halo ${m.name}, mengingatkan jadwal kelas kamu 📣`,
-                           `📚 ${g.programs.join(', ') || 'Kelas'}`,
-                           `🗓️ ${formatDate(g.next.date)}`,
-                           `⏰ ${formatTime(g.next.start_time)} - ${formatTime(g.next.end_time)} WIB`,
-                           `👨‍🏫 Tutor: ${user.name}`,
-                           g.location ? `📍 ${g.location}` : '',
-                           g.next.meeting_link ? `🔗 Link kelas: ${g.next.meeting_link}` : '',
-                           `Mohon hadir tepat waktu ya 🙏`
-                         ]);
-                    %>
-                      <a href="<%= waHref %>" target="_blank" rel="noopener" class="wa-followup-btn" title="Follow up via WhatsApp"><i class="fab fa-whatsapp"></i></a>
-                    <% } else if (!m.phone) { %>
-                      <span class="wa-followup-missing" title="Nomor WhatsApp belum tersedia"><i class="fas fa-phone-slash"></i></span>
-                    <% } %>
-                  </div>
-                <% }) %>
-              </div>
-            </div>
-            <% } %>
-          </div>
-
-          <div class="period-card-footer">
-            <a href="/tutor/presence?schedule_id=<%= g.presence_session_id %>" class="btn btn-primary btn-sm period-btn-main"><i class="fas fa-user-check"></i> Kelola Presensi</a>
-            <div class="period-actions">
-              <% if (g.zoom_link) { %>
-              <a href="<%= g.zoom_link %>" target="_blank" rel="noopener" class="btn btn-zoom btn-sm"><i class="fas fa-video"></i> Zoom</a>
-              <% } %>
-              <% if (g.member && g.member.phone) {
-                   const waHref = waReminderHref(g.member.phone, [
-                     `Halo ${g.member.name}, mengingatkan jadwal kelas kamu 📣`,
-                     `📚 ${g.programs.join(', ') || 'Kelas'}`,
-                     g.next ? `🗓️ ${formatDate(g.next.date)}` : '',
-                     g.next ? `⏰ ${formatTime(g.next.start_time)} - ${formatTime(g.next.end_time)} WIB` : '',
-                     `👨‍🏫 Tutor: ${user.name}`,
-                     g.location ? `📍 ${g.location}` : '',
-                     g.zoom_link ? `🔗 Link Zoom: ${g.zoom_link}` : '',
-                     `Mohon hadir tepat waktu ya 🙏`
-                   ]);
-              %>
-              <a href="<%= waHref %>" target="_blank" rel="noopener" class="btn btn-wa btn-sm"><i class="fab fa-whatsapp"></i> WhatsApp</a>
-              <% } %>
-            </div>
-          </div>
-        </div>
-        <% }) %>
+          <% if (filters.period) { %>
+            <a href="/tutor/schedule" class="btn btn-outline schedule-filter-reset"><i class="fas fa-rotate-left"></i> Reset</a>
+          <% } %>
+        </form>
       </div>
-    <% } %>
+
+      <%
+        // One row per session (table like the reference). Carry the member + group meta.
+        const rows = [];
+        periodGroups.forEach(g => {
+          (g.sessions || []).forEach(s => rows.push({ g, s }));
+        });
+        rows.sort((a, b) => (String(a.s.date) < String(b.s.date) ? -1 : 1));
+      %>
+
+      <% if (rows.length === 0) { %>
+        <div class="empty-state"><i class="fas fa-calendar-times"></i><p><%= filters.period ? 'Tidak ada jadwal pada periode ini.' : 'Belum ada jadwal.' %></p></div>
+      <% } else { %>
+      <div class="jadwal-table-wrap">
+        <table class="jadwal-table">
+          <thead>
+            <tr>
+              <th>Nama Lengkap</th>
+              <th>Kategori</th>
+              <th>Paket</th>
+              <th>Program</th>
+              <th>Periode</th>
+              <th>Durasi</th>
+              <th>Jam Belajar</th>
+              <th>Tutor</th>
+              <th>Zoom Room</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(({ g, s }) => {
+                 const isCancelled = s.status === 'cancelled';
+                 const past = String(s.date) < new Date().toISOString().slice(0, 10);
+                 const attended = s.presence_status === 'present';
+                 const memberName = g.member ? g.member.name : 'Tanpa peserta';
+            %>
+            <tr class="<%= isCancelled ? 'is-cancelled' : (past ? 'is-past' : 'is-upcoming') %>">
+              <td data-label="Nama Lengkap" class="jt-name">
+                <span><%= memberName %></span>
+                <% if (isCancelled) { %>
+                  <span class="jt-badge jt-badge-cancel">Dibatalkan</span>
+                <% } else if (past) { %>
+                  <span class="jt-badge <%= attended ? 'jt-badge-ok' : 'jt-badge-warn' %>"><%= attended ? 'Hadir' : 'Belum Hadir' %></span>
+                <% } else { %>
+                  <span class="jt-badge jt-badge-next">Akan Datang</span>
+                <% } %>
+              </td>
+              <td data-label="Kategori"><%= g.kategori %></td>
+              <td data-label="Paket"><%= g.paket %></td>
+              <td data-label="Program"><%= s.program_name || '-' %></td>
+              <td data-label="Periode" class="jt-nowrap"><%= formatDate(s.date) %></td>
+              <td data-label="Durasi" class="jt-nowrap"><%= g.durasi %></td>
+              <td data-label="Jam Belajar" class="jt-nowrap"><%= formatTime(s.start_time) %> - <%= formatTime(s.end_time) %> WIB</td>
+              <td data-label="Tutor"><%= user.name %></td>
+              <td data-label="Zoom Room"><%= s.location || '-' %></td>
+              <td data-label="Aksi" class="jt-actions-cell">
+                <div class="jt-actions">
+                  <a href="/tutor/presence?schedule_id=<%= g.presence_session_id %>" class="btn btn-primary btn-sm"><i class="fas fa-user-check"></i> Presensi</a>
+                  <% if (s.meeting_link) { %>
+                    <a href="<%= s.meeting_link %>" target="_blank" rel="noopener" class="btn btn-zoom btn-sm"><i class="fas fa-video"></i> Link ZOOM</a>
+                  <% } %>
+                  <% if (g.member && g.member.phone) {
+                       const waHref = waReminderHref(g.member.phone, [
+                         `Halo ${g.member.name}, mengingatkan jadwal kelas kamu 📣`,
+                         `📚 ${s.program_name || 'Kelas'}`,
+                         `🗓️ ${formatDate(s.date)}`,
+                         `⏰ ${formatTime(s.start_time)} - ${formatTime(s.end_time)} WIB`,
+                         `👨‍🏫 Tutor: ${user.name}`,
+                         s.location ? `📍 ${s.location}` : '',
+                         s.meeting_link ? `🔗 Link Zoom: ${s.meeting_link}` : '',
+                         `Mohon hadir tepat waktu ya 🙏`
+                       ]);
+                  %>
+                    <a href="<%= waHref %>" target="_blank" rel="noopener" class="btn btn-wa btn-sm"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </div>
   </div>
 </div>
-
-<script>
-(function () {
-  var container = document.getElementById('periodCards');
-  var buttons = document.querySelectorAll('.schedule-view-toggle button');
-  if (!buttons.length) return;
-  var KEY = 'scheduleView:tutor';
-  function apply(view) {
-    if (container) container.classList.toggle('is-list', view === 'list');
-    buttons.forEach(function (b) { b.classList.toggle('is-active', b.dataset.view === view); });
-    try { localStorage.setItem(KEY, view); } catch (e) {}
-  }
-  buttons.forEach(function (b) { b.addEventListener('click', function () { apply(b.dataset.view); }); });
-  var saved = 'grid';
-  try { saved = localStorage.getItem(KEY) || 'grid'; } catch (e) {}
-  apply(saved);
-})();
-</script>
 
 <%- include('../partials/footer') %>

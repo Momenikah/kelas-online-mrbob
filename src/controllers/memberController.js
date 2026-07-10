@@ -267,6 +267,7 @@ exports.schedule = async (req, res) => {
           sessions: g.sessions.map((s) => ({
             date: s.date, start_time: s.start_time, end_time: s.end_time,
             program_name: s.program_name, tutor_name: s.tutor_name,
+            tutor_phone: s.tutor_phone || '',
             location: s.location || '', meeting_link: s.meeting_link || '',
             status: s.status, presence_status: s.presence_status,
           })),
