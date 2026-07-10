@@ -27,6 +27,10 @@ const isConfigured = () => Boolean(sourceUrl());
 async function ensureScheduleSyncSchema(q = query) {
   await q(`ALTER TABLE schedules ADD COLUMN IF NOT EXISTS source VARCHAR(20)`);
   await q(`ALTER TABLE schedules ADD COLUMN IF NOT EXISTS external_id VARCHAR(120)`);
+  // Plotting-sheet fields shown on the schedule table (Kategori / Paket / Durasi).
+  await q(`ALTER TABLE schedules ADD COLUMN IF NOT EXISTS kategori VARCHAR(80)`);
+  await q(`ALTER TABLE schedules ADD COLUMN IF NOT EXISTS paket VARCHAR(120)`);
+  await q(`ALTER TABLE schedules ADD COLUMN IF NOT EXISTS durasi VARCHAR(60)`);
   await q(`CREATE UNIQUE INDEX IF NOT EXISTS ux_schedules_external
            ON schedules(external_id) WHERE external_id IS NOT NULL`);
   await q(`
@@ -182,7 +186,9 @@ async function syncSchedulesFromSheet({ triggeredBy = 'manual' } = {}) {
       const email = normEmail(row.email);
       const memberName = String(row.nama_lengkap || '').trim();
       const programName = String(row.program || '').trim();
+      const kategori = String(row.kategori || '').trim();
       const paket = String(row.paket || '').trim();
+      const durasi = String(row.durasi || '').trim();
       const periode = String(row.periode || '').trim();
       const jam = String(row.jam_belajar || '').trim();
       const tutorRaw = String(row.tutor || '').trim();
@@ -227,20 +233,23 @@ async function syncSchedulesFromSheet({ triggeredBy = 'manual' } = {}) {
         await client.query(
           `UPDATE schedules SET
              tutor_id=$1, program_id=$2, title=$3, description=$4, date=$5,
-             start_time=$6, end_time=$7, location=$8, meeting_link=$9
+             start_time=$6, end_time=$7, location=$8, meeting_link=$9,
+             kategori=$11, paket=$12, durasi=$13
              ${reactivate ? ", status='upcoming'" : ''}
            WHERE id=$10`,
-          [tutorId, programId, title, notes, date, start, end, location, meetingLink, scheduleId]
+          [tutorId, programId, title, notes, date, start, end, location, meetingLink, scheduleId,
+           kategori || null, paket || null, durasi || null]
         );
         summary.updated += 1;
       } else {
         const ins = await client.query(
           `INSERT INTO schedules
              (tutor_id, program_id, title, description, date, start_time, end_time,
-              location, meeting_link, status, source, external_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'upcoming','sheet',$10)
+              location, meeting_link, status, source, external_id, kategori, paket, durasi)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'upcoming','sheet',$10,$11,$12,$13)
            RETURNING id`,
-          [tutorId, programId, title, notes, date, start, end, location, meetingLink, id]
+          [tutorId, programId, title, notes, date, start, end, location, meetingLink, id,
+           kategori || null, paket || null, durasi || null]
         );
         scheduleId = ins.rows[0].id;
         summary.added += 1;

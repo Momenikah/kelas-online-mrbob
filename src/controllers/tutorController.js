@@ -158,6 +158,7 @@ exports.schedule = async (req, res) => {
           date: s.date, start_time: s.start_time, end_time: s.end_time,
           program_name: s.program_name, location: s.location || '',
           meeting_link: s.meeting_link || '', status: s.status,
+          kategori: s.kategori || '', paket: s.paket || '', durasi: s.durasi || '',
           presence_status: m ? m.presence_status : null,
         });
       });
@@ -200,6 +201,20 @@ exports.schedule = async (req, res) => {
         )) || {};
         const zoomLink = (g.next && g.next.meeting_link)
           || (g.sessions.find((s) => s.meeting_link) || {}).meeting_link || '';
+        // Kategori/Paket/Durasi ikut sheet ploting (kolom di schedules); fallback
+        // ke pendaftaran member per program bila sel sheet kosong.
+        const sessions = g.sessions.map((s) => {
+          const ri = (g.member && (
+            regByMember.get(g.member.id + '|' + String(s.program_name || '').toLowerCase()) ||
+            regDefaultByMember.get(g.member.id)
+          )) || {};
+          return {
+            ...s,
+            kategori: s.kategori || ri.kategori || '-',
+            paket: s.paket || ri.paket || '-',
+            durasi: s.durasi || ri.durasi || '-',
+          };
+        });
         return {
           period_start: g.period_start,
           label: g.label,
@@ -207,16 +222,16 @@ exports.schedule = async (req, res) => {
           members: g.member ? [g.member] : [],
           programs: Array.from(g.programs),
           location: Array.from(g.locations)[0] || '',
-          paket: reg.paket || '-',
-          kategori: reg.kategori || '-',
-          durasi: reg.durasi || '-',
+          paket: (sessions[0] && sessions[0].paket) || reg.paket || '-',
+          kategori: (sessions[0] && sessions[0].kategori) || reg.kategori || '-',
+          durasi: (sessions[0] && sessions[0].durasi) || reg.durasi || '-',
           counts: g.counts,
           present_total: g.present_total,
           status: g.counts.upcoming > 0 ? 'upcoming' : (g.counts.completed > 0 ? 'completed' : 'cancelled'),
           next: g.next,
           presence_session_id: (g.next && g.next.id) || g.firstSessionId,
           zoom_link: zoomLink,
-          sessions: g.sessions,
+          sessions,
         };
       })
       .sort((a, b) => {

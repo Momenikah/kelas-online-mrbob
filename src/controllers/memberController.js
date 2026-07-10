@@ -264,13 +264,21 @@ exports.schedule = async (req, res) => {
           attended: g.attendance.present + g.attendance.late,
           status: g.counts.upcoming > 0 ? 'upcoming' : (g.counts.completed > 0 ? 'completed' : 'cancelled'),
           next: g.next,
-          sessions: g.sessions.map((s) => ({
-            date: s.date, start_time: s.start_time, end_time: s.end_time,
-            program_name: s.program_name, tutor_name: s.tutor_name,
-            tutor_phone: s.tutor_phone || '',
-            location: s.location || '', meeting_link: s.meeting_link || '',
-            status: s.status, presence_status: s.presence_status,
-          })),
+          sessions: g.sessions.map((s) => {
+            // Kategori/Paket/Durasi ikut sheet ploting (kolom di schedules); jika
+            // kosong (mis. jadwal buatan Plot), fallback ke pendaftaran member.
+            const ri = regByProgram.get(String(s.program_name || '').toLowerCase()) || regDefault || {};
+            return {
+              date: s.date, start_time: s.start_time, end_time: s.end_time,
+              program_name: s.program_name, tutor_name: s.tutor_name,
+              tutor_phone: s.tutor_phone || '',
+              location: s.location || '', meeting_link: s.meeting_link || '',
+              kategori: s.kategori || ri.kategori || '-',
+              paket: s.paket || ri.paket || '-',
+              durasi: s.durasi || ri.durasi || '-',
+              status: s.status, presence_status: s.presence_status,
+            };
+          }),
         };
       })
       .sort((a, b) => (a.period_start < b.period_start ? 1 : -1));

@@ -90,11 +90,11 @@
                   <span class="jt-badge jt-badge-next">Akan Datang</span>
                 <% } %>
               </td>
-              <td data-label="Kategori"><%= g.kategori %></td>
-              <td data-label="Paket"><%= g.paket %></td>
+              <td data-label="Kategori"><%= s.kategori %></td>
+              <td data-label="Paket"><%= s.paket %></td>
               <td data-label="Program"><%= s.program_name || '-' %></td>
               <td data-label="Periode" class="jt-nowrap"><%= formatDate(s.date) %></td>
-              <td data-label="Durasi" class="jt-nowrap"><%= g.durasi %></td>
+              <td data-label="Durasi" class="jt-nowrap"><%= s.durasi %></td>
               <td data-label="Jam Belajar" class="jt-nowrap"><%= formatTime(s.start_time) %> - <%= formatTime(s.end_time) %> WIB</td>
               <td data-label="Tutor"><%= user.name %></td>
               <td data-label="Zoom Room"><%= s.location || '-' %></td>
