@@ -132,7 +132,7 @@ exports.schedule = async (req, res) => {
         if (!groups.has(key)) {
           groups.set(key, {
             period_start: periodKey,
-            label: at.formatPeriodRange(periodKey),
+            label: at.formatPeriodLabel(periodKey),
             member: m && m.id ? { id: m.id, name: m.name, phone: m.phone || '' } : null,
             programs: new Set(),
             locations: new Set(),
@@ -243,7 +243,7 @@ exports.schedule = async (req, res) => {
 
     const periods = periodsResult.rows.map((r) => ({
       value: at.toISODate(r.period_start),
-      label: at.formatPeriodRange(at.toISODate(r.period_start)),
+      label: at.formatPeriodLabel(at.toISODate(r.period_start)),
     }));
     res.render('tutor/schedule', {
       title: 'Jadwal Mengajar',

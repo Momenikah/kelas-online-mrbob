@@ -212,7 +212,7 @@ exports.schedule = async (req, res) => {
       if (!groups.has(key)) {
         groups.set(key, {
           period_start: key,
-          label: at.formatPeriodRange(key),
+          label: at.formatPeriodLabel(key),
           sessions: [],
           programs: new Set(),
           tutors: new Set(),
@@ -285,7 +285,7 @@ exports.schedule = async (req, res) => {
 
     const periods = periodsResult.rows.map((r) => ({
       value: at.toISODate(r.period_start),
-      label: at.formatPeriodRange(at.toISODate(r.period_start)),
+      label: at.formatPeriodLabel(at.toISODate(r.period_start)),
     }));
 
     res.render('member/schedule', {
