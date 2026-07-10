@@ -13,6 +13,8 @@
 //   PAKET      -> dipakai untuk judul jadwal (opsional)
 //   PERIODE    -> tanggal, mis. "13 Juli 2026" atau "2026-07-13"
 //   JAM BELAJAR-> rentang, mis. "16.00 WIB - 17.00 WIB"
+//   ZOOM ROOM  -> lokasi/ruang (opsional) -> schedules.location
+//   LINK ZOOM  -> URL meeting (opsional)  -> schedules.meeting_link
 //   TUTOR      -> sel bebas, mis. "Sist Nani - 13 Ju..."; app mencari tutor yang
 //                 NAMANYA terkandung (include) di dalam teks ini (match terpanjang)
 // =============================================
@@ -192,6 +194,9 @@ async function syncSchedulesFromSheet({ triggeredBy = 'manual' } = {}) {
       const periode = String(row.periode || '').trim();
       const jam = String(row.jam_belajar || '').trim();
       const tutorRaw = String(row.tutor || '').trim();
+      // ZOOM ROOM -> location; LINK ZOOM -> meeting_link (nama header fleksibel).
+      const zoomRoom = String(row.zoom_room || row.room_zoom || '').trim();
+      const linkZoom = String(row.link_zoom || row.zoom_link || '').trim();
 
       const date = normDateID(periode);
       const [start, end] = parseJamRange(jam);
@@ -199,8 +204,8 @@ async function syncSchedulesFromSheet({ triggeredBy = 'manual' } = {}) {
       const tutorId = findTutorByInclude(tutorRaw);
       const programId = programByName.get(normKey(programName));
       const title = paket ? `${programName} — ${paket}` : programName;
-      const location = null;
-      const meetingLink = null;
+      const location = zoomRoom || null;
+      const meetingLink = linkZoom || null;
       const notes = null;
 
       if (!email) rowErrors.push('EMAIL kosong');
