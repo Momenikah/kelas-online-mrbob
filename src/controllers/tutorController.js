@@ -602,8 +602,8 @@ exports.presence = async (req, res) => {
         ORDER BY mp.created_at DESC
         LIMIT 25
       `, [tutorId]),
-      query(`SELECT DISTINCT p.id, p.name FROM schedules s JOIN programs p ON s.program_id = p.id
-             WHERE s.tutor_id = $1 ORDER BY p.name`, [tutorId]),
+      query(`SELECT DISTINCT ON (p.name) p.id, p.name FROM programs p
+             WHERE p.is_active = true ORDER BY p.name, p.id`),
       query('SELECT period_start, label FROM periods ORDER BY period_start'),
     ]);
 

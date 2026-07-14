@@ -355,13 +355,12 @@ exports.presence = async (req, res) => {
     const [tutorsRes, periodsRes, programsRes, submissionsRes, schedulesRes] = await Promise.all([
       query("SELECT id, name FROM users WHERE role = 'tutor' AND is_active = true ORDER BY name"),
       query('SELECT period_start, label FROM periods ORDER BY period_start'),
-      // Only the programs this member registered/enrolled in — matches the
-      // registration choice instead of listing every program. DISTINCT ON (name)
-      // collapses duplicate program rows that share the same name.
+      // Full list of active programs. DISTINCT ON (name) collapses duplicate
+      // program rows that share the same name.
       query(`SELECT DISTINCT ON (p.name) p.id, p.name
-             FROM enrollments e JOIN programs p ON e.program_id = p.id
-             WHERE e.member_id = $1
-             ORDER BY p.name, p.id`, [userId]),
+             FROM programs p
+             WHERE p.is_active = true
+             ORDER BY p.name, p.id`),
       query(`SELECT mp.*, t.name as tutor_name, p.name as program_name
              FROM member_presences mp
              LEFT JOIN users t ON mp.tutor_id = t.id
