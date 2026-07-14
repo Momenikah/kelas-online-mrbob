@@ -17,8 +17,15 @@ const normalizeCertificateDetails = (body = {}) => {
     program_label: String(body.program_label || '').trim(),
     grade: String(body.grade || '').trim(),
     scores: {},
+    notes: {},
     improvement: {},
   };
+
+  // Per-section notes filled by the tutor (shown in the Personal Report "Notes" column).
+  ['speaking', 'vocabulary', 'grammar', 'pronunciation', 'understanding'].forEach((key) => {
+    const v = body[`${key}_note`];
+    if (v !== undefined && String(v).trim() !== '') details.notes[key] = String(v).trim();
+  });
 
   [
     'speaking_score',

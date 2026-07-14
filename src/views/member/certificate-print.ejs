@@ -210,6 +210,8 @@
          const miniVals = [scores.speaking_score, scores.vocabulary_score, scores.grammar_score, scores.pronunciation_score, scores.understanding_score, scores.cefr_score];
          const miniX = [18.7, 32.2, 45.6, 59, 72.4, 85.9];
          const rowKeys = ['speaking_score', 'vocabulary_score', 'grammar_score', 'pronunciation_score', 'understanding_score'];
+         const noteKeys = ['speaking', 'vocabulary', 'grammar', 'pronunciation', 'understanding'];
+         const notes = d.notes || {};
          const rowY = [39.75, 42.85, 46.0, 49.1, 52.25];
     %>
       <section class="sheet sheet-report">
@@ -222,6 +224,7 @@
         <% rowKeys.forEach((key, i) => { %>
           <div class="v c" style="left:39.2%;top:<%= rowY[i] %>%;font-size:1.1cqw;"><%= show(scores[key], '') %></div>
           <div class="v c" style="left:53.7%;top:<%= rowY[i] %>%;font-size:1cqw;"><%= scores[key] ? resultLabel(scores[key]) : '' %></div>
+          <div class="v l" style="left:62.5%;top:<%= rowY[i] %>%;width:28.5%;font-size:0.82cqw;font-weight:600;line-height:1.12;"><%= show(notes[noteKeys[i]], '') %></div>
         <% }) %>
         <div class="v l" style="left:12.7%;top:65.5%;width:38%;font-size:1cqw;font-weight:600;line-height:1.25;"><%= show(improvement.before, '') %></div>
         <div class="v l" style="left:54%;top:65.5%;width:38%;font-size:1cqw;font-weight:600;line-height:1.25;"><%= show(improvement.after, '') %></div>
