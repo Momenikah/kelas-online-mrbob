@@ -59,6 +59,7 @@ router.get('/report/export.csv', isTutor, tutorController.exportReportCsv);
 router.get('/report/:id', isTutor, tutorController.reportDetail);
 router.get('/certificate', requireRole('tutor'), tutorController.certificate);
 router.post('/certificate', requireRole('tutor'), tutorController.issueCertificate);
+router.post('/certificate/:id/update', requireRole('tutor'), tutorController.updateCertificate);
 router.get('/certificate/:id/print', requireRole('tutor'), tutorController.certificatePrint);
 router.post('/certificate/:id/delete', requireRole('tutor'), tutorController.deleteCertificate);
 router.get('/help-support', requireRole('tutor'), tutorController.helpSupport);

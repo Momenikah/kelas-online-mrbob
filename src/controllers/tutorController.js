@@ -1487,6 +1487,34 @@ exports.issueCertificate = async (req, res) => {
   }
 };
 
+// Edit an existing certificate's details (scores, notes, improvement, grade, title).
+// Member/program/period stay fixed — only the certificate content is updated.
+exports.updateCertificate = async (req, res) => {
+  try {
+    await ensureCertificateDetailsColumn(query);
+    const details = normalizeCertificateDetails(req.body);
+    const title = String(req.body.title || '').trim() || 'Sertifikat Kelulusan';
+    const updated = await query(
+      `UPDATE certificates SET title = $1, details = $2
+       WHERE id = $3 AND program_id IN (SELECT DISTINCT program_id FROM schedules WHERE tutor_id = $4)
+       RETURNING id`,
+      [title, JSON.stringify(details), req.params.id, req.session.user.id]
+    );
+    if (!updated.rows.length) {
+      req.flash('error', 'Sertifikat tidak ditemukan atau di luar wewenang Anda.');
+      return res.redirect('/tutor/certificate');
+    }
+    syncCertificate(updated.rows[0].id)
+      .catch((e) => console.error('Gagal sinkronisasi sertifikat ke spreadsheet:', e.message));
+    req.flash('success', 'Sertifikat berhasil diperbarui.');
+    res.redirect('/tutor/certificate');
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal memperbarui sertifikat.');
+    res.redirect('/tutor/certificate');
+  }
+};
+
 exports.certificatePrint = async (req, res) => {
   try {
     await ensureCertificateDetailsColumn(query);
