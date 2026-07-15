@@ -51,6 +51,9 @@ router.post('/questionnaire/:id/questions/:questionId/delete', isAdmin, adminCon
 router.get('/report', isAdmin, adminController.report);
 router.get('/report/:id', isAdmin, adminController.reportDetail);
 router.get('/certificate', isAdmin, adminController.certificate);
+router.post('/certificate', isAdmin, adminController.issueCertificate);
+router.post('/certificate/:id/update', isAdmin, adminController.updateCertificate);
+router.post('/certificate/:id/toggle', isAdmin, adminController.toggleCertificate);
 router.get('/certificate/:id/print', isAdmin, adminController.certificatePrint);
 router.post('/certificate/:id/sync', isAdmin, adminController.certificateSync);
 router.get('/periods', isAdmin, adminController.periods);

@@ -11,7 +11,7 @@ const {
 } = require('../utils/scheduleSheetSync');
 const { sendScheduleNotificationEmails } = require('../utils/scheduleEmail');
 const { normalizeReportDays, ensureMemberReportsTable } = require('../utils/memberReports');
-const { ensureCertificateDetailsColumn } = require('../utils/certificates');
+const { ensureCertificateDetailsColumn, normalizeCertificateDetails } = require('../utils/certificates');
 const { ensureSupportFeedbackTable } = require('../utils/supportFeedback');
 const { ensureRenewalRequestsTable, renewalStatuses } = require('../utils/renewalRequests');
 const { ensureUserAccessColumns } = require('../utils/userAccess');
@@ -2280,7 +2280,7 @@ exports.certificate = async (req, res) => {
       conds.push(`c.details->>'period_label' = $${params.length}`);
     }
     const whereClause = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
-    const [certsResult, statsRes, tutorOptsRes, periodOptsRes] = await Promise.all([
+    const [certsResult, statsRes, tutorOptsRes, periodOptsRes, membersRes, programsRes, tutorsRes, periodsRes] = await Promise.all([
       query(`
         SELECT c.*, u.name as member_name, p.name as program_name,
                c.details->>'tutor_name' AS tutor_name,
@@ -2296,6 +2296,11 @@ exports.certificate = async (req, res) => {
              WHERE COALESCE(details->>'tutor_name', '') <> '' ORDER BY name`),
       query(`SELECT DISTINCT details->>'period_label' AS label FROM certificates
              WHERE COALESCE(details->>'period_label', '') <> '' ORDER BY label`),
+      // Untuk form terbit/edit milik admin: admin boleh pilih member & program apa pun.
+      query(`SELECT id, name, email FROM users WHERE role = 'member' AND is_active = true ORDER BY name`),
+      query(`SELECT DISTINCT ON (name) id, name FROM programs WHERE is_active = true ORDER BY name, id`),
+      query(`SELECT id, name FROM users WHERE role = 'tutor' AND is_active = true ORDER BY name`),
+      query('SELECT period_start, label FROM periods ORDER BY period_start DESC'),
     ]);
     res.render('admin/certificate', {
       title: 'Sertifikat',
@@ -2304,6 +2309,13 @@ exports.certificate = async (req, res) => {
       filters: { search, tutor, period },
       tutorOptions: tutorOptsRes.rows.map((r) => r.name),
       periodOptions: periodOptsRes.rows.map((r) => r.label),
+      members: membersRes.rows,
+      programs: programsRes.rows,
+      tutors: tutorsRes.rows,
+      periods: periodsRes.rows.map((p) => ({
+        value: at.toISODate(p.period_start),
+        label: at.formatPeriodLabelEN(p.period_start),
+      })),
       stats: statsRes.rows[0],
       error: req.flash('error'),
       success: req.flash('success'),
@@ -2340,6 +2352,77 @@ exports.certificatePrint = async (req, res) => {
     console.error(err);
     res.render('error', { title: 'Error', message: err.message, user: req.session.user });
   }
+};
+
+// Admin boleh menerbitkan sertifikat untuk member & program mana pun (tidak
+// dibatasi jadwal seperti tutor) — jalan keluar bila tutor di jadwal belum sesuai.
+exports.issueCertificate = async (req, res) => {
+  try {
+    const { member_id, program_id, title } = req.body;
+    if (!member_id || !program_id) {
+      req.flash('error', 'Pilih member dan program terlebih dahulu.');
+      return res.redirect('/admin/certificate');
+    }
+    await ensureCertificateDetailsColumn(query);
+    const details = normalizeCertificateDetails(req.body);
+    const certNum = `CERT-${Date.now()}-${member_id}`;
+    const inserted = await query(
+      `INSERT INTO certificates (member_id, program_id, title, certificate_number, details)
+       VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+      [member_id, program_id, String(title || '').trim() || 'Sertifikat Kelulusan', certNum, JSON.stringify(details)]
+    );
+    syncCertificate(inserted.rows[0].id)
+      .catch((e) => console.error('Gagal sinkronisasi sertifikat ke spreadsheet:', e.message));
+    req.flash('success', `Sertifikat ${certNum} berhasil diterbitkan.`);
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal menerbitkan sertifikat.');
+  }
+  res.redirect('/admin/certificate');
+};
+
+// Admin mengubah isi sertifikat (skor, notes, grade, judul). Member/program tetap.
+exports.updateCertificate = async (req, res) => {
+  try {
+    await ensureCertificateDetailsColumn(query);
+    const details = normalizeCertificateDetails(req.body);
+    const title = String(req.body.title || '').trim() || 'Sertifikat Kelulusan';
+    const updated = await query(
+      `UPDATE certificates SET title = $1, details = $2 WHERE id = $3 RETURNING id, certificate_number`,
+      [title, JSON.stringify(details), req.params.id]
+    );
+    if (!updated.rows.length) {
+      req.flash('error', 'Sertifikat tidak ditemukan.');
+      return res.redirect('/admin/certificate');
+    }
+    syncCertificate(updated.rows[0].id)
+      .catch((e) => console.error('Gagal sinkronisasi sertifikat ke spreadsheet:', e.message));
+    req.flash('success', `Sertifikat ${updated.rows[0].certificate_number} berhasil diperbarui.`);
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal memperbarui sertifikat.');
+  }
+  res.redirect('/admin/certificate');
+};
+
+// Cabut / aktifkan kembali — badge Aktif/Nonaktif sekarang bisa diubah.
+exports.toggleCertificate = async (req, res) => {
+  try {
+    const result = await query(
+      `UPDATE certificates SET is_active = NOT COALESCE(is_active, true)
+       WHERE id = $1 RETURNING certificate_number, is_active`,
+      [req.params.id]
+    );
+    if (!result.rows.length) req.flash('error', 'Sertifikat tidak ditemukan.');
+    else {
+      const r = result.rows[0];
+      req.flash('success', `Sertifikat ${r.certificate_number} ${r.is_active ? 'diaktifkan kembali' : 'dicabut (nonaktif)'}.`);
+    }
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal mengubah status sertifikat.');
+  }
+  res.redirect('/admin/certificate');
 };
 
 exports.certificateSync = async (req, res) => {

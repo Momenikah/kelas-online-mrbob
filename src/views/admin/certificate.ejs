@@ -6,8 +6,13 @@
 
   <div class="sub-banner">
     <a href="/admin" class="back-link"><i class="fas fa-arrow-left"></i></a>
-    <h1>Sertifikat</h1>
-    <p class="sub-banner-desc">Admin hanya melihat sertifikat yang diterbitkan tutor.</p>
+    <div class="sub-banner-titles">
+      <h1>Sertifikat</h1>
+      <p class="sub-banner-desc">Admin dapat menerbitkan, mengedit, dan mencabut sertifikat untuk member mana pun.</p>
+    </div>
+    <button class="btn btn-light" onclick="newAdminCert()">
+      <i class="fas fa-plus"></i> Terbitkan Sertifikat
+    </button>
   </div>
 
   <div class="container">
@@ -64,14 +69,26 @@
                   <td><%= formatDate(c.issued_date) %></td>
                   <td><span class="badge-pill badge-<%= c.is_active ? 'completed' : 'cancelled' %>"><%= c.is_active ? 'Aktif' : 'Nonaktif' %></span></td>
                   <td>
-                    <a class="btn btn-outline btn-sm" href="/admin/certificate/<%= c.id %>/print" target="_blank" rel="noopener">
-                      <i class="fas fa-eye"></i> Lihat
-                    </a>
-                    <form action="/admin/certificate/<%= c.id %>/sync" method="POST" style="display:inline">
-                      <button type="submit" class="btn btn-primary btn-sm" title="Sinkronkan sertifikat & personal report ke spreadsheet">
-                        <i class="fas fa-file-export"></i> Sync
+                    <div class="row-actions">
+                      <button type="button" class="btn btn-outline btn-sm" onclick="editAdminCert('<%= c.id %>')">
+                        <i class="fas fa-pen"></i> Edit
                       </button>
-                    </form>
+                      <a class="btn btn-outline btn-sm" href="/admin/certificate/<%= c.id %>/print" target="_blank" rel="noopener">
+                        <i class="fas fa-eye"></i> Lihat
+                      </a>
+                      <form action="/admin/certificate/<%= c.id %>/sync" method="POST" style="display:inline">
+                        <button type="submit" class="btn btn-primary btn-sm" title="Sinkronkan sertifikat & personal report ke spreadsheet">
+                          <i class="fas fa-file-export"></i> Sync
+                        </button>
+                      </form>
+                      <form action="/admin/certificate/<%= c.id %>/toggle" method="POST" style="display:inline"
+                            data-confirm="<%= c.is_active ? 'Cabut' : 'Aktifkan kembali' %> sertifikat <%= c.certificate_number %>?">
+                        <button type="submit" class="btn btn-sm <%= c.is_active ? 'btn-outline' : 'btn-primary' %>"
+                                title="<%= c.is_active ? 'Cabut (nonaktifkan)' : 'Aktifkan kembali' %>">
+                          <i class="fas fa-<%= c.is_active ? 'ban' : 'rotate-left' %>"></i> <%= c.is_active ? 'Cabut' : 'Aktifkan' %>
+                        </button>
+                      </form>
+                    </div>
                   </td>
                 </tr>
               <% }) %>
@@ -81,6 +98,243 @@
       <% } %>
     </div>
   </div>
+
+  <!-- Terbitkan / Edit Sertifikat (admin) -->
+  <div class="modal" id="adminCertModal" style="display:none">
+    <div class="modal-overlay" onclick="toggleModal('adminCertModal')"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="adminCertModalTitle">Terbitkan Sertifikat</h3>
+        <button class="modal-close" onclick="toggleModal('adminCertModal')"><i class="fas fa-times"></i></button>
+      </div>
+      <form action="/admin/certificate" method="POST" class="modal-form" id="adminCertForm">
+        <div class="form-group">
+          <label class="form-label">Kategori Program <span class="req">*</span></label>
+          <select name="category" id="acCategory" class="form-input" required onchange="acSections()">
+            <option value="Speaking &amp; Career Class">Speaking &amp; Career Class (Personal Report)</option>
+            <option value="Holiday Class">Holiday Class (Personal Report)</option>
+            <option value="Grammar Class">Grammar Class (grade saja)</option>
+            <option value="TOEFL Class">TOEFL Class (test score)</option>
+            <option value="IELTS Class">IELTS Class (band score)</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Member <span class="req">*</span></label>
+            <select name="member_id" id="acMember" class="form-input" required onchange="acMemberChanged()">
+              <option value="">-- Pilih Member --</option>
+              <% members.forEach(m => { %>
+                <option value="<%= m.id %>" data-email="<%= m.email %>"><%= m.name %> — <%= m.email %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Program <span class="req">*</span></label>
+            <select name="program_id" id="acProgram" class="form-input" required onchange="acProgramChanged()">
+              <option value="">-- Pilih Program --</option>
+              <% programs.forEach(p => { %>
+                <option value="<%= p.id %>"><%= p.name %></option>
+              <% }) %>
+            </select>
+            <input type="hidden" name="program_label" id="acProgramLabel">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Email Member</label>
+            <input type="email" name="member_email" id="acEmail" class="form-input" readonly>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nama Tutor <span class="req">*</span></label>
+            <input type="text" name="tutor_name" id="acTutor" class="form-input" list="acTutorList" required placeholder="Nama tutor pengajar">
+            <datalist id="acTutorList">
+              <% tutors.forEach(t => { %><option value="<%= t.name %>"></option><% }) %>
+            </datalist>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Periode <span class="req">*</span></label>
+            <select name="period_label" id="acPeriod" class="form-input" required>
+              <option value="">-- Pilih Periode --</option>
+              <% periods.forEach(p => { %><option value="<%= p.label %>"><%= p.label %></option><% }) %>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Grade <span class="req">*</span></label>
+            <input type="text" name="grade" id="acGrade" class="form-input" required placeholder="Contoh: B+">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Judul Sertifikat</label>
+          <input type="text" name="title" id="acTitle" class="form-input" required value="Sertifikat Kelulusan">
+        </div>
+
+        <div class="cert-extra-section" data-ac-section="personal">
+          <h4>Personal Report</h4>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Speaking (1-5)</label><input type="number" min="1" max="5" name="speaking_score" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Pronunciation (1-5)</label><input type="number" min="1" max="5" name="pronunciation_score" class="form-input"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Vocabulary (1-5)</label><input type="number" min="1" max="5" name="vocabulary_score" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Grammar (1-5)</label><input type="number" min="1" max="5" name="grammar_score" class="form-input"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Understanding (1-5)</label><input type="number" min="1" max="5" name="understanding_score" class="form-input"></div>
+            <div class="form-group"><label class="form-label">CEFR</label><input type="text" name="cefr_score" class="form-input" placeholder="Contoh: B2 Proficiency"></div>
+          </div>
+          <h4 style="margin-top:18px;">Notes per Section</h4>
+          <p class="field-hint">Catatan tiap bagian — tampil di kolom <strong>Notes</strong> pada Personal Report.</p>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Notes Speaking</label><input type="text" name="speaking_note" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Notes Vocabulary</label><input type="text" name="vocabulary_note" class="form-input"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Notes Grammar</label><input type="text" name="grammar_note" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Notes Pronunciation</label><input type="text" name="pronunciation_note" class="form-input"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Notes Understanding</label><input type="text" name="understanding_note" class="form-input"></div>
+            <div class="form-group"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Before</label><textarea name="before" class="form-textarea" rows="3"></textarea></div>
+            <div class="form-group"><label class="form-label">After</label><textarea name="after" class="form-textarea" rows="3"></textarea></div>
+          </div>
+        </div>
+
+        <div class="cert-extra-section" data-ac-section="toefl" style="display:none">
+          <h4>TOEFL Test</h4>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Listening Comprehension</label><input type="text" name="listening_score" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Structure &amp; Written</label><input type="text" name="structure_score" class="form-input"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Reading Comprehension</label><input type="text" name="reading_score" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Total Score</label><input type="text" name="total_score" class="form-input"></div>
+          </div>
+        </div>
+
+        <div class="cert-extra-section" data-ac-section="ielts" style="display:none">
+          <h4>IELTS Test</h4>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Listening</label><input type="text" name="listening_score" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Reading</label><input type="text" name="reading_score" class="form-input"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Writing</label><input type="text" name="writing_score" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Speaking</label><input type="text" name="speaking_score" class="form-input"></div>
+          </div>
+          <div class="form-group"><label class="form-label">Total Score</label><input type="text" name="total_score" class="form-input"></div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" onclick="toggleModal('adminCertModal')">Batal</button>
+          <button type="submit" class="btn btn-primary" id="acSubmit"><i class="fas fa-award"></i> Terbitkan</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
+
+<script>
+<%
+  const acData = {};
+  certificates.forEach((c) => {
+    acData[c.id] = {
+      member_id: c.member_id, program_id: c.program_id,
+      title: c.title || '', details: c.details || {},
+    };
+  });
+%>
+window.AC_DATA = <%- JSON.stringify(acData).replace(/</g, '\\u003c') %>;
+
+// Tampilkan hanya bagian nilai yang sesuai kategori; field bagian lain dinonaktifkan
+// supaya tidak ikut terkirim (nama field sengaja sama dengan form tutor).
+function acSections() {
+  const cat = document.getElementById('acCategory').value || '';
+  const map = {
+    personal: cat.includes('Speaking') || cat.includes('Holiday'),
+    toefl: cat.includes('TOEFL'),
+    ielts: cat.includes('IELTS'),
+  };
+  Object.keys(map).forEach((name) => {
+    const sec = document.querySelector('[data-ac-section="' + name + '"]');
+    sec.style.display = map[name] ? 'block' : 'none';
+    sec.querySelectorAll('input, textarea, select').forEach((f) => { f.disabled = !map[name]; });
+  });
+}
+function acMemberChanged() {
+  const sel = document.getElementById('acMember');
+  const opt = sel.options[sel.selectedIndex];
+  document.getElementById('acEmail').value = (opt && opt.dataset.email) || '';
+}
+function acProgramChanged() {
+  const sel = document.getElementById('acProgram');
+  const opt = sel.options[sel.selectedIndex];
+  document.getElementById('acProgramLabel').value = (opt && opt.value) ? opt.textContent.trim() : '';
+}
+function acSet(name, value) {
+  const fields = Array.from(document.querySelectorAll('#adminCertForm [name="' + name + '"]'));
+  const target = fields.find((f) => !f.disabled) || fields[0];
+  if (target) target.value = (value === undefined || value === null) ? '' : value;
+}
+function newAdminCert() {
+  const form = document.getElementById('adminCertForm');
+  form.reset();
+  form.action = '/admin/certificate';
+  document.getElementById('adminCertModalTitle').textContent = 'Terbitkan Sertifikat';
+  document.getElementById('acSubmit').innerHTML = '<i class="fas fa-award"></i> Terbitkan';
+  acSections();
+  toggleModal('adminCertModal');
+}
+function editAdminCert(id) {
+  const c = window.AC_DATA[String(id)];
+  if (!c) return;
+  const d = c.details || {};
+  const form = document.getElementById('adminCertForm');
+  form.action = '/admin/certificate/' + id + '/update';
+  document.getElementById('adminCertModalTitle').textContent = 'Edit Sertifikat';
+  document.getElementById('acSubmit').innerHTML = '<i class="fas fa-save"></i> Simpan Perubahan';
+
+  document.getElementById('acCategory').value = d.category || 'Speaking & Career Class';
+  document.getElementById('acMember').value = String(c.member_id);
+  document.getElementById('acProgram').value = String(c.program_id);
+  acMemberChanged();
+  acProgramChanged();
+  if (d.member_email) document.getElementById('acEmail').value = d.member_email;
+  if (d.program_label) document.getElementById('acProgramLabel').value = d.program_label;
+  document.getElementById('acTutor').value = d.tutor_name || '';
+
+  const per = document.getElementById('acPeriod');
+  const pv = d.period_label || '';
+  if (pv && !Array.from(per.options).some((o) => o.value === pv)) {
+    const po = document.createElement('option'); po.value = pv; po.textContent = pv; per.appendChild(po);
+  }
+  per.value = pv;
+  document.getElementById('acGrade').value = d.grade || '';
+  document.getElementById('acTitle').value = c.title || 'Sertifikat Kelulusan';
+
+  acSections(); // aktifkan bagian sesuai kategori dulu, baru isi nilainya
+  const scores = d.scores || {};
+  ['speaking_score', 'pronunciation_score', 'vocabulary_score', 'grammar_score', 'understanding_score',
+   'cefr_score', 'listening_score', 'structure_score', 'reading_score', 'writing_score', 'total_score']
+    .forEach((k) => acSet(k, scores[k]));
+  const notes = d.notes || {};
+  ['speaking', 'vocabulary', 'grammar', 'pronunciation', 'understanding']
+    .forEach((k) => acSet(k + '_note', notes[k]));
+  const imp = d.improvement || {};
+  acSet('before', imp.before);
+  acSet('after', imp.after);
+
+  toggleModal('adminCertModal');
+}
+acSections();
+</script>
 
 <%- include('../partials/footer') %>
