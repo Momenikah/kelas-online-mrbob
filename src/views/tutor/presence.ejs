@@ -208,7 +208,11 @@
             <img class="class-proof-preview" id="classProofPreview" alt="preview" hidden>
           </label>
           <div class="class-proof-form-side">
-            <input type="text" name="caption" class="form-input" maxlength="255" placeholder="Keterangan (opsional), mis. Sesi Speaking 1">
+            <select name="meeting_number" class="form-input" required title="Foto ini untuk pertemuan ke berapa?">
+              <option value="">Pertemuan ke- *</option>
+              <% meetings.forEach(n => { %><option value="<%= n %>">Pertemuan <%= n %></option><% }) %>
+            </select>
+            <input type="text" name="caption" class="form-input" maxlength="255" placeholder="Keterangan (opsional), mis. Materi structure tips">
             <button type="submit" class="btn btn-primary"><i class="fas fa-upload"></i> Unggah Foto</button>
           </div>
         </form>
@@ -216,27 +220,38 @@
         <% if (classProofs.length === 0) { %>
           <div class="empty-state compact"><i class="fas fa-image"></i><p>Belum ada foto kelas untuk sesi ini.</p></div>
         <% } else { %>
-          <div class="class-proof-gallery">
-            <% classProofs.forEach(cp => { %>
-              <figure class="class-proof-item">
-                <a href="<%= cp.image %>" target="_blank" rel="noopener">
-                  <img src="<%= cp.image %>" alt="<%= cp.caption || 'Foto kelas' %>" loading="lazy">
-                </a>
-                <figcaption>
-                  <span class="cp-meta">
-                    <b><%= cp.caption || 'Foto kelas' %></b>
-                    <small>
-                      <i class="fas fa-<%= cp.uploader_role === 'member' ? 'user-graduate' : 'chalkboard-teacher' %>"></i>
-                      <%= cp.uploader_name || (cp.uploader_role === 'member' ? 'Member' : 'Tutor') %> · <%= formatDate(cp.created_at) %>
-                    </small>
-                  </span>
-                  <form action="/tutor/presence/class-proof/<%= cp.id %>/delete" method="POST" onsubmit="return confirm('Hapus foto ini?')">
-                    <button class="cp-del" title="Hapus"><i class="fas fa-trash"></i></button>
-                  </form>
-                </figcaption>
-              </figure>
-            <% }) %>
-          </div>
+          <% classProofGroups.forEach(g => { %>
+            <div class="cp-meeting-group">
+              <div class="cp-meeting-head">
+                <span class="cp-meeting-label">
+                  <i class="fas fa-<%= g.meeting ? 'hashtag' : 'folder-open' %>"></i>
+                  <%= g.meeting ? 'Pertemuan ' + g.meeting : 'Tanpa nomor pertemuan' %>
+                </span>
+                <span class="cp-meeting-count"><%= g.items.length %> foto</span>
+              </div>
+              <div class="class-proof-gallery">
+                <% g.items.forEach(cp => { %>
+                  <figure class="class-proof-item">
+                    <a href="<%= cp.image %>" target="_blank" rel="noopener">
+                      <img src="<%= cp.image %>" alt="<%= cp.caption || 'Foto kelas' %>" loading="lazy">
+                    </a>
+                    <figcaption>
+                      <span class="cp-meta">
+                        <b><%= cp.caption || 'Foto kelas' %></b>
+                        <small>
+                          <i class="fas fa-<%= cp.uploader_role === 'member' ? 'user-graduate' : 'chalkboard-teacher' %>"></i>
+                          <%= cp.uploader_name || (cp.uploader_role === 'member' ? 'Member' : 'Tutor') %> · <%= formatDate(cp.created_at) %>
+                        </small>
+                      </span>
+                      <form action="/tutor/presence/class-proof/<%= cp.id %>/delete" method="POST" onsubmit="return confirm('Hapus foto ini?')">
+                        <button class="cp-del" title="Hapus"><i class="fas fa-trash"></i></button>
+                      </form>
+                    </figcaption>
+                  </figure>
+                <% }) %>
+              </div>
+            </div>
+          <% }) %>
         <% } %>
         </div>
 

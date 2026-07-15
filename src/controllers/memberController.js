@@ -9,6 +9,7 @@ const { ensureCertificateDetailsColumn } = require('../utils/certificates');
 const { STUDY_TIME_SLOTS, PROGRAM_CATALOG } = require('../utils/catalog');
 const { ensureRenewalRequestsTable } = require('../utils/renewalRequests');
 const { getModuleMaterial } = require('../utils/moduleLinks');
+const { groupProofsByMeeting } = require('../utils/classProofs');
 const { packagesForProgram, PRICE_LIST } = require('../utils/priceList');
 const { syncRenewal } = require('../utils/spreadsheetSync');
 const { sendRenewalEmail, sendRenewalAdminEmail } = require('../utils/registrationEmail');
@@ -407,6 +408,7 @@ exports.presence = async (req, res) => {
       ...schedule,
       can_check_in: canCheckInSchedule(schedule),
       class_proofs: proofsBySchedule[schedule.id] || [],
+      class_proof_groups: groupProofsByMeeting(proofsBySchedule[schedule.id] || []),
     }));
     const presenceStats = schedules.reduce((acc, schedule) => {
       if (acc[schedule.presence_status] !== undefined) acc[schedule.presence_status] += 1;
@@ -552,12 +554,14 @@ exports.uploadClassProof = async (req, res) => {
       req.flash('error', 'Pilih gambar foto kelas terlebih dahulu.');
       return res.redirect('/member/presence');
     }
+    const meeting = Number(req.body.meeting_number) || null;
     await query(
-      `INSERT INTO class_proofs (schedule_id, uploaded_by, uploader_role, uploader_name, image, caption)
-       VALUES ($1,$2,'member',$3,$4,$5)`,
-      [scheduleId, userId, req.session.user.name, `/uploads/${req.file.filename}`, (req.body.caption || '').trim() || null]
+      `INSERT INTO class_proofs (schedule_id, uploaded_by, uploader_role, uploader_name, image, caption, meeting_number)
+       VALUES ($1,$2,'member',$3,$4,$5,$6)`,
+      [scheduleId, userId, req.session.user.name, `/uploads/${req.file.filename}`,
+       (req.body.caption || '').trim() || null, meeting]
     );
-    req.flash('success', 'Foto kelas berhasil diunggah.');
+    req.flash('success', meeting ? `Foto kelas Pertemuan ${meeting} berhasil diunggah.` : 'Foto kelas berhasil diunggah.');
     return res.redirect('/member/presence');
   } catch (err) {
     console.error(err);

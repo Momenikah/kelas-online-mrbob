@@ -6624,6 +6624,23 @@ h1, h2, h3, h4, h5, h6 { line-height: 1.3; color: var(--gray-900); font-weight: 
 }
 .btn-wa:hover { background: #1ebe5a; border-color: #1ebe5a; color: #fff; }
 
+/* Foto kelas dikelompokkan per pertemuan */
+.cp-meeting-group { margin-bottom: 14px; }
+.cp-meeting-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 6px 10px; margin-bottom: 8px;
+  background: var(--brand-50); border-left: 3px solid var(--brand-500);
+  border-radius: var(--radius-sm);
+}
+.cp-meeting-label {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 800; color: var(--brand-700);
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
+.cp-meeting-label i { font-size: 11px; }
+.cp-meeting-count { font-size: 11px; font-weight: 600; color: var(--gray-500); white-space: nowrap; }
+.cp-meeting-select { max-width: 150px; }
+
 /* Sub-banner subtitle (member/tutor schedule title) */
 .sub-banner-sub { margin: 2px 0 0; font-size: 14px; font-weight: 600; opacity: 0.92; }
 

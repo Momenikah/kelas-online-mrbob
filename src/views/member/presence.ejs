@@ -76,37 +76,50 @@
                   <span><i class="fas fa-camera-retro"></i> Foto Kelas</span>
                   <span class="sched-proofs-count"><%= (s.class_proofs || []).length %></span>
                 </summary>
-                <% if (s.class_proofs && s.class_proofs.length) { %>
-                  <div class="class-proof-gallery compact">
-                    <% s.class_proofs.forEach(cp => { %>
-                      <figure class="class-proof-item">
-                        <a href="<%= cp.image %>" target="_blank" rel="noopener">
-                          <img src="<%= cp.image %>" alt="<%= cp.caption || 'Foto kelas' %>" loading="lazy">
-                        </a>
-                        <figcaption>
-                          <span class="cp-meta">
-                            <b><%= cp.caption || 'Foto kelas' %></b>
-                            <small>
-                              <i class="fas fa-<%= cp.uploader_role === 'member' ? 'user-graduate' : 'chalkboard-teacher' %>"></i>
-                              <%= cp.uploader_name || (cp.uploader_role === 'member' ? 'Member' : 'Tutor') %>
-                            </small>
-                          </span>
-                          <% if (cp.uploaded_by == user.id) { %>
-                            <form action="/member/presence/class-proof/<%= cp.id %>/delete" method="POST" onsubmit="return confirm('Hapus foto ini?')">
-                              <button class="cp-del" title="Hapus"><i class="fas fa-trash"></i></button>
-                            </form>
-                          <% } %>
-                        </figcaption>
-                      </figure>
-                    <% }) %>
+                <% (s.class_proof_groups || []).forEach(g => { %>
+                  <div class="cp-meeting-group">
+                    <div class="cp-meeting-head">
+                      <span class="cp-meeting-label">
+                        <i class="fas fa-<%= g.meeting ? 'hashtag' : 'folder-open' %>"></i>
+                        <%= g.meeting ? 'Pertemuan ' + g.meeting : 'Tanpa nomor pertemuan' %>
+                      </span>
+                      <span class="cp-meeting-count"><%= g.items.length %> foto</span>
+                    </div>
+                    <div class="class-proof-gallery compact">
+                      <% g.items.forEach(cp => { %>
+                        <figure class="class-proof-item">
+                          <a href="<%= cp.image %>" target="_blank" rel="noopener">
+                            <img src="<%= cp.image %>" alt="<%= cp.caption || 'Foto kelas' %>" loading="lazy">
+                          </a>
+                          <figcaption>
+                            <span class="cp-meta">
+                              <b><%= cp.caption || 'Foto kelas' %></b>
+                              <small>
+                                <i class="fas fa-<%= cp.uploader_role === 'member' ? 'user-graduate' : 'chalkboard-teacher' %>"></i>
+                                <%= cp.uploader_name || (cp.uploader_role === 'member' ? 'Member' : 'Tutor') %>
+                              </small>
+                            </span>
+                            <% if (cp.uploaded_by == user.id) { %>
+                              <form action="/member/presence/class-proof/<%= cp.id %>/delete" method="POST" onsubmit="return confirm('Hapus foto ini?')">
+                                <button class="cp-del" title="Hapus"><i class="fas fa-trash"></i></button>
+                              </form>
+                            <% } %>
+                          </figcaption>
+                        </figure>
+                      <% }) %>
+                    </div>
                   </div>
-                <% } %>
+                <% }) %>
                 <form action="/member/presence/<%= s.id %>/class-proof" method="POST" enctype="multipart/form-data" class="sched-proof-form">
                   <label class="sched-proof-file">
                     <i class="fas fa-cloud-arrow-up"></i> <span>Pilih gambar</span>
                     <input type="file" name="class_photo" accept="image/*" required onchange="this.closest('form').querySelector('.sched-proof-name').textContent = (this.files[0] ? this.files[0].name : '');">
                   </label>
                   <span class="sched-proof-name"></span>
+                  <select name="meeting_number" class="form-input cp-meeting-select" required title="Foto ini untuk pertemuan ke berapa?">
+                    <option value="">Pertemuan ke-</option>
+                    <% meetings.forEach(n => { %><option value="<%= n %>">Pertemuan <%= n %></option><% }) %>
+                  </select>
                   <input type="text" name="caption" class="form-input" maxlength="255" placeholder="Keterangan (opsional)">
                   <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-upload"></i> Unggah</button>
                 </form>

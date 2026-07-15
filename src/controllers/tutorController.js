@@ -8,6 +8,7 @@ const { syncTutorAvailableTime, syncCertificate } = require('../utils/spreadshee
 const { sendScheduleNotificationEmails } = require('../utils/scheduleEmail');
 const { emptyReportDays, normalizeReportDays, ensureMemberReportsTable } = require('../utils/memberReports');
 const { ensureCertificateDetailsColumn, normalizeCertificateDetails } = require('../utils/certificates');
+const { groupProofsByMeeting } = require('../utils/classProofs');
 const { SUPPORT_EMAIL, sendSupportFeedback } = require('../utils/supportEmail');
 const { saveSupportFeedback, updateSupportFeedbackEmailStatus } = require('../utils/supportFeedback');
 const {
@@ -611,6 +612,7 @@ exports.presence = async (req, res) => {
     let members = [];
     let selectedSchedule = null;
     let classProofs = [];
+    let classProofGroups = [];
     if (selectedId) {
       selectedSchedule = schedResult.rows.find(s => s.id == selectedId);
       const [mResult, proofResult] = await Promise.all([
@@ -631,6 +633,7 @@ exports.presence = async (req, res) => {
       ]);
       members = mResult.rows;
       classProofs = proofResult.rows;
+      classProofGroups = groupProofsByMeeting(proofResult.rows);
     }
     const submissions = submissionsResult.rows.map((s) => ({
       ...s,
@@ -659,6 +662,7 @@ exports.presence = async (req, res) => {
       periods,
       meetings,
       classProofs,
+      classProofGroups,
       error: req.flash('error'),
       success: req.flash('success'),
     });
@@ -765,12 +769,14 @@ exports.uploadClassProof = async (req, res) => {
       req.flash('error', 'Pilih gambar foto kelas terlebih dahulu.');
       return res.redirect(back);
     }
+    const meeting = Number(req.body.meeting_number) || null;
     await query(
-      `INSERT INTO class_proofs (schedule_id, uploaded_by, uploader_role, uploader_name, image, caption)
-       VALUES ($1,$2,'tutor',$3,$4,$5)`,
-      [schedule_id, req.session.user.id, req.session.user.name, `/uploads/${req.file.filename}`, (req.body.caption || '').trim() || null]
+      `INSERT INTO class_proofs (schedule_id, uploaded_by, uploader_role, uploader_name, image, caption, meeting_number)
+       VALUES ($1,$2,'tutor',$3,$4,$5,$6)`,
+      [schedule_id, req.session.user.id, req.session.user.name, `/uploads/${req.file.filename}`,
+       (req.body.caption || '').trim() || null, meeting]
     );
-    req.flash('success', 'Foto kelas berhasil diunggah.');
+    req.flash('success', meeting ? `Foto kelas Pertemuan ${meeting} berhasil diunggah.` : 'Foto kelas berhasil diunggah.');
     res.redirect(back);
   } catch (err) {
     console.error(err);
