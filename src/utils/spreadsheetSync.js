@@ -14,6 +14,23 @@ const at = require('./availableTime');
 
 const appBaseUrl = () => (process.env.APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
 
+// Kolom `timestamp` di sheet memakai waktu lokal Indonesia (WIB), bukan ISO/UTC.
+// Format "DD/MM/YYYY HH:mm:ss" — sesuai locale Indonesia dan tetap dikenali
+// Google Sheets sebagai tanggal-waktu. hourCycle h23 supaya 00:xx bukan 24:xx.
+const TS_FMT = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Jakarta',
+  day: '2-digit', month: '2-digit', year: 'numeric',
+  hour: '2-digit', minute: '2-digit', second: '2-digit',
+  hourCycle: 'h23',
+});
+function nowWIB(date = new Date()) {
+  const p = TS_FMT.formatToParts(date).reduce((acc, part) => {
+    acc[part.type] = part.value;
+    return acc;
+  }, {});
+  return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}:${p.second}`;
+}
+
 // Low-level POST with a timeout so a slow webhook never blocks for long.
 async function postToWebhook(url, payload) {
   const controller = new AbortController();
@@ -39,7 +56,7 @@ async function postToWebhook(url, payload) {
 function buildPayload(event, registration, extra = {}) {
   return {
     event, // 'pendaftaran' | 'konfirmasi'
-    timestamp: new Date().toISOString(),
+    timestamp: nowWIB(),
     registration_code: registration.registration_code || '',
     name: registration.name || '',
     email: registration.email || '',
@@ -113,7 +130,7 @@ async function buildAvailableTimePayload(tutorId) {
 
   return {
     event: 'available_time',
-    timestamp: new Date().toISOString(),
+    timestamp: nowWIB(),
     tutor_id: tutorId,
     tutor_name: tutor.name || '',
     tutor_email: tutor.email || '',
@@ -161,7 +178,7 @@ async function buildSchedulePayload(scheduleId) {
   if (!s) return null;
   return {
     event: 'jadwal',
-    timestamp: new Date().toISOString(),
+    timestamp: nowWIB(),
     schedule_id: s.id,
     date: dateOnly(s.date),
     start_time: String(s.start_time || '').slice(0, 5),
@@ -210,7 +227,7 @@ async function buildCertificatePayload(certificateId) {
 
   return {
     event: 'sertifikat',
-    timestamp: new Date().toISOString(),
+    timestamp: nowWIB(),
     certificate_id: c.id,
     certificate_number: c.certificate_number || '',
     issued_date: dateOnly(c.issued_date),
@@ -268,7 +285,7 @@ async function buildRenewalPayload(renewalId) {
   if (!r) return null;
   return {
     event: 'renewal',
-    timestamp: new Date().toISOString(),
+    timestamp: nowWIB(),
     renewal_id: r.id,
     request_type: r.request_type || 'renewal',
     member_name: r.member_name || '',
