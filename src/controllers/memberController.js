@@ -456,7 +456,34 @@ exports.submitPresence = async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6)`,
       [userId, tutorId, periodStart, programId, meeting, screenshot]
     );
-    req.flash('success', 'Presensi berhasil dikirim. Terima kasih!');
+
+    // Kaitkan presensi mandiri ke jadwal aslinya supaya TERHITUNG HADIR.
+    // Tanpa ini, member yang sudah mengisi presensi tetap berstatus 'absent'
+    // (check-in hanya terbuka di sekitar jam kelas). Dipilih satu sesi: yang
+    // tutornya cocok lebih dulu, lalu sesi terawal di periode yang belum hadir.
+    const marked = await query(
+      `INSERT INTO presences (schedule_id, member_id, status, check_in_time, updated_by, updated_at, source)
+       SELECT s.id, $1, 'present', NOW(), $1, NOW(), 'self-report'
+       FROM schedules s
+       JOIN schedule_members sm ON sm.schedule_id = s.id AND sm.member_id = $1
+       LEFT JOIN presences pr ON pr.schedule_id = s.id AND pr.member_id = $1
+       WHERE s.program_id = $2
+         AND date_trunc('week', s.date)::date = $3::date
+         AND s.status <> 'cancelled'
+         AND (pr.status IS NULL OR pr.status NOT IN ('present', 'late'))
+       ORDER BY (s.tutor_id = $4) DESC, s.date, s.start_time
+       LIMIT 1
+       ON CONFLICT (schedule_id, member_id)
+       DO UPDATE SET status = 'present',
+                     check_in_time = COALESCE(presences.check_in_time, NOW()),
+                     updated_by = EXCLUDED.updated_by, updated_at = NOW(), source = 'self-report'
+       RETURNING schedule_id`,
+      [userId, programId, periodStart, tutorId]
+    );
+
+    req.flash('success', marked.rows.length
+      ? 'Presensi berhasil dikirim. Kamu tercatat HADIR untuk sesi ini.'
+      : 'Presensi berhasil dikirim, tetapi jadwal yang cocok tidak ditemukan (atau sudah tercatat hadir). Hubungi tutor bila status kehadiranmu belum berubah.');
     res.redirect('/member/presence');
   } catch (err) {
     console.error(err);
