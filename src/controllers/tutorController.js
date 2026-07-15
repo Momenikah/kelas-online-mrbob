@@ -1390,6 +1390,17 @@ exports.exportReportCsv = async (req, res) => {
   }
 };
 
+// Wewenang tutor atas sebuah sertifikat: membernya benar-benar dia ajar DI PROGRAM
+// sertifikat itu (punya jadwal bersama). Dipakai konsisten oleh daftar, statistik,
+// preview, edit, dan hapus — supaya tutor tidak menyentuh sertifikat murid orang lain.
+const tutorCertScope = (alias, tutorParam) => `EXISTS (
+  SELECT 1 FROM schedule_members sm
+  JOIN schedules s ON s.id = sm.schedule_id
+  WHERE sm.member_id = ${alias}.member_id
+    AND s.program_id = ${alias}.program_id
+    AND s.tutor_id = ${tutorParam}
+)`;
+
 exports.certificate = async (req, res) => {
   try {
     const tutorId = req.session.user.id;
@@ -1405,8 +1416,8 @@ exports.certificate = async (req, res) => {
     const [certsResult, membersResult, periodsResult, countResult] = await Promise.all([
       query(`SELECT c.*, u.name as member_name, p.name as program_name
              FROM certificates c JOIN users u ON c.member_id = u.id JOIN programs p ON c.program_id = p.id
-             JOIN schedules s ON s.program_id = p.id WHERE s.tutor_id = $1${searchFilter}
-             GROUP BY c.id, u.name, p.name ORDER BY c.issued_date DESC`, params),
+             WHERE ${tutorCertScope('c', '$1')}${searchFilter}
+             ORDER BY c.issued_date DESC`, params),
       // Hanya member yang BENAR-BENAR diajar tutor ini (punya jadwal bersama tutor),
       // bukan semua member yang kebetulan terdaftar di program yang sama.
       query(`SELECT DISTINCT u.id, u.name, u.email, p.id as program_id, p.name as program_name,
@@ -1421,9 +1432,8 @@ exports.certificate = async (req, res) => {
              WHERE s.tutor_id = $1 AND u.role = 'member'
              ORDER BY u.name`, [tutorId]),
       query('SELECT period_start, label FROM periods ORDER BY period_start DESC'),
-      query(`SELECT COUNT(DISTINCT c.id) AS total
-             FROM certificates c JOIN programs p ON c.program_id = p.id
-             JOIN schedules s ON s.program_id = p.id WHERE s.tutor_id = $1`, [tutorId]),
+      query(`SELECT COUNT(*) AS total FROM certificates c
+             WHERE ${tutorCertScope('c', '$1')}`, [tutorId]),
     ]);
     res.render('tutor/certificate', {
       title: 'Kelola Sertifikat',
@@ -1448,9 +1458,9 @@ exports.certificate = async (req, res) => {
 exports.deleteCertificate = async (req, res) => {
   try {
     const result = await query(
-      `DELETE FROM certificates
-       WHERE id = $1 AND program_id IN (SELECT DISTINCT program_id FROM schedules WHERE tutor_id = $2)
-       RETURNING certificate_number`,
+      `DELETE FROM certificates c
+       WHERE c.id = $1 AND ${tutorCertScope('c', '$2')}
+       RETURNING c.certificate_number`,
       [req.params.id, req.session.user.id]
     );
     if (!result.rows.length) req.flash('error', 'Sertifikat tidak ditemukan atau di luar wewenang Anda.');
@@ -1500,9 +1510,9 @@ exports.updateCertificate = async (req, res) => {
     const details = normalizeCertificateDetails(req.body);
     const title = String(req.body.title || '').trim() || 'Sertifikat Kelulusan';
     const updated = await query(
-      `UPDATE certificates SET title = $1, details = $2
-       WHERE id = $3 AND program_id IN (SELECT DISTINCT program_id FROM schedules WHERE tutor_id = $4)
-       RETURNING id`,
+      `UPDATE certificates c SET title = $1, details = $2
+       WHERE c.id = $3 AND ${tutorCertScope('c', '$4')}
+       RETURNING c.id`,
       [title, JSON.stringify(details), req.params.id, req.session.user.id]
     );
     if (!updated.rows.length) {
@@ -1528,8 +1538,7 @@ exports.certificatePrint = async (req, res) => {
       FROM certificates c
       JOIN users u ON c.member_id = u.id
       JOIN programs p ON c.program_id = p.id
-      WHERE c.id = $1
-        AND c.program_id IN (SELECT DISTINCT program_id FROM schedules WHERE tutor_id = $2)
+      WHERE c.id = $1 AND ${tutorCertScope('c', '$2')}
     `, [req.params.id, req.session.user.id]);
     const cert = result.rows[0];
     if (!cert) {
