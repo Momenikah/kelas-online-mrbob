@@ -1189,13 +1189,13 @@ const getTutorReportOptions = async (tutorId) => {
       WHERE s.tutor_id = $1
       ORDER BY u.name
     `, [tutorId]),
+    // Full list of active programs (not just the tutor's own schedules), deduped by name.
     query(`
-      SELECT DISTINCT p.id, p.name
-      FROM schedules s
-      JOIN programs p ON p.id = s.program_id
-      WHERE s.tutor_id = $1
-      ORDER BY p.name
-    `, [tutorId]),
+      SELECT DISTINCT ON (p.name) p.id, p.name
+      FROM programs p
+      WHERE p.is_active = true
+      ORDER BY p.name, p.id
+    `),
     query('SELECT period_start, label FROM periods ORDER BY period_start DESC'),
   ]);
   return {
