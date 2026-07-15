@@ -1407,14 +1407,19 @@ exports.certificate = async (req, res) => {
              FROM certificates c JOIN users u ON c.member_id = u.id JOIN programs p ON c.program_id = p.id
              JOIN schedules s ON s.program_id = p.id WHERE s.tutor_id = $1${searchFilter}
              GROUP BY c.id, u.name, p.name ORDER BY c.issued_date DESC`, params),
+      // Hanya member yang BENAR-BENAR diajar tutor ini (punya jadwal bersama tutor),
+      // bukan semua member yang kebetulan terdaftar di program yang sama.
       query(`SELECT DISTINCT u.id, u.name, u.email, p.id as program_id, p.name as program_name,
                     (SELECT COUNT(*)::int FROM presences pr
                      JOIN schedules s2 ON s2.id = pr.schedule_id
                      WHERE pr.member_id = u.id AND s2.program_id = p.id
                        AND pr.status IN ('present', 'late')) AS attended
-             FROM enrollments e JOIN users u ON e.member_id = u.id
-             JOIN programs p ON e.program_id = p.id
-             JOIN schedules s ON s.program_id = p.id WHERE s.tutor_id = $1 AND e.status = 'active'`, [tutorId]),
+             FROM schedule_members sm
+             JOIN schedules s ON s.id = sm.schedule_id
+             JOIN users u ON u.id = sm.member_id
+             JOIN programs p ON p.id = s.program_id
+             WHERE s.tutor_id = $1 AND u.role = 'member'
+             ORDER BY u.name`, [tutorId]),
       query('SELECT period_start, label FROM periods ORDER BY period_start DESC'),
       query(`SELECT COUNT(DISTINCT c.id) AS total
              FROM certificates c JOIN programs p ON c.program_id = p.id
