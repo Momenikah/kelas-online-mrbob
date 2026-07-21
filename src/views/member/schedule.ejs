@@ -95,6 +95,11 @@
                 <% } else { %>
                   <span class="jt-badge jt-badge-next">Akan Datang</span>
                 <% } %>
+                <% if (s.request) { %>
+                  <span class="jt-request" title="Permintaan khusus: <%= s.request %>">
+                    <i class="fas fa-comment-dots"></i> <%= s.request %>
+                  </span>
+                <% } %>
               </td>
               <td data-label="Kategori"><%= s.kategori %></td>
               <td data-label="Paket"><%= s.paket %></td>

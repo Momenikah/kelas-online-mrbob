@@ -277,6 +277,7 @@ exports.schedule = async (req, res) => {
               kategori: s.kategori || ri.kategori || '-',
               paket: s.paket || ri.paket || '-',
               durasi: s.durasi || ri.durasi || '-',
+              request: s.request || '',
               status: s.status, presence_status: s.presence_status,
             };
           }),

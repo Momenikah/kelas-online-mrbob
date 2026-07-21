@@ -160,6 +160,7 @@ exports.schedule = async (req, res) => {
           program_name: s.program_name, location: s.location || '',
           meeting_link: s.meeting_link || '', status: s.status,
           kategori: s.kategori || '', paket: s.paket || '', durasi: s.durasi || '',
+          request: s.request || '',
           presence_status: m ? m.presence_status : null,
         });
       });

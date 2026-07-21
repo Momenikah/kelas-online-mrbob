@@ -13,6 +13,7 @@
 //   PAKET      -> dipakai untuk judul jadwal (opsional)
 //   PERIODE    -> tanggal, mis. "13 Juli 2026" atau "2026-07-13"
 //   JAM BELAJAR-> rentang, mis. "16.00 WIB - 17.00 WIB"
+//   REQUEST    -> permintaan khusus member (opsional) -> schedules.request
 //   ZOOM ROOM  -> lokasi/ruang (opsional) -> schedules.location
 //   LINK ZOOM  -> URL meeting (opsional)  -> schedules.meeting_link
 //   TUTOR      -> sel bebas, mis. "Sist Nani - 13 Ju..."; app mencari tutor yang
@@ -33,6 +34,9 @@ async function ensureScheduleSyncSchema(q = query) {
   await q(`ALTER TABLE schedules ADD COLUMN IF NOT EXISTS kategori VARCHAR(80)`);
   await q(`ALTER TABLE schedules ADD COLUMN IF NOT EXISTS paket VARCHAR(120)`);
   await q(`ALTER TABLE schedules ADD COLUMN IF NOT EXISTS durasi VARCHAR(60)`);
+  // Catatan permintaan khusus dari member (kolom REQUEST di sheet), mis.
+  // "DAY1 07.00-08.00" atau "CEWE SENIN, RABU" — teks bebas, kadang panjang.
+  await q(`ALTER TABLE schedules ADD COLUMN IF NOT EXISTS request TEXT`);
   await q(`CREATE UNIQUE INDEX IF NOT EXISTS ux_schedules_external
            ON schedules(external_id) WHERE external_id IS NOT NULL`);
   await q(`
@@ -194,6 +198,7 @@ async function syncSchedulesFromSheet({ triggeredBy = 'manual' } = {}) {
       const periode = String(row.periode || '').trim();
       const jam = String(row.jam_belajar || '').trim();
       const tutorRaw = String(row.tutor || '').trim();
+      const request = String(row.request || row.permintaan || '').trim();
       // ZOOM ROOM -> location; LINK ZOOM -> meeting_link (nama header fleksibel).
       const zoomRoom = String(row.zoom_room || row.room_zoom || '').trim();
       const linkZoom = String(row.link_zoom || row.zoom_link || '').trim();
@@ -239,22 +244,22 @@ async function syncSchedulesFromSheet({ triggeredBy = 'manual' } = {}) {
           `UPDATE schedules SET
              tutor_id=$1, program_id=$2, title=$3, description=$4, date=$5,
              start_time=$6, end_time=$7, location=$8, meeting_link=$9,
-             kategori=$11, paket=$12, durasi=$13
+             kategori=$11, paket=$12, durasi=$13, request=$14
              ${reactivate ? ", status='upcoming'" : ''}
            WHERE id=$10`,
           [tutorId, programId, title, notes, date, start, end, location, meetingLink, scheduleId,
-           kategori || null, paket || null, durasi || null]
+           kategori || null, paket || null, durasi || null, request || null]
         );
         summary.updated += 1;
       } else {
         const ins = await client.query(
           `INSERT INTO schedules
              (tutor_id, program_id, title, description, date, start_time, end_time,
-              location, meeting_link, status, source, external_id, kategori, paket, durasi)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'upcoming','sheet',$10,$11,$12,$13)
+              location, meeting_link, status, source, external_id, kategori, paket, durasi, request)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'upcoming','sheet',$10,$11,$12,$13,$14)
            RETURNING id`,
           [tutorId, programId, title, notes, date, start, end, location, meetingLink, id,
-           kategori || null, paket || null, durasi || null]
+           kategori || null, paket || null, durasi || null, request || null]
         );
         scheduleId = ins.rows[0].id;
         summary.added += 1;

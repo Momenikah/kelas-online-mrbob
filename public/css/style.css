@@ -6624,6 +6624,16 @@ h1, h2, h3, h4, h5, h6 { line-height: 1.3; color: var(--gray-900); font-weight: 
 }
 .btn-wa:hover { background: #1ebe5a; border-color: #1ebe5a; color: #fff; }
 
+/* Kolom REQUEST dari sheet — permintaan khusus member, tampil di bawah nama */
+.jt-request {
+  display: block; margin-top: 5px; max-width: 240px;
+  padding: 3px 8px;
+  background: #FFFBEB; border: 1px solid #FDE68A; border-radius: var(--radius-sm);
+  color: #92400E; font-size: 11px; font-weight: 600; line-height: 1.45;
+  white-space: normal; word-break: break-word;
+}
+.jt-request i { margin-right: 4px; opacity: 0.75; }
+
 /* Foto kelas dikelompokkan per pertemuan */
 .cp-meeting-group { margin-bottom: 14px; }
 .cp-meeting-head {
