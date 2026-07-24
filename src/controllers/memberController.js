@@ -10,6 +10,7 @@ const { STUDY_TIME_SLOTS, PROGRAM_CATALOG } = require('../utils/catalog');
 const { ensureRenewalRequestsTable } = require('../utils/renewalRequests');
 const { getModuleMaterial } = require('../utils/moduleLinks');
 const { groupProofsByMeeting } = require('../utils/classProofs');
+const { isSemiPrivateStart } = require('../utils/semiPrivate');
 const { packagesForProgram, PRICE_LIST } = require('../utils/priceList');
 const { syncRenewal } = require('../utils/spreadsheetSync');
 const { sendRenewalEmail, sendRenewalAdminEmail } = require('../utils/registrationEmail');
@@ -1129,6 +1130,12 @@ exports.submitRenewal = async (req, res) => {
     if (!programId || !preferredStartDate || !studyTime || !phone) {
       removeUploadedFile(req.file);
       req.flash('error', 'Lengkapi program, tanggal mulai, jam belajar, dan WhatsApp.');
+      return res.redirect('/member/renewal#renewal-form');
+    }
+    // Kelas Semi Private hanya dibuka 2 minggu sekali.
+    if (/semi/i.test(postedPackageName) && !isSemiPrivateStart(preferredStartDate)) {
+      removeUploadedFile(req.file);
+      req.flash('error', 'Kelas Semi Private dibuka 2 minggu sekali. Pilih periode yang tersedia.');
       return res.redirect('/member/renewal#renewal-form');
     }
 

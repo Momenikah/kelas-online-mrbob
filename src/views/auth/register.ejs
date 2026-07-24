@@ -196,19 +196,22 @@
               <label>Pilih Mulai Belajar <span>*</span></label>
               <select name="start_date" id="startDate">
                 <option value="">Pilih tanggal</option>
-                <option>01 Juni 2026</option>
-                <option>08 Juni 2026</option>
-                <option>15 Juni 2026</option>
-                <option>22 Juni 2026</option>
-                <option>29 Juni 2026</option>
-                <option>06 Juli 2026</option>
-                <option>13 Juli 2026</option>
-                <option>20 Juli 2026</option>
-                <option>27 Juli 2026</option>
-                <option>03 Agustus 2026</option>
-                <option>10 Agustus 2026</option>
-                <option>17 Agustus 2026</option>
+                <%
+                  // data-semi menandai periode buka kelas Semi Private (2 minggu sekali).
+                  const startDateOptions = [
+                    ['2026-06-01', '01 Juni 2026'], ['2026-06-08', '08 Juni 2026'],
+                    ['2026-06-15', '15 Juni 2026'], ['2026-06-22', '22 Juni 2026'],
+                    ['2026-06-29', '29 Juni 2026'], ['2026-07-06', '06 Juli 2026'],
+                    ['2026-07-13', '13 Juli 2026'], ['2026-07-20', '20 Juli 2026'],
+                    ['2026-07-27', '27 Juli 2026'], ['2026-08-03', '03 Agustus 2026'],
+                    ['2026-08-10', '10 Agustus 2026'], ['2026-08-17', '17 Agustus 2026'],
+                  ];
+                %>
+                <% startDateOptions.forEach(function ([iso, label]) { %>
+                  <option data-semi="<%= isSemiPrivateStart(iso) ? '1' : '0' %>"><%= label %></option>
+                <% }) %>
               </select>
+              <small class="signup-hint" id="startDateHint" hidden>Kelas Semi Private dibuka 2 minggu sekali.</small>
             </div>
           </div>
 
@@ -515,6 +518,22 @@ function renderStudyTimes(group, pkg) {
   if (times.indexOf(prev) !== -1) studyTime.value = prev;
 }
 
+// Semi Private dibuka 2 minggu sekali — sisakan hanya tanggal berjadwal semi private.
+function renderStartDates(group) {
+  const semiOnly = group === 'Semi Private';
+  Array.prototype.forEach.call(startDate.options, (o) => {
+    if (!o.textContent.trim() || !o.dataset.semi) return;
+    const hide = semiOnly && o.dataset.semi !== '1';
+    o.hidden = hide;
+    o.disabled = hide;
+  });
+  // Tanggal yang sudah dipilih bisa jadi tidak berlaku setelah ganti paket.
+  const cur = startDate.selectedOptions[0];
+  if (cur && cur.disabled) startDate.value = '';
+  const hint = document.getElementById('startDateHint');
+  if (hint) hint.hidden = !semiOnly;
+}
+
 function friendRows() {
   return friendList.querySelectorAll('.friend-row');
 }
@@ -592,6 +611,7 @@ function updatePayment() {
     packagePrice.value = '';
     packageNote.value = '';
     renderStudyTimes();
+    renderStartDates(null); // belum pilih paket -> semua tanggal tersedia lagi
     updateFriendRequirement({ note: '' });
     updateLuxuryTutorRequirement(null);
     paymentSummary.innerHTML = '<div class="summary-empty">Pilih program dan paket untuk melihat estimasi biaya.</div>';
@@ -606,6 +626,7 @@ function updatePayment() {
   packagePrice.value = selectedPackage.price;
   packageNote.value = selectedPackage.note || '';
   renderStudyTimes(selectedGroup, selectedPackage);
+  renderStartDates(selectedGroup);
   updateFriendRequirement(selectedPackage);
   updateLuxuryTutorRequirement(selectedPackage);
 

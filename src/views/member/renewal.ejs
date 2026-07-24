@@ -74,13 +74,13 @@
             </div>
             <div class="form-group">
               <label class="form-label">Mulai Belajar (Periode) <span class="required">*</span></label>
-              <select name="preferred_start_date" class="form-input" required>
+              <select name="preferred_start_date" id="rStartDate" class="form-input" required>
                 <option value="">-- Pilih Periode --</option>
                 <% periods.forEach(pr => { %>
-                  <option value="<%= pr.value %>"><%= pr.label %></option>
+                  <option value="<%= pr.value %>" data-semi="<%= isSemiPrivateStart(pr.value) ? '1' : '0' %>"><%= pr.label %></option>
                 <% }) %>
               </select>
-              <small class="field-hint">Sesuai periode pendaftaran yang tersedia.</small>
+              <small class="field-hint" id="rStartDateHint">Sesuai periode pendaftaran yang tersedia.</small>
             </div>
           </div>
 
@@ -282,6 +282,28 @@ function renderStudyTimes(group, pkg) {
   if (times.indexOf(prev) !== -1) rStudyTime.value = prev;
 }
 
+// Semi Private dibuka 2 minggu sekali — sisakan hanya periode berjadwal semi private.
+function renderStartDates(group) {
+  const semiOnly = group === 'Semi Private';
+  const sel = document.getElementById('rStartDate');
+  if (!sel) return;
+  Array.prototype.forEach.call(sel.options, (o) => {
+    if (!o.value) return;
+    const hide = semiOnly && o.dataset.semi !== '1';
+    o.hidden = hide;
+    o.disabled = hide;
+  });
+  // Pilihan lama bisa jadi tidak berlaku setelah ganti paket.
+  const cur = sel.selectedOptions[0];
+  if (cur && cur.disabled) sel.value = '';
+  const hint = document.getElementById('rStartDateHint');
+  if (hint) {
+    hint.textContent = semiOnly
+      ? 'Kelas Semi Private dibuka 2 minggu sekali.'
+      : 'Sesuai periode pendaftaran yang tersedia.';
+  }
+}
+
 function updateSummary() {
   const cls = getClassName();
   const pkg = getSelectedPackage();
@@ -298,6 +320,7 @@ function updateSummary() {
     rpsDiscount.textContent = '- ' + rupiah(RENEWAL_DISCOUNT);
     rpsTotal.textContent = '-';
     if (rPackageNote) rPackageNote.hidden = true;
+    renderStartDates(null); // belum pilih paket -> semua periode tersedia lagi
     return;
   }
 
@@ -308,6 +331,7 @@ function updateSummary() {
   rPackageName.value = pkg.name;
   rPackagePrice.value = pkg.price;
   renderStudyTimes(group, pkg);
+  renderStartDates(group);
 
   const base = Number(pkg.price) || 0;
   const total = Math.max(0, base - RENEWAL_DISCOUNT);

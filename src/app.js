@@ -73,6 +73,8 @@ app.locals.getInitials = (name) => {
   if (!name) return '?';
   return name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
 };
+// Kelas Semi Private dibuka 2 minggu sekali — dipakai form pendaftaran & renewal.
+app.locals.isSemiPrivateStart = require('./utils/semiPrivate').isSemiPrivateStart;
 
 // Routes
 app.get('/', (req, res) => {

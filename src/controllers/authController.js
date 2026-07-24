@@ -10,6 +10,7 @@ const {
 } = require('../utils/registrationEmail');
 const { syncRegistration, syncConfirmation } = require('../utils/spreadsheetSync');
 const { STUDY_TIME_SLOTS, PROGRAM_CATALOG } = require('../utils/catalog');
+const { isSemiPrivateStartLabel } = require('../utils/semiPrivate');
 const { PRICE_LIST, packagesForProgram, groupSizeBounds } = require('../utils/priceList');
 const { ensureUserAccessColumns, isLuxuryPackage, getAccessFromRegistration } = require('../utils/userAccess');
 
@@ -192,6 +193,11 @@ exports.register = async (req, res) => {
         preferredTutorId = selectedTutor.id;
         preferredTutorName = selectedTutor.name;
       }
+    }
+    // Kelas Semi Private hanya dibuka 2 minggu sekali.
+    if (/semi/i.test(package_name || '') && !isSemiPrivateStartLabel(start_date)) {
+      req.flash('error', 'Kelas Semi Private dibuka 2 minggu sekali. Pilih tanggal mulai yang tersedia.');
+      return res.redirect('/register');
     }
     const activeUser = await query('SELECT id FROM users WHERE email = $1 AND is_active = true', [email]);
     if (activeUser.rows.length > 0) {
