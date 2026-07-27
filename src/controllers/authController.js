@@ -12,6 +12,7 @@ const { syncRegistration, syncConfirmation } = require('../utils/spreadsheetSync
 const { STUDY_TIME_SLOTS, PROGRAM_CATALOG } = require('../utils/catalog');
 const { isSemiPrivateStartLabel } = require('../utils/semiPrivate');
 const metaPixel = require('../utils/metaPixel');
+const at = require('../utils/availableTime');
 const { PRICE_LIST, packagesForProgram, groupSizeBounds } = require('../utils/priceList');
 const { ensureUserAccessColumns, isLuxuryPackage, getAccessFromRegistration } = require('../utils/userAccess');
 
@@ -135,6 +136,7 @@ exports.showRegister = async (req, res) => {
       programCatalog: PROGRAM_CATALOG,
       priceList: PRICE_LIST,
       gradeATutors: tutors.rows,
+      startDateOptions: at.upcomingMondays(),
     });
   } catch (err) {
     console.error(err);
@@ -145,6 +147,7 @@ exports.showRegister = async (req, res) => {
       programCatalog: PROGRAM_CATALOG,
       priceList: PRICE_LIST,
       gradeATutors: [],
+      startDateOptions: at.upcomingMondays(),
     });
   }
 };

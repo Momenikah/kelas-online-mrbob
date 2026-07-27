@@ -186,6 +186,23 @@ function formatPeriodLabelEN(isoDate) {
   return `${MONTHS_EN[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
+// Daftar Senin mulai dari minggu berjalan hingga `months` bulan ke depan —
+// dipakai form pendaftaran agar pilihan tanggal selalu bergulir otomatis (tiap
+// Senin, tiap bulan) tanpa perlu di-hardcode. Hasil: [{ value:ISO, label:'DD MMMM YYYY' }].
+function upcomingMondays(months = 6, today = new Date()) {
+  const start = new Date(currentPeriodValue(today)); // Senin minggu ini
+  const limit = new Date(start);
+  limit.setMonth(limit.getMonth() + months);
+  const out = [];
+  const cursor = new Date(start);
+  while (cursor <= limit) {
+    const iso = toISODate(cursor);
+    out.push({ value: iso, label: formatPeriodLabel(iso) });
+    cursor.setDate(cursor.getDate() + 7);
+  }
+  return out;
+}
+
 module.exports = {
   MONTHS_ID,
   DAY_NAMES_ID,
@@ -204,4 +221,5 @@ module.exports = {
   formatPeriodLabelEN,
   toISODate,
   mondayOf,
+  upcomingMondays,
 };

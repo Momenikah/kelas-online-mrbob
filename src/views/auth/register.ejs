@@ -197,18 +197,12 @@
               <select name="start_date" id="startDate">
                 <option value="">Pilih tanggal</option>
                 <%
-                  // data-semi menandai periode buka kelas Semi Private (2 minggu sekali).
-                  const startDateOptions = [
-                    ['2026-06-01', '01 Juni 2026'], ['2026-06-08', '08 Juni 2026'],
-                    ['2026-06-15', '15 Juni 2026'], ['2026-06-22', '22 Juni 2026'],
-                    ['2026-06-29', '29 Juni 2026'], ['2026-07-06', '06 Juli 2026'],
-                    ['2026-07-13', '13 Juli 2026'], ['2026-07-20', '20 Juli 2026'],
-                    ['2026-07-27', '27 Juli 2026'], ['2026-08-03', '03 Agustus 2026'],
-                    ['2026-08-10', '10 Agustus 2026'], ['2026-08-17', '17 Agustus 2026'],
-                  ];
+                  // Tanggal mulai = setiap Senin (dibuat otomatis di controller, selalu
+                  // bergulir). data-semi menandai Senin yang membuka kelas Semi Private
+                  // (2 minggu sekali). Nilai dikirim sebagai label "DD MMMM YYYY".
                 %>
-                <% startDateOptions.forEach(function ([iso, label]) { %>
-                  <option data-semi="<%= isSemiPrivateStart(iso) ? '1' : '0' %>"><%= label %></option>
+                <% (startDateOptions || []).forEach(function (opt) { %>
+                  <option data-semi="<%= isSemiPrivateStart(opt.value) ? '1' : '0' %>"><%= opt.label %></option>
                 <% }) %>
               </select>
               <small class="signup-hint" id="startDateHint" hidden>Kelas Semi Private dibuka 2 minggu sekali.</small>
