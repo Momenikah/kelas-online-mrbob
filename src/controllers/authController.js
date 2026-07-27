@@ -11,6 +11,7 @@ const {
 const { syncRegistration, syncConfirmation } = require('../utils/spreadsheetSync');
 const { STUDY_TIME_SLOTS, PROGRAM_CATALOG } = require('../utils/catalog');
 const { isSemiPrivateStartLabel } = require('../utils/semiPrivate');
+const metaPixel = require('../utils/metaPixel');
 const { PRICE_LIST, packagesForProgram, groupSizeBounds } = require('../utils/priceList');
 const { ensureUserAccessColumns, isLuxuryPackage, getAccessFromRegistration } = require('../utils/userAccess');
 
@@ -287,6 +288,22 @@ exports.register = async (req, res) => {
       console.error('Gagal mengirim email pendaftaran:', mailErr.message);
     }
 
+    // Meta Pixel: CompleteRegistration (browser + CAPI, event_id sama utk dedup).
+    const regEventId = metaPixel.newEventId();
+    const regValue = finalPackagePrice > 0 ? finalPackagePrice : 0;
+    metaPixel.queueBrowserEvent(req, {
+      eventName: 'CompleteRegistration',
+      eventId: regEventId,
+      params: { value: regValue, currency: 'IDR', content_name: package_name || selected_class || '' },
+    });
+    metaPixel.sendServerEvent({
+      eventName: 'CompleteRegistration',
+      eventId: regEventId,
+      eventSourceUrl: metaPixel.fullUrl(req),
+      userData: metaPixel.buildUserData(req, { email, phone }),
+      customData: { value: regValue, currency: 'IDR', content_name: package_name || selected_class || '' },
+    }).catch((e) => console.error('Meta CAPI CompleteRegistration gagal:', e.message));
+
     res.redirect(`/pendaftaran/${registrationCode}`);
   } catch (err) {
     console.error(err);
@@ -450,6 +467,22 @@ exports.confirmTransfer = async (req, res) => {
     } catch (mailErr) {
       console.error('Gagal mengirim email konfirmasi pembayaran:', mailErr.message);
     }
+
+    // Meta Pixel: Purchase saat bukti transfer dikirim (browser + CAPI, dedup).
+    const buyEventId = metaPixel.newEventId();
+    const buyValue = Number(registration.package_price) || 0;
+    metaPixel.queueBrowserEvent(req, {
+      eventName: 'Purchase',
+      eventId: buyEventId,
+      params: { value: buyValue, currency: 'IDR', content_name: registration.package_name || '' },
+    });
+    metaPixel.sendServerEvent({
+      eventName: 'Purchase',
+      eventId: buyEventId,
+      eventSourceUrl: metaPixel.fullUrl(req),
+      userData: metaPixel.buildUserData(req, { email: registration.email, phone: registration.phone }),
+      customData: { value: buyValue, currency: 'IDR', content_name: registration.package_name || '' },
+    }).catch((e) => console.error('Meta CAPI Purchase gagal:', e.message));
 
     req.flash('success', 'Bukti transfer berhasil dikirim. Selamat datang di Member Area!');
     res.redirect('/member');

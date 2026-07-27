@@ -49,10 +49,16 @@ app.use(session({
 app.use(flash());
 
 // Global template locals
+const metaPixel = require('./utils/metaPixel');
 app.use((req, res, next) => {
   res.locals.currentUser = req.session.user || null;
   res.locals.flashSuccess = req.flash('success');
   res.locals.flashError = req.flash('error');
+  // Meta Pixel: ID untuk base code + event yang menunggu ditembakkan di browser
+  // (dititipkan lewat session agar tetap terbawa melewati redirect), lalu dihapus.
+  res.locals.metaPixelId = metaPixel.pixelId();
+  res.locals.pixelEvents = (req.session && req.session.pixelEvents) || [];
+  if (req.session) req.session.pixelEvents = [];
   next();
 });
 
