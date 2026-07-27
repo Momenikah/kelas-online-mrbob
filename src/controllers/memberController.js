@@ -417,7 +417,8 @@ exports.presence = async (req, res) => {
       acc.total += 1;
       return acc;
     }, { total: 0, present: 0, late: 0, excused: 0, absent: 0 });
-    const meetings = Array.from({ length: 24 }, (_, i) => i + 1);
+    // Sampai 40 — mencakup paket terbesar (40 pertemuan), bukan hanya 24.
+    const meetings = Array.from({ length: 40 }, (_, i) => i + 1);
 
     res.render('member/presence', {
       title: 'Presensi',

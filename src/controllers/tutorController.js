@@ -648,7 +648,8 @@ exports.presence = async (req, res) => {
       value: at.toISODate(p.period_start),
       label: p.label || at.formatPeriodLabel(p.period_start),
     }));
-    const meetings = Array.from({ length: 24 }, (_, i) => i + 1);
+    // Sampai 40 — mencakup paket terbesar (40 pertemuan), bukan hanya 24.
+    const meetings = Array.from({ length: 40 }, (_, i) => i + 1);
 
     res.render('tutor/presence', {
       title: 'Kelola Presensi',
