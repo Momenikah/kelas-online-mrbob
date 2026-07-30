@@ -80,15 +80,17 @@ const ensureTeachingQuestionnaires = async (query) => {
     SELECT
       'Questionnaire Evaluasi Tutor',
       'Kegiatan Ajar Mengajar Oleh Tutor',
-      NULL,
+      p.id,
       $1,
       NULL,
       30,
       true
-    WHERE NOT EXISTS (
+    FROM programs p
+    WHERE p.is_active = true
+      AND NOT EXISTS (
         SELECT 1
         FROM questionnaires q
-        WHERE q.program_id IS NULL
+        WHERE q.program_id = p.id
           AND q.is_active = true
           AND ${teachingQuestionnaireFilter('q')}
       )

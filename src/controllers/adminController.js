@@ -1900,6 +1900,7 @@ exports.memberPresence = async (req, res) => {
 
 exports.questionnaire = async (req, res) => {
   try {
+    const programId = req.query.program_id || '';
     const tutor = (req.query.tutor || '').trim();
     const period = (req.query.period || '').trim();
 
@@ -1912,15 +1913,16 @@ exports.questionnaire = async (req, res) => {
     if (period) { params.push(period); qrConds.push(`qr.answers->>'study_period' = $${params.length}`); }
 
     const where = ['1=1'];
+    if (programId) { params.push(Number(programId)); where.push(`q.program_id = $${params.length}`); }
     const having = (tutor || period) ? 'HAVING COUNT(DISTINCT qr.id) > 0' : '';
 
-    const [listRes, statsRes, tutorOptsRes, periodOptsRes] = await Promise.all([
+    const [listRes, programsRes, statsRes, tutorOptsRes, periodOptsRes] = await Promise.all([
       query(`
-        SELECT q.*, COALESCE(p.name, 'Semua Program') as program_name, u.name as creator_name,
+        SELECT q.*, p.name as program_name, u.name as creator_name,
                COUNT(DISTINCT qq.id) as question_count,
                COUNT(DISTINCT qr.id) as response_count
         FROM questionnaires q
-        LEFT JOIN programs p ON q.program_id = p.id
+        JOIN programs p ON q.program_id = p.id
         LEFT JOIN users u ON q.created_by = u.id
         LEFT JOIN questions qq ON q.id = qq.questionnaire_id
         LEFT JOIN questionnaire_responses qr ON ${qrConds.join(' AND ')}
@@ -1929,6 +1931,7 @@ exports.questionnaire = async (req, res) => {
         ${having}
         ORDER BY q.created_at DESC
       `, params),
+      query('SELECT id, name FROM programs WHERE is_active = true ORDER BY name'),
       query(`
         SELECT
           (SELECT COUNT(*) FROM questionnaires) AS total,
@@ -1946,7 +1949,8 @@ exports.questionnaire = async (req, res) => {
       title: 'Questionnaire',
       user: req.session.user,
       questionnaires: listRes.rows,
-      filters: { tutor, period },
+      programs: programsRes.rows,
+      filters: { programId, tutor, period },
       tutorOptions: tutorOptsRes.rows.map((r) => r.name),
       periodOptions: periodOptsRes.rows.map((r) => r.label),
       stats: statsRes.rows[0],
@@ -1964,9 +1968,9 @@ exports.questionnaireDetail = async (req, res) => {
     const { id } = req.params;
     const [qResult, questionsResult, responsesResult] = await Promise.all([
       query(`
-        SELECT q.*, COALESCE(p.name, 'Semua Program') as program_name, u.name as creator_name
+        SELECT q.*, p.name as program_name, u.name as creator_name
         FROM questionnaires q
-        LEFT JOIN programs p ON q.program_id = p.id
+        JOIN programs p ON q.program_id = p.id
         LEFT JOIN users u ON q.created_by = u.id
         WHERE q.id = $1
       `, [id]),
@@ -2010,9 +2014,9 @@ exports.questionnaireDetail = async (req, res) => {
 
 exports.createQuestionnaire = async (req, res) => {
   try {
-    const { title, description, due_date, duration_minutes } = req.body;
-    if (!title || !title.trim()) {
-      req.flash('error', 'Judul wajib diisi.');
+    const { title, description, program_id, due_date, duration_minutes } = req.body;
+    if (!title || !title.trim() || !program_id) {
+      req.flash('error', 'Judul dan program wajib diisi.');
       return res.redirect('/admin/questionnaire');
     }
     const result = await query(
@@ -2021,7 +2025,7 @@ exports.createQuestionnaire = async (req, res) => {
       [
         title.trim(),
         description && description.trim() ? description.trim() : null,
-        null,
+        Number(program_id),
         req.session.user.id,
         due_date || null,
         duration_minutes ? Number(duration_minutes) : 30,

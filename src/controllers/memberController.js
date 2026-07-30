@@ -94,16 +94,16 @@ exports.dashboard = async (req, res) => {
                 (SELECT COUNT(*) FROM certificates WHERE member_id = $1) AS certificates`, [userId]),
       query(`
         WITH pending AS (
-          SELECT q.id, q.title, q.due_date, COALESCE(p.name, 'Semua Program') as program_name,
+          SELECT q.id, q.title, q.due_date, p.name as program_name,
                  ROW_NUMBER() OVER (
-                   PARTITION BY (CASE WHEN COALESCE(qc.cnt, 0) > 0 THEN 'c' || q.id ELSE 'teaching' END)
+                   PARTITION BY (CASE WHEN COALESCE(qc.cnt, 0) > 0 THEN 'c' || q.id ELSE 'p' || p.name END)
                    ORDER BY q.created_at DESC, q.id DESC
                  ) AS rn
           FROM questionnaires q
-          LEFT JOIN programs p ON q.program_id = p.id
+          JOIN programs p ON q.program_id = p.id
           LEFT JOIN (SELECT questionnaire_id, COUNT(*) AS cnt FROM questions GROUP BY questionnaire_id) qc
             ON qc.questionnaire_id = q.id
-          WHERE (q.program_id IS NULL OR q.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active'))
+          WHERE q.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
             AND q.is_active = true
             AND (${teachingQuestionnaireFilter('q')} OR COALESCE(qc.cnt, 0) > 0)
             AND NOT EXISTS (SELECT 1 FROM questionnaire_responses qr WHERE qr.questionnaire_id = q.id AND qr.member_id = $1)
@@ -607,18 +607,18 @@ exports.questionnaire = async (req, res) => {
       WITH available AS (
         SELECT q.*,
                qr.id as response_id, qr.score, qr.max_score, qr.submitted_at,
-               COALESCE(p.name, 'Semua Program') as program_name,
+               p.name as program_name,
                COALESCE(qc.cnt, 0) AS question_count,
                ROW_NUMBER() OVER (
-                 PARTITION BY (CASE WHEN COALESCE(qc.cnt, 0) > 0 THEN 'c' || q.id ELSE 'teaching' END)
+                 PARTITION BY (CASE WHEN COALESCE(qc.cnt, 0) > 0 THEN 'c' || q.id ELSE 'p' || p.name END)
                  ORDER BY q.created_at DESC, q.id DESC
                ) AS rn
         FROM questionnaires q
-        LEFT JOIN programs p ON q.program_id = p.id
+        JOIN programs p ON q.program_id = p.id
         LEFT JOIN questionnaire_responses qr ON q.id = qr.questionnaire_id AND qr.member_id = $1
         LEFT JOIN (SELECT questionnaire_id, COUNT(*) AS cnt FROM questions GROUP BY questionnaire_id) qc
           ON qc.questionnaire_id = q.id
-        WHERE (q.program_id IS NULL OR q.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active'))
+        WHERE q.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
           AND q.is_active = true
           AND (${teachingQuestionnaireFilter('q')} OR COALESCE(qc.cnt, 0) > 0)
       )
@@ -646,11 +646,11 @@ exports.questionnaireShow = async (req, res) => {
     const { id } = req.params;
     const userId = req.session.user.id;
     const [qResult, questionsResult, responseResult, tutorsRes, programsRes, periodsRes] = await Promise.all([
-      query(`SELECT q.*, COALESCE(p.name, 'Semua Program') as program_name
+      query(`SELECT q.*, p.name as program_name
              FROM questionnaires q
-             LEFT JOIN programs p ON q.program_id = p.id
+             JOIN programs p ON q.program_id = p.id
              WHERE q.id = $1
-               AND (q.program_id IS NULL OR q.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $2 AND status = 'active'))`, [id, userId]),
+               AND q.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $2 AND status = 'active')`, [id, userId]),
       query('SELECT * FROM questions WHERE questionnaire_id = $1 ORDER BY order_number', [id]),
       query('SELECT * FROM questionnaire_responses WHERE questionnaire_id = $1 AND member_id = $2', [id, userId]),
       query("SELECT id, name FROM users WHERE role = 'tutor' AND is_active = true ORDER BY name"),

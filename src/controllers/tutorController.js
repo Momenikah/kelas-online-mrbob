@@ -824,8 +824,8 @@ exports.questionnaire = async (req, res) => {
     const params = [String(tutorId)];
     const where = [`qr.answers->>'tutor_id' = $1`, teachingQuestionnaireFilter('q')];
     if (programId) {
-      params.push(String(programId));
-      where.push(`qr.answers->>'study_program_id' = $${params.length}`);
+      params.push(Number(programId));
+      where.push(`q.program_id = $${params.length}`);
     }
     if (period) {
       params.push(period);
@@ -834,12 +834,11 @@ exports.questionnaire = async (req, res) => {
 
     const [responsesResult, programsResult, periodsResult] = await Promise.all([
       query(`
-        SELECT qr.*, q.title, q.description,
-               COALESCE(qr.answers->>'study_program_name', p.name, 'Semua Program') as program_name,
+        SELECT qr.*, q.title, q.description, p.name as program_name,
                u.name as member_name, u.email as member_email, u.photo as member_photo
         FROM questionnaire_responses qr
         JOIN questionnaires q ON q.id = qr.questionnaire_id
-        LEFT JOIN programs p ON p.id = q.program_id
+        JOIN programs p ON p.id = q.program_id
         JOIN users u ON u.id = qr.member_id
         WHERE ${where.join(' AND ')}
         ORDER BY qr.submitted_at DESC NULLS LAST, qr.started_at DESC
@@ -972,10 +971,7 @@ exports.questionnaireDetail = async (req, res) => {
     return res.redirect('/tutor/questionnaire');
     const { id } = req.params;
     const [qResult, questionsResult, responsesResult] = await Promise.all([
-      query(`SELECT q.*, COALESCE(p.name, 'Semua Program') as program_name
-             FROM questionnaires q
-             LEFT JOIN programs p ON q.program_id = p.id
-             WHERE q.id = $1`, [id]),
+      query('SELECT q.*, p.name as program_name FROM questionnaires q JOIN programs p ON q.program_id = p.id WHERE q.id = $1', [id]),
       query('SELECT * FROM questions WHERE questionnaire_id = $1 ORDER BY order_number', [id]),
       query(`SELECT qr.*, u.name as member_name FROM questionnaire_responses qr
              JOIN users u ON qr.member_id = u.id WHERE qr.questionnaire_id = $1`, [id]),
@@ -1038,10 +1034,10 @@ exports.questionnaireAnswer = async (req, res) => {
       WITH available AS (
         SELECT q.*,
                qr.id as response_id, qr.score, qr.max_score, qr.submitted_at,
-               COALESCE(p.name, 'Semua Program') as program_name,
-               ROW_NUMBER() OVER (PARTITION BY 'teaching' ORDER BY q.created_at DESC, q.id DESC) AS rn
+               p.name as program_name,
+               ROW_NUMBER() OVER (PARTITION BY p.name ORDER BY q.created_at DESC, q.id DESC) AS rn
         FROM questionnaires q
-        LEFT JOIN programs p ON q.program_id = p.id
+        JOIN programs p ON q.program_id = p.id
         LEFT JOIN questionnaire_responses qr ON q.id = qr.questionnaire_id AND qr.member_id = $1
         WHERE q.is_active = true
           AND ${teachingQuestionnaireFilter('q')}
@@ -1069,10 +1065,7 @@ exports.questionnaireAnswerShow = async (req, res) => {
     const { id } = req.params;
     const userId = req.session.user.id;
     const [qResult, questionsResult, responseResult, tutorsRes, programsRes, periodsRes] = await Promise.all([
-      query(`SELECT q.*, COALESCE(p.name, 'Semua Program') as program_name
-             FROM questionnaires q
-             LEFT JOIN programs p ON q.program_id = p.id
-             WHERE q.id = $1 AND q.is_active = true`, [id]),
+      query('SELECT q.*, p.name as program_name FROM questionnaires q JOIN programs p ON q.program_id = p.id WHERE q.id = $1 AND q.is_active = true', [id]),
       query('SELECT * FROM questions WHERE questionnaire_id = $1 ORDER BY order_number', [id]),
       query('SELECT * FROM questionnaire_responses WHERE questionnaire_id = $1 AND member_id = $2', [id, userId]),
       query("SELECT id, name FROM users WHERE role = 'tutor' AND is_active = true ORDER BY name"),
