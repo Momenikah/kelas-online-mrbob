@@ -213,12 +213,21 @@
               </div>
               <div class="cert-preview-pages">
                 <div class="cert-mini-sheet cert-mini-general" id="previewCertSheet">
-                  <img id="previewTemplateImg" src="/img/certificates/sertifikat-umum.png" alt="">
+                  <img id="previewTemplateImg" src="/img/certificates/sertif-terbaru.jpg" alt="">
                   <span class="pv-code" id="previewCode">DD/MM/YYYY/CERT</span>
+                  <span class="pv-static pv-certify">This is to Certify that</span>
                   <strong class="pv-name" id="previewMember">Pilih member</strong>
+                  <span class="pv-static pv-awarded">Has been awarded</span>
                   <strong class="pv-grade" id="previewGrade">Grade -</strong>
+                  <span class="pv-static pv-in-the">In The</span>
                   <strong class="pv-program" id="previewProgram">-</strong>
+                  <span class="pv-static pv-period-label">Date of Period :</span>
                   <strong class="pv-period" id="previewPeriod">-</strong>
+                  <div class="pv-stamp" aria-hidden="true">
+                    <img src="/img/logo-mrbob.webp" alt="">
+                    <strong>Super</strong>
+                    <strong>Seru!</strong>
+                  </div>
                   <div class="pv-score-list" id="previewScoreList">
                     <span><b>Listening</b><i>:</i><em id="pvListening">-</em></span>
                     <span id="pvStructureRow"><b>Structure & Written</b><i>:</i><em id="pvStructure">-</em></span>
@@ -229,12 +238,17 @@
                   </div>
                 </div>
                 <div class="cert-mini-sheet cert-mini-report" id="previewReportSheet">
-                  <img src="/img/certificates/Personal-Report.png" alt="">
-                  <strong class="pv-report-title">Member Report</strong>
-                  <span class="pv-report-code" id="previewReportCode">DD/MM/YYYY/CERT</span>
+                  <img src="/img/certificates/report-member-terbaru.png" alt="">
                   <span class="pv-report-member" id="previewReportMember">Member's Name : -</span>
                   <span class="pv-report-tutor">Tutor's Name : <%= user.name %></span>
-                  <span class="pv-report-band">Personal Report</span>
+                  <div class="pv-report-score-strip">
+                    <span>Speaking</span>
+                    <span>Vocabulary</span>
+                    <span>Grammar</span>
+                    <span>Pronunciation</span>
+                    <span>Understanding</span>
+                    <span></span>
+                  </div>
                   <div class="pv-report-scores">
                     <b id="pvReportSpeaking">-</b>
                     <b id="pvReportVocab">-</b>
@@ -243,7 +257,6 @@
                     <b id="pvReportUnderstanding">-</b>
                     <b id="pvReportCefr">-</b>
                   </div>
-                  <span class="pv-report-improvement">Improvement</span>
                 </div>
               </div>
               <div class="cert-preview-summary">
@@ -333,7 +346,7 @@ function updateCertificatePreview() {
   sheet.classList.toggle('cert-mini-general', !(isToefl || isIelts));
   templateImg.src = isToefl || isIelts
     ? '/img/certificates/template-TOEFL-IELTS-1.png'
-    : '/img/certificates/sertifikat-umum.png';
+    : '/img/certificates/sertif-terbaru.jpg';
   scoreList.style.display = isToefl || isIelts ? 'grid' : 'none';
   reportSheet.style.display = isPersonal ? 'block' : 'none';
   document.getElementById('previewReportTab').style.display = isPersonal ? 'inline-flex' : 'none';
@@ -344,7 +357,7 @@ function updateCertificatePreview() {
 
   document.getElementById('previewMember').textContent = memberText;
   document.getElementById('previewCategory').textContent = category;
-  document.getElementById('previewProgram').textContent = isToefl ? 'TOEFL Test' : isIelts ? 'IELTS Test' : program.toUpperCase();
+  document.getElementById('previewProgram').textContent = isToefl ? 'TOEFL Test' : isIelts ? 'IELTS Test' : program;
   document.getElementById('previewPeriod').textContent = (isToefl || isIelts) ? `Date of periode : ${period}` : period;
   document.getElementById('previewGrade').textContent = gradeText;
   document.getElementById('previewGrade').style.display = (isToefl || isIelts) ? 'none' : 'block';
@@ -362,7 +375,6 @@ function updateCertificatePreview() {
   document.getElementById('pvWritingRow').style.display = isIelts ? 'grid' : 'none';
   document.getElementById('pvSpeakingRow').style.display = isIelts ? 'grid' : 'none';
 
-  document.getElementById('previewReportCode').textContent = 'DD/MM/YYYY/CERT';
   document.getElementById('previewReportMember').textContent = `Member's Name : ${memberText}`;
   document.getElementById('pvReportSpeaking').textContent = getValue('input[name="speaking_score"]');
   document.getElementById('pvReportVocab').textContent = getValue('input[name="vocabulary_score"]');

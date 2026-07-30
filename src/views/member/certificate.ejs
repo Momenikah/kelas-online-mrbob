@@ -49,7 +49,7 @@
           const dateSlash = `${String(issueDate.getDate()).padStart(2, '0')}/${String(issueDate.getMonth() + 1).padStart(2, '0')}/${issueDate.getFullYear()}`;
           const certNo = c.certificate_number || '';
           const testTitle = isIelts ? 'IELTS Test' : 'TOEFL Test';
-          const templateSrc = isTest ? '/img/certificates/template-TOEFL-IELTS-1.png' : '/img/certificates/sertifikat-umum.png';
+          const templateSrc = isTest ? '/img/certificates/template-TOEFL-IELTS-1.png' : '/img/certificates/sertif-terbaru.jpg';
           const show = (value, fallback = '-') => (value !== undefined && value !== null && String(value).trim() !== '' ? value : fallback);
         %>
         <article class="cert-member-card">
@@ -78,10 +78,19 @@
                 </div>
                 <div class="cm-period">Date of periode : <%= periodLabel %></div>
               <% } else { %>
+                <div class="cm-static cm-certify">This is to Certify that</div>
                 <div class="cm-name cm-general-name"><%= recipientName %></div>
+                <div class="cm-static cm-awarded">Has been awarded</div>
                 <% if (d.grade) { %><div class="cm-general-grade"><%= gradeText %></div><% } %>
+                <div class="cm-static cm-in-the">In The</div>
                 <div class="cm-program"><%= programName %></div>
+                <div class="cm-static cm-period-label">Date of Period :</div>
                 <div class="cm-period cm-general-period"><%= periodLabel %></div>
+                <div class="cm-stamp" aria-hidden="true">
+                  <img src="/img/logo-mrbob.webp" alt="">
+                  <strong>Super</strong>
+                  <strong>Seru!</strong>
+                </div>
               <% } %>
             </div>
           </button>

@@ -21,6 +21,14 @@
     const dateSlash = `${String(issueDate.getDate()).padStart(2, '0')}/${String(issueDate.getMonth() + 1).padStart(2, '0')}/${issueDate.getFullYear()}`;
     const certNo = cert.certificate_number || '';
     const testTitle = isIelts ? 'IELTS Test' : 'TOEFL Test';
+    const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[char]));
+    const ordinalHtml = (value) => escapeHtml(value).replace(/(\d+)(st|nd|rd|th)\b/g, '$1<sup>$2</sup>');
     const resultLabel = (value) => {
       const score = Number(value);
       if (Number.isNaN(score)) return '-';
@@ -80,9 +88,9 @@
       container-type: inline-size;
     }
     .sheet:last-child { page-break-after: auto; break-after: auto; }
-    .sheet-general { aspect-ratio: 2086 / 2947; }
+    .sheet-general { aspect-ratio: 1240 / 1754; }
     .sheet-test { aspect-ratio: 1414 / 2000; }
-    .sheet-report { aspect-ratio: 2086 / 2947; }
+    .sheet-report { aspect-ratio: 1414 / 2000; }
     /* Value overlays positioned/sized relative to the sheet (cqw = 1% of sheet width). */
     .v {
       position: absolute;
@@ -152,6 +160,177 @@
       width: 78%;
       font-size: clamp(19px, 2.7vw, 31px);
     }
+    .cert-label {
+      left: 12%;
+      width: 80%;
+      font-size: 2.65cqw;
+      font-weight: 500;
+      line-height: 1.15;
+    }
+    .cert-label.certify { top: 37.1%; }
+    .cert-label.awarded { top: 46.5%; }
+    .cert-label.in-the { top: 54.9%; }
+    .cert-label.period-label { top: 63.9%; }
+    .cert-value {
+      left: 12%;
+      width: 78%;
+      font-size: 4.65cqw;
+      font-weight: 900;
+      line-height: 1.05;
+    }
+    .cert-name { top: 41.1%; }
+    .cert-grade { top: 50.3%; }
+    .cert-program { top: 58.8%; }
+    .cert-period { top: 67.3%; font-size: 2.75cqw; }
+    .cert-period sup { font-size: .55em; line-height: 0; vertical-align: super; }
+    .cert-stamp {
+      position: absolute;
+      z-index: 2;
+      left: 31.6%;
+      top: 74%;
+      width: 19%;
+      line-height: .82;
+      pointer-events: none;
+    }
+    .cert-stamp img {
+      display: block;
+      width: 80%;
+      height: 3.6cqw;
+      object-fit: cover;
+      object-position: top left;
+      margin-bottom: .05cqw;
+    }
+    .cert-stamp strong {
+      display: block;
+      color: #0b4cff;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 3.35cqw;
+      font-weight: 900;
+      letter-spacing: 0;
+      line-height: .78;
+    }
+    .report-name-label,
+    .report-name-value,
+    .report-tutor-label,
+    .report-tutor-value {
+      transform: none !important;
+      top: 20.85%;
+      font-size: 1.58cqw;
+      font-weight: 600;
+      line-height: 1.1;
+    }
+    .report-name-label { left: 12.9%; width: 16%; }
+    .report-name-value { left: 29.1%; width: 26%; }
+    .report-tutor-label { left: 57%; width: 15.5%; }
+    .report-tutor-value { left: 72.6%; width: 20%; }
+    .report-score-strip {
+      transform: none !important;
+      left: 12.1%;
+      top: 23%;
+      width: 80.2%;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      text-align: center;
+      font-size: 1.18cqw;
+      font-weight: 700;
+    }
+    .report-score-strip span,
+    .report-score-values span {
+      position: static;
+    }
+    .report-score-values {
+      transform: none !important;
+      left: 12.1%;
+      top: 24.45%;
+      width: 80.2%;
+      height: 1.75%;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      border: 1px solid #111;
+      text-align: center;
+      align-items: center;
+      font-size: 1.25cqw;
+      font-weight: 500;
+    }
+    .report-score-values span:not(:last-child) {
+      border-right: 1px solid #111;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .report-main-table {
+      transform: none !important;
+      left: 12.1%;
+      top: 32.5%;
+      width: 82%;
+      display: grid;
+      grid-template-columns: 25% 15% 20% 40%;
+      border: 1px solid #111;
+      font-size: 1.25cqw;
+      text-align: center;
+    }
+    .report-main-table > div {
+      min-height: 4.65cqw;
+      border-right: 1px solid #111;
+      border-bottom: 1px solid #111;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: .25cqw .6cqw;
+      line-height: 1.08;
+      font-weight: 500;
+    }
+    .report-main-table > div:nth-child(4n) { border-right: 0; }
+    .report-main-table > div:nth-last-child(-n+4) { border-bottom: 0; }
+    .report-main-table .table-head {
+      background: #9a00c7;
+      color: #fff;
+      font-size: 1.32cqw;
+      font-weight: 800;
+    }
+    .report-main-table .section-cell {
+      background: #ffd11f;
+      font-size: 1.35cqw;
+      font-weight: 800;
+    }
+    .report-main-table .notes-cell {
+      text-align: center;
+      font-size: 1.12cqw;
+      font-family: Georgia, "Times New Roman", serif;
+      font-weight: 500;
+    }
+    .report-improvement-head {
+      transform: none !important;
+      left: 12.1%;
+      top: 64.25%;
+      width: 82%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      text-align: center;
+      font-size: 1.35cqw;
+      font-weight: 800;
+    }
+    .report-improvement-head span { position: static; }
+    .report-improvement-boxes {
+      transform: none !important;
+      left: 12.1%;
+      top: 65.75%;
+      width: 82%;
+      min-height: 3.35%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border: 1px solid #111;
+    }
+    .report-improvement-boxes div {
+      position: static;
+      padding: .45cqw .75cqw;
+      font-size: 1cqw;
+      font-family: Georgia, "Times New Roman", serif;
+      font-weight: 500;
+      line-height: 1.1;
+    }
+    .report-improvement-boxes div:first-child { border-right: 1px solid #111; }
     @media print {
       body { padding: 0; background: #fff; }
       .toolbar { display: none; }
@@ -198,11 +377,20 @@
       </section>
     <% } else { %>
       <section class="sheet sheet-general">
-        <img class="template-img" src="/img/certificates/sertifikat-umum.png" alt="">
-        <div class="v l" style="left:12%;top:41.8%;font-size:3.2cqw;"><%= recipientName %></div>
-        <div class="v l" style="left:12%;top:50.5%;font-size:3cqw;"><%= gradeText %></div>
-        <div class="v l" style="left:12%;top:59.2%;font-size:2.9cqw;"><%= programName %></div>
-        <div class="v l" style="left:12%;top:67.2%;font-size:2.4cqw;"><%= periodLabel %></div>
+        <img class="template-img" src="/img/certificates/sertif-terbaru.jpg" alt="">
+        <div class="v l cert-label certify">This is to Certify that</div>
+        <div class="v l cert-value cert-name"><%= recipientName %></div>
+        <div class="v l cert-label awarded">Has been awarded</div>
+        <div class="v l cert-value cert-grade"><%= gradeText %></div>
+        <div class="v l cert-label in-the">In The</div>
+        <div class="v l cert-value cert-program"><%= programName %></div>
+        <div class="v l cert-label period-label">Date of Period :</div>
+        <div class="v l cert-value cert-period"><%- ordinalHtml(periodLabel) %></div>
+        <div class="cert-stamp" aria-hidden="true">
+          <img src="/img/logo-mrbob.webp" alt="">
+          <strong>Super</strong>
+          <strong>Seru!</strong>
+        </div>
       </section>
     <% } %>
 
@@ -215,19 +403,31 @@
          const rowY = [39.75, 42.85, 46.0, 49.1, 52.25];
     %>
       <section class="sheet sheet-report">
-        <img class="template-img" src="/img/certificates/Personal-Report.png" alt="">
-        <div class="v l" style="left:31%;top:20.3%;font-size:1.5cqw;font-weight:600;"><%= recipientName %></div>
-        <div class="v l" style="left:73%;top:20.3%;font-size:1.5cqw;font-weight:600;"><%= show(d.tutor_name, '-') %></div>
-        <% miniVals.forEach((val, i) => { %>
-          <div class="v c" style="left:<%= miniX[i] %>%;top:26%;font-size:1.4cqw;"><%= show(val, '') %></div>
-        <% }) %>
-        <% rowKeys.forEach((key, i) => { %>
-          <div class="v c" style="left:39.2%;top:<%= rowY[i] %>%;font-size:1.1cqw;"><%= show(scores[key], '') %></div>
-          <div class="v c" style="left:53.7%;top:<%= rowY[i] %>%;font-size:1cqw;"><%= scores[key] ? resultLabel(scores[key]) : '' %></div>
-          <div class="v l" style="left:62.5%;top:<%= rowY[i] %>%;width:28.5%;font-size:0.82cqw;font-weight:600;line-height:1.12;"><%= show(notes[noteKeys[i]], '') %></div>
-        <% }) %>
-        <div class="v l" style="left:12.7%;top:65.5%;width:38%;font-size:1cqw;font-weight:600;line-height:1.25;"><%= show(improvement.before, '') %></div>
-        <div class="v l" style="left:54%;top:65.5%;width:38%;font-size:1cqw;font-weight:600;line-height:1.25;"><%= show(improvement.after, '') %></div>
+        <img class="template-img" src="/img/certificates/report-member-terbaru.png" alt="">
+        <div class="v l report-name-label">Member's Name :</div>
+        <div class="v l report-name-value"><%= recipientName %></div>
+        <div class="v l report-tutor-label">Tutor's Name :</div>
+        <div class="v l report-tutor-value"><%= show(d.tutor_name, '-') %></div>
+        <div class="v l report-score-strip">
+          <span>Speaking</span><span>Vocabulary</span><span>Grammar</span><span>Pronunciation</span><span>Understanding</span><span></span>
+        </div>
+        <div class="v l report-score-values">
+          <% miniVals.forEach((val) => { %><span><%= show(val, '') %></span><% }) %>
+        </div>
+        <div class="v l report-main-table">
+          <div class="table-head">Section</div><div class="table-head">Score</div><div class="table-head">Result</div><div class="table-head">Notes</div>
+          <% rowKeys.forEach((key, i) => { %>
+            <div class="section-cell"><%= ['Speaking', 'Vocabulary', 'Grammar', 'Pronunciation', 'Understanding'][i] %></div>
+            <div><%= show(scores[key], '') %></div>
+            <div><%= scores[key] ? resultLabel(scores[key]) : '' %></div>
+            <div class="notes-cell"><%= show(notes[noteKeys[i]], '') %></div>
+          <% }) %>
+        </div>
+        <div class="v l report-improvement-head"><span>Before</span><span>After</span></div>
+        <div class="v l report-improvement-boxes">
+          <div><%= show(improvement.before, '') %></div>
+          <div><%= show(improvement.after, '') %></div>
+        </div>
       </section>
     <% } %>
   </main>
