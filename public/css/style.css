@@ -3395,30 +3395,30 @@ h1, h2, h3, h4, h5, h6 { line-height: 1.3; color: var(--gray-900); font-weight: 
   font-size: 2.75cqw;
 }
 .cm-stamp {
-  left: 31.6%;
-  top: 74%;
-  width: 19%;
-  line-height: .82;
+  left: 30.6%;
+  top: 73.7%;
+  width: 22%;
+  line-height: .8;
   pointer-events: none;
 }
 .cm-stamp img {
   position: static;
   inset: auto;
   display: block;
-  width: 80%;
-  height: 3.6cqw;
+  width: 78%;
+  height: 4.15cqw;
   object-fit: cover;
   object-position: top left;
-  margin-bottom: .05cqw;
+  margin-bottom: .08cqw;
 }
 .cm-stamp strong {
   display: block;
   color: #0b4cff;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 3.35cqw;
+  font-size: 3.85cqw;
   font-weight: 900;
   letter-spacing: 0;
-  line-height: .78;
+  line-height: .76;
 }
 .cm-test-name {
   left: 10.8%;
@@ -8021,30 +8021,30 @@ select.form-input,
 }
 .cert-mini-test .pv-period { left: 10.8%; top: 69.6%; width: 74%; font-size: clamp(8px, 1vw, 14px); }
 .pv-stamp {
-  left: 31.6%;
-  top: 74%;
-  width: 19%;
-  line-height: .82;
+  left: 30.6%;
+  top: 73.7%;
+  width: 22%;
+  line-height: .8;
   pointer-events: none;
 }
 .cert-mini-test .pv-stamp { display: none; }
 .pv-stamp img {
   display: block;
-  width: 80%;
-  height: 3.6cqw;
+  width: 78%;
+  height: 4.15cqw;
   object-fit: cover;
   object-position: top left;
-  margin-bottom: .05cqw;
+  margin-bottom: .08cqw;
 }
 .pv-stamp strong {
   position: static !important;
   display: block;
   color: #0b4cff !important;
   font-family: Arial, Helvetica, sans-serif !important;
-  font-size: clamp(8px, .98vw, 14px);
+  font-size: clamp(9px, 1.12vw, 16px);
   font-weight: 900;
   letter-spacing: 0;
-  line-height: .78;
+  line-height: .76;
 }
 .pv-score-list {
   left: 11%;
@@ -8086,7 +8086,7 @@ select.form-input,
 .pv-report-tutor {
   top: 20.85%;
   width: 40%;
-  font-size: clamp(5px, .62vw, 9px);
+  font-size: clamp(6px, .76vw, 11px);
   font-weight: 800;
 }
 .pv-report-member { left: 12.9%; }
@@ -8098,7 +8098,7 @@ select.form-input,
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   text-align: center;
-  font-size: clamp(4px, .5vw, 7px);
+  font-size: clamp(5px, .62vw, 9px);
   font-weight: 800;
 }
 .pv-report-score-strip span {
@@ -8132,8 +8132,8 @@ select.form-input,
 }
 .pv-report-scores b {
   position: static !important;
-  font-size: clamp(5px, .58vw, 8px);
-  font-weight: 500;
+  font-size: clamp(6px, .7vw, 10px);
+  font-weight: 700;
   height: 100%;
   display: flex;
   align-items: center;
