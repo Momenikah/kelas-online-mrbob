@@ -88,7 +88,9 @@ const removeUploadedFile = (file) => {
 };
 
 exports.showLogin = (req, res) => {
-  res.render('auth/login', { title: 'Login', error: req.flash('error'), success: req.flash('success') });
+  // Pakai flash yang sudah dibaca middleware global (res.locals). Membaca ulang
+  // req.flash() di sini akan selalu kosong karena middleware sudah menguras & meng-clear-nya.
+  res.render('auth/login', { title: 'Login', error: res.locals.flashError, success: res.locals.flashSuccess });
 };
 
 exports.login = async (req, res) => {
@@ -131,7 +133,7 @@ exports.showRegister = async (req, res) => {
     const tutors = await getGradeATutors();
     res.render('auth/register', {
       title: 'Daftar Akun',
-      error: req.flash('error'),
+      error: res.locals.flashError,
       studyTimeSlots: STUDY_TIME_SLOTS,
       programCatalog: PROGRAM_CATALOG,
       priceList: PRICE_LIST,
@@ -142,7 +144,7 @@ exports.showRegister = async (req, res) => {
     console.error(err);
     res.render('auth/register', {
       title: 'Daftar Akun',
-      error: req.flash('error'),
+      error: res.locals.flashError,
       studyTimeSlots: STUDY_TIME_SLOTS,
       programCatalog: PROGRAM_CATALOG,
       priceList: PRICE_LIST,
@@ -328,8 +330,8 @@ exports.showRegistrationThanks = async (req, res) => {
     res.render('auth/register-thanks', {
       title: 'Detail Pendaftaran',
       registration,
-      success: req.flash('success'),
-      error: req.flash('error'),
+      success: res.locals.flashSuccess,
+      error: res.locals.flashError,
     });
   } catch (err) {
     console.error(err);
@@ -355,7 +357,7 @@ exports.showTransferConfirmation = async (req, res) => {
     res.render('auth/confirm-transfer', {
       title: 'Konfirmasi Bukti Transfer',
       registration,
-      error: req.flash('error'),
+      error: res.locals.flashError,
     });
   } catch (err) {
     console.error(err);
@@ -367,7 +369,7 @@ exports.showTransferConfirmation = async (req, res) => {
 exports.showTransferLookup = (req, res) => {
   res.render('auth/confirm-transfer-lookup', {
     title: 'Cari Pendaftaran',
-    error: req.flash('error'),
+    error: res.locals.flashError,
   });
 };
 
