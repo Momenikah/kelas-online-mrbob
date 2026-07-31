@@ -8,7 +8,6 @@ const { syncTutorAvailableTime, syncCertificate } = require('../utils/spreadshee
 const { sendScheduleNotificationEmails } = require('../utils/scheduleEmail');
 const { emptyReportDays, normalizeReportDays, ensureMemberReportsTable } = require('../utils/memberReports');
 const { ensureCertificateDetailsColumn, normalizeCertificateDetails } = require('../utils/certificates');
-const { groupProofsByMeeting } = require('../utils/classProofs');
 const { SUPPORT_EMAIL, sendSupportFeedback } = require('../utils/supportEmail');
 const { saveSupportFeedback, updateSupportFeedbackEmailStatus } = require('../utils/supportFeedback');
 const {
@@ -581,11 +580,7 @@ exports.deleteAvailablePeriod = async (req, res) => {
 exports.presence = async (req, res) => {
   try {
     const tutorId = req.session.user.id;
-    const [schedResult, submissionsResult, myPresResult, programsResult, periodsResult] = await Promise.all([
-      query(
-        `SELECT s.*, p.name as program_name FROM schedules s JOIN programs p ON s.program_id = p.id
-         WHERE s.tutor_id = $1 ORDER BY s.date DESC`, [tutorId]
-      ),
+    const [submissionsResult, myPresResult, programsResult, periodsResult, myMembersResult] = await Promise.all([
       query(`
         SELECT mp.*, m.name as member_name, m.photo as member_photo, p.name as program_name
         FROM member_presences mp
@@ -595,7 +590,7 @@ exports.presence = async (req, res) => {
         ORDER BY mp.created_at DESC
         LIMIT 25
       `, [tutorId]),
-      // Tutor's own presence submissions (same flow as members).
+      // Tutor's own presence submissions (data lama, member_id = tutor).
       query(`
         SELECT mp.*, p.name as program_name
         FROM member_presences mp
@@ -607,35 +602,17 @@ exports.presence = async (req, res) => {
       query(`SELECT DISTINCT ON (p.name) p.id, p.name FROM programs p
              WHERE p.is_active = true ORDER BY p.name, p.id`),
       query('SELECT period_start, label FROM periods ORDER BY period_start'),
+      // Member yang diajar tutor ini (lewat schedule_members) untuk dropdown bukti presensi.
+      query(`
+        SELECT DISTINCT u.id, u.name
+        FROM schedule_members sm
+        JOIN schedules s ON s.id = sm.schedule_id
+        JOIN users u ON u.id = sm.member_id
+        WHERE s.tutor_id = $1 AND u.role = 'member' AND u.is_active = true
+        ORDER BY u.name
+      `, [tutorId]),
     ]);
 
-    const selectedId = req.query.schedule_id;
-    let members = [];
-    let selectedSchedule = null;
-    let classProofs = [];
-    let classProofGroups = [];
-    if (selectedId) {
-      selectedSchedule = schedResult.rows.find(s => s.id == selectedId);
-      const [mResult, proofResult] = await Promise.all([
-        query(`
-          SELECT u.id, u.name, u.photo, u.phone,
-                 COALESCE(pr.status, 'absent') as status,
-                 pr.notes, pr.check_in_time
-          FROM schedule_members sm
-          JOIN users u ON sm.member_id = u.id
-          LEFT JOIN presences pr ON pr.schedule_id = sm.schedule_id AND pr.member_id = sm.member_id
-          WHERE sm.schedule_id = $1 ORDER BY u.name
-        `, [selectedId]),
-        query(`
-          SELECT cp.*, u.photo as uploader_photo
-          FROM class_proofs cp LEFT JOIN users u ON cp.uploaded_by = u.id
-          WHERE cp.schedule_id = $1 ORDER BY cp.created_at DESC
-        `, [selectedId]),
-      ]);
-      members = mResult.rows;
-      classProofs = proofResult.rows;
-      classProofGroups = groupProofsByMeeting(proofResult.rows);
-    }
     const submissions = submissionsResult.rows.map((s) => ({
       ...s,
       period_label: s.period_start ? at.formatPeriodLabel(s.period_start) : '-',
@@ -654,17 +631,12 @@ exports.presence = async (req, res) => {
     res.render('tutor/presence', {
       title: 'Kelola Presensi',
       user: req.session.user,
-      schedules: schedResult.rows,
-      members,
-      selectedSchedule,
-      selectedId,
       submissions,
       myPresences,
       programs: programsResult.rows,
       periods,
       meetings,
-      classProofs,
-      classProofGroups,
+      myMembers: myMembersResult.rows,
       error: req.flash('error'),
       success: req.flash('success'),
     });
@@ -679,28 +651,40 @@ exports.presence = async (req, res) => {
 exports.submitPresence = async (req, res) => {
   try {
     const userId = req.session.user.id;
+    const memberId = Number(req.body.member_id) || null;
     const periodStart = req.body.period_start || null;
     const programId = Number(req.body.program_id) || null;
     const meeting = Number(req.body.meeting_number) || null;
 
-    if (!periodStart || !programId || !meeting) {
+    if (!memberId || !periodStart || !programId || !meeting) {
       removeUploadedFile(req.file);
-      req.flash('error', 'Lengkapi periode, program, dan meeting.');
+      req.flash('error', 'Lengkapi member, periode, program, dan meeting.');
       return res.redirect('/tutor/presence#riwayat-presensi');
     }
     if (!req.file) {
       req.flash('error', 'Screenshot kelas wajib diunggah.');
       return res.redirect('/tutor/presence#riwayat-presensi');
     }
+    // Member harus benar-benar diajar tutor ini — cegah mengisi untuk member acak.
+    const owns = await query(
+      `SELECT 1 FROM schedule_members sm JOIN schedules s ON s.id = sm.schedule_id
+       WHERE s.tutor_id = $1 AND sm.member_id = $2 LIMIT 1`,
+      [userId, memberId]
+    );
+    if (!owns.rows.length) {
+      removeUploadedFile(req.file);
+      req.flash('error', 'Member tidak ditemukan di kelas kamu.');
+      return res.redirect('/tutor/presence#riwayat-presensi');
+    }
 
     const screenshot = `/uploads/${req.file.filename}`;
     await query(
       `INSERT INTO member_presences (member_id, tutor_id, period_start, program_id, meeting_number, screenshot)
-       VALUES ($1,$1,$2,$3,$4,$5)`,
-      [userId, periodStart, programId, meeting, screenshot]
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [memberId, userId, periodStart, programId, meeting, screenshot]
     );
-    req.flash('success', 'Presensi berhasil dikirim. Terima kasih!');
-    res.redirect('/tutor/presence#riwayat-presensi');
+    req.flash('success', 'Bukti presensi berhasil dikirim. Terima kasih!');
+    res.redirect('/tutor/presence#bukti-member');
   } catch (err) {
     console.error(err);
     removeUploadedFile(req.file);
