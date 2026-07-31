@@ -91,3 +91,25 @@ document.querySelectorAll('form[data-confirm]').forEach(form => {
     });
   });
 })();
+
+// ----------------------------------------------------------------------------
+// Tampilkan/sembunyikan password (ikon mata) — dipakai form ganti password &
+// pembuatan user. Delegasi global: tombol .toggle-password mengubah input di
+// dalam .field-wrap yang sama antara type password <-> text.
+// ----------------------------------------------------------------------------
+(function () {
+  document.addEventListener('click', function (e) {
+    // Keyed on data-pw-toggle (bukan sekadar .toggle-password) agar tidak bentrok
+    // dengan tombol lama di halaman login yang sudah punya handler inline sendiri.
+    const btn = e.target.closest('[data-pw-toggle]');
+    if (!btn) return;
+    const wrap = btn.closest('.field-wrap');
+    const input = wrap && wrap.querySelector('input');
+    if (!input) return;
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    const icon = btn.querySelector('i');
+    if (icon) icon.className = show ? 'fas fa-eye-slash' : 'fas fa-eye';
+    btn.setAttribute('aria-label', show ? 'Sembunyikan password' : 'Tampilkan password');
+  });
+})();
