@@ -436,6 +436,21 @@ exports.presence = async (req, res) => {
       period_start: at.mondayOf(schedule.date),
       meeting_number_guess: Number(schedule.meeting_number_guess) || '',
     }));
+    // Pilihan Program untuk form presensi: utamakan program dari sesi jadwal member
+    // (id-nya harus cocok dgn auto-fill saat sesi dipilih), lalu tambahkan program
+    // dari enrollment yang belum tercakup. Enrollment saja sering kosong padahal
+    // member punya sesi -> dropdown jadi kosong.
+    const programByName = new Map();
+    schedulesRes.rows.forEach((s) => {
+      if (s.program_id && !programByName.has(s.program_name)) {
+        programByName.set(s.program_name, { id: s.program_id, name: s.program_name });
+      }
+    });
+    programsRes.rows.forEach((p) => {
+      if (!programByName.has(p.name)) programByName.set(p.name, { id: p.id, name: p.name });
+    });
+    const presencePrograms = Array.from(programByName.values())
+      .sort((a, b) => String(a.name).localeCompare(String(b.name)));
     // Sampai 40 — mencakup paket terbesar (40 pertemuan), bukan hanya 24.
     const meetings = Array.from({ length: 40 }, (_, i) => i + 1);
 
@@ -443,7 +458,7 @@ exports.presence = async (req, res) => {
       title: 'Presensi',
       user: req.session.user,
       periods,
-      programs: programsRes.rows,
+      programs: presencePrograms,
       meetings,
       submissions,
       schedules,
