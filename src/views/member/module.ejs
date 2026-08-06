@@ -14,7 +14,7 @@
     <div class="at-stats">
       <div class="at-stat">
         <span class="at-stat-icon" style="--c:var(--brand-600)"><i class="fas fa-layer-group"></i></span>
-        <div><strong><%= stats.total %></strong><small>Total modul</small></div>
+        <div><strong><%= stats.total %></strong><small>Materi tersedia</small></div>
       </div>
       <div class="at-stat">
         <span class="at-stat-icon" style="--c:#D97706"><i class="fas fa-star"></i></span>
@@ -60,12 +60,12 @@
     </div>
     <% } %>
 
-    <% if (modules.length === 0) { %>
+    <% if (modules.length === 0 && visibleMaterials.length === 0) { %>
       <div class="empty-state">
         <i class="fas fa-book-open"></i>
         <p>Belum ada modul tersedia.</p>
       </div>
-    <% } else { %>
+    <% } else if (modules.length > 0) { %>
       <% let currentProgram = ''; %>
       <% modules.forEach(m => { %>
         <% if (m.program_name !== currentProgram) { %>
@@ -123,4 +123,3 @@ function showContent(id) {
 </script>
 
 <%- include('../partials/footer') %>
-

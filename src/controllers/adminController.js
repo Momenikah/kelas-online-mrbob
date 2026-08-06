@@ -11,7 +11,11 @@ const {
 } = require('../utils/scheduleSheetSync');
 const { sendScheduleNotificationEmails } = require('../utils/scheduleEmail');
 const { normalizeReportDays, ensureMemberReportsTable } = require('../utils/memberReports');
-const { ensureCertificateDetailsColumn, normalizeCertificateDetails } = require('../utils/certificates');
+const {
+  ensureCertificateDetailsColumn,
+  normalizeCertificateDetails,
+  missingRequiredPersonalReportFields,
+} = require('../utils/certificates');
 const { ensureSupportFeedbackTable } = require('../utils/supportFeedback');
 const { ensureRenewalRequestsTable, renewalStatuses } = require('../utils/renewalRequests');
 const { ensureUserAccessColumns } = require('../utils/userAccess');
@@ -1904,13 +1908,18 @@ exports.questionnaire = async (req, res) => {
     const tutor = (req.query.tutor || '').trim();
     const period = (req.query.period || '').trim();
 
-    // Tutor & period live inside each response's answers (teaching questionnaires
-    // capture tutor_name and study_period). Filtering by them keeps only
-    // questionnaires that have a matching response, and response_count follows suit.
+    // Tutor & period are now stored as scoped columns; JSON remains as fallback
+    // for older responses that were submitted before the scope columns existed.
     const params = [];
     const qrConds = ['q.id = qr.questionnaire_id'];
-    if (tutor) { params.push(tutor); qrConds.push(`qr.answers->>'tutor_name' = $${params.length}`); }
-    if (period) { params.push(period); qrConds.push(`qr.answers->>'study_period' = $${params.length}`); }
+    if (tutor) {
+      params.push(tutor);
+      qrConds.push(`COALESCE((SELECT tu.name FROM users tu WHERE tu.id = qr.tutor_id), qr.answers->>'tutor_name') = $${params.length}`);
+    }
+    if (period) {
+      params.push(period);
+      qrConds.push(`COALESCE(qr.study_period, qr.answers->>'study_period') = $${params.length}`);
+    }
 
     const where = ['1=1'];
     if (programId) { params.push(Number(programId)); where.push(`q.program_id = $${params.length}`); }
@@ -1939,10 +1948,12 @@ exports.questionnaire = async (req, res) => {
           (SELECT COUNT(*) FROM questionnaire_responses) AS responses,
           (SELECT COUNT(DISTINCT member_id) FROM questionnaire_responses) AS respondents
       `),
-      query(`SELECT DISTINCT answers->>'tutor_name' AS name FROM questionnaire_responses
-             WHERE COALESCE(answers->>'tutor_name', '') <> '' ORDER BY name`),
-      query(`SELECT DISTINCT answers->>'study_period' AS label FROM questionnaire_responses
-             WHERE COALESCE(answers->>'study_period', '') <> '' ORDER BY label`),
+      query(`SELECT DISTINCT COALESCE(t.name, qr.answers->>'tutor_name') AS name
+             FROM questionnaire_responses qr
+             LEFT JOIN users t ON t.id = qr.tutor_id
+             WHERE COALESCE(t.name, qr.answers->>'tutor_name', '') <> '' ORDER BY name`),
+      query(`SELECT DISTINCT COALESCE(study_period, answers->>'study_period') AS label FROM questionnaire_responses
+             WHERE COALESCE(study_period, answers->>'study_period', '') <> '' ORDER BY label`),
     ]);
 
     res.render('admin/questionnaire', {
@@ -2014,7 +2025,7 @@ exports.questionnaireDetail = async (req, res) => {
 
 exports.createQuestionnaire = async (req, res) => {
   try {
-    const { title, description, program_id, due_date, duration_minutes } = req.body;
+    const { title, description, program_id } = req.body;
     if (!title || !title.trim() || !program_id) {
       req.flash('error', 'Judul dan program wajib diisi.');
       return res.redirect('/admin/questionnaire');
@@ -2027,8 +2038,8 @@ exports.createQuestionnaire = async (req, res) => {
         description && description.trim() ? description.trim() : null,
         Number(program_id),
         req.session.user.id,
-        due_date || null,
-        duration_minutes ? Number(duration_minutes) : 30,
+        null,
+        null,
       ]
     );
     req.flash('success', 'Questionnaire dibuat. Tambahkan soal untuk melengkapinya.');
@@ -2364,6 +2375,11 @@ exports.issueCertificate = async (req, res) => {
       return res.redirect('/admin/certificate');
     }
     await ensureCertificateDetailsColumn(query);
+    const missingPersonalReport = missingRequiredPersonalReportFields(req.body);
+    if (missingPersonalReport.length) {
+      req.flash('error', `Personal Report wajib diisi: ${missingPersonalReport.join(', ')}.`);
+      return res.redirect('/admin/certificate');
+    }
     const details = normalizeCertificateDetails(req.body);
     const certNum = `CERT-${Date.now()}-${member_id}`;
     const inserted = await query(
@@ -2385,6 +2401,11 @@ exports.issueCertificate = async (req, res) => {
 exports.updateCertificate = async (req, res) => {
   try {
     await ensureCertificateDetailsColumn(query);
+    const missingPersonalReport = missingRequiredPersonalReportFields(req.body);
+    if (missingPersonalReport.length) {
+      req.flash('error', `Personal Report wajib diisi: ${missingPersonalReport.join(', ')}.`);
+      return res.redirect('/admin/certificate');
+    }
     const details = normalizeCertificateDetails(req.body);
     const title = String(req.body.title || '').trim() || 'Sertifikat Kelulusan';
     const updated = await query(

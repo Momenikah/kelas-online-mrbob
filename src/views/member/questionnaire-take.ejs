@@ -29,10 +29,6 @@
         </div>
         <div class="qform-meta">
           <span><i class="fas fa-book"></i> <%= questionnaire.program_name %></span>
-          <span><i class="fas fa-clock"></i> <%= questionnaire.duration_minutes %> menit</span>
-          <% if (questionnaire.due_date) { %>
-            <span><i class="fas fa-calendar"></i> <%= formatDate(questionnaire.due_date) %></span>
-          <% } %>
         </div>
       </div>
 
@@ -88,31 +84,36 @@
         <% } %>
       <% } else { %>
         <form action="<%= qSubmitBasePath %>/<%= questionnaire.id %>/submit" method="POST" id="quizForm">
-          <% if (questionnaire.duration_minutes) { %>
-            <div class="timer-bar">
-              <i class="fas fa-stopwatch"></i>
-              Sisa waktu: <span id="timer" class="timer-count"><%= questionnaire.duration_minutes %>:00</span>
-            </div>
-          <% } %>
-
           <% if (teachingMode) { %>
             <div class="qstandard-card">
               <h3>Kegiatan Ajar Mengajar Oleh Tutor</h3>
               <div class="form-group">
                 <label class="form-label">Select Tutor <span class="req">*</span></label>
-                <select name="tutor_id" id="qTutorSelect" class="form-input" required>
-                  <option value="">- Select -</option>
-                  <% teachingOptions.tutors.forEach(t => { %><option value="<%= t.id %>" data-name="<%= t.name %>"><%= t.name %></option><% }) %>
-                </select>
-                <input type="hidden" name="tutor_name" id="qTutorName">
+                <% if (teachingOptions.selectedTutor) { %>
+                  <input type="hidden" name="tutor_id" value="<%= teachingOptions.selectedTutor.id %>">
+                  <input type="hidden" name="tutor_name" value="<%= teachingOptions.selectedTutor.name %>">
+                  <input type="text" class="form-input ff-read-only" value="<%= teachingOptions.selectedTutor.name %>" readonly>
+                <% } else { %>
+                  <select name="tutor_id" id="qTutorSelect" class="form-input" required>
+                    <option value="">- Select -</option>
+                    <% teachingOptions.tutors.forEach(t => { %><option value="<%= t.id %>" data-name="<%= t.name %>"><%= t.name %></option><% }) %>
+                  </select>
+                  <input type="hidden" name="tutor_name" id="qTutorName">
+                <% } %>
               </div>
               <div class="form-group">
                 <label class="form-label">Select a Study Program <span class="req">*</span></label>
-                <select name="study_program_id" id="qProgramSelect" class="form-input" required>
-                  <option value="">- Select -</option>
-                  <% teachingOptions.programs.forEach(p => { %><option value="<%= p.id %>" data-name="<%= p.name %>"><%= p.name %></option><% }) %>
-                </select>
-                <input type="hidden" name="study_program_name" id="qProgramName">
+                <% if (teachingOptions.selectedProgram) { %>
+                  <input type="hidden" name="study_program_id" value="<%= teachingOptions.selectedProgram.id %>">
+                  <input type="hidden" name="study_program_name" value="<%= teachingOptions.selectedProgram.name %>">
+                  <input type="text" class="form-input ff-read-only" value="<%= teachingOptions.selectedProgram.name %>" readonly>
+                <% } else { %>
+                  <select name="study_program_id" id="qProgramSelect" class="form-input" required>
+                    <option value="">- Select -</option>
+                    <% teachingOptions.programs.forEach(p => { %><option value="<%= p.id %>" data-name="<%= p.name %>"><%= p.name %></option><% }) %>
+                  </select>
+                  <input type="hidden" name="study_program_name" id="qProgramName">
+                <% } %>
               </div>
               <div class="form-group">
                 <label class="form-label">Study Period <span class="req">*</span></label>
@@ -244,23 +245,6 @@ form.addEventListener('submit', function (event) {
   }
 });
 updateQuestionProgress();
-</script>
-<% } %>
-
-<% if (!response && questionnaire.duration_minutes) { %>
-<script>
-let totalSeconds = <%= questionnaire.duration_minutes %> * 60;
-const timerEl = document.getElementById('timer');
-const interval = setInterval(() => {
-  totalSeconds--;
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  timerEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
-  if (totalSeconds <= 0) {
-    clearInterval(interval);
-    document.getElementById('quizForm').submit();
-  }
-}, 1000);
 </script>
 <% } %>
 

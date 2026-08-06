@@ -11,7 +11,7 @@
   </div>
 
   <div class="container">
-    <form action="/tutor/report" method="POST" class="report-form">
+    <form action="/tutor/report" method="POST" class="report-form" id="memberReportForm">
       <% const filledCount = reportDays.filter(day => day.text).length; %>
       <div class="section-card report-editor-card">
         <div class="presence-header">
@@ -65,9 +65,13 @@
         <div class="presence-header">
           <div>
             <h3>Daily Progress</h3>
-            <p>Buka day yang ingin diisi. Day kosong tidak akan tampil di halaman member/admin.</p>
+            <p>Buka day yang ingin diisi. Minimal satu catatan Personal Report wajib diisi.</p>
           </div>
           <span class="presence-session-count"><i class="fas fa-calendar-days"></i> Day 1-15</span>
+        </div>
+        <div class="alert alert-danger report-required-alert" id="reportRequiredAlert" style="display:none">
+          <i class="fas fa-exclamation-circle"></i>
+          Personal Report wajib diisi minimal satu catatan harian.
         </div>
         <div class="report-write-list">
           <% reportDays.forEach((day, idx) => { %>
@@ -92,6 +96,8 @@
 <script>
 const reportInputs = Array.from(document.querySelectorAll('.report-day-input'));
 const filledBadge = document.getElementById('reportFilledCount');
+const reportForm = document.getElementById('memberReportForm');
+const reportRequiredAlert = document.getElementById('reportRequiredAlert');
 function updateReportFilledState() {
   let filled = 0;
   reportInputs.forEach((input) => {
@@ -103,8 +109,20 @@ function updateReportFilledState() {
     badge.classList.toggle('is-filled', hasValue);
   });
   filledBadge.innerHTML = `<i class="fas fa-file-lines"></i> ${filled}/15 terisi`;
+  if (reportRequiredAlert && filled > 0) reportRequiredAlert.style.display = 'none';
+  return filled;
 }
 reportInputs.forEach((input) => input.addEventListener('input', updateReportFilledState));
+if (reportForm) {
+  reportForm.addEventListener('submit', function (event) {
+    if (updateReportFilledState() > 0) return;
+    event.preventDefault();
+    if (reportRequiredAlert) reportRequiredAlert.style.display = 'flex';
+    const firstDay = reportInputs[0] && reportInputs[0].closest('.report-write-day');
+    if (firstDay) firstDay.open = true;
+    if (reportInputs[0]) reportInputs[0].focus();
+  });
+}
 updateReportFilledState();
 </script>
 

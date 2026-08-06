@@ -94,16 +94,27 @@ exports.showLogin = (req, res) => {
 };
 
 exports.login = async (req, res) => {
-  const { email, password } = req.body;
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const password = String(req.body.password || '');
   try {
     await ensureUserAccessColumns(query);
-    const result = await query('SELECT * FROM users WHERE email = $1 AND is_active = true', [email]);
+    const result = await query('SELECT * FROM users WHERE LOWER(TRIM(email)) = $1 AND is_active = true', [email]);
     const user = result.rows[0];
     if (!user) {
       req.flash('error', 'Email atau password salah.');
       return res.redirect('/login');
     }
-    const valid = await bcrypt.compare(password, user.password);
+    const passwordHash = String(user.password || '');
+    let valid = false;
+    if (/^\$2[aby]\$/.test(passwordHash)) {
+      valid = await bcrypt.compare(password, passwordHash);
+    } else {
+      valid = passwordHash === password;
+      if (valid) {
+        const hashed = await bcrypt.hash(password, 10);
+        await query('UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2', [hashed, user.id]);
+      }
+    }
     if (!valid) {
       req.flash('error', 'Email atau password salah.');
       return res.redirect('/login');

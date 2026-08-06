@@ -155,7 +155,7 @@ CREATE TABLE IF NOT EXISTS questionnaires (
     program_id INTEGER REFERENCES programs(id),
     created_by INTEGER REFERENCES users(id),
     due_date TIMESTAMP,
-    duration_minutes INTEGER DEFAULT 60,
+    duration_minutes INTEGER,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT NOW()
 );
@@ -175,13 +175,23 @@ CREATE TABLE IF NOT EXISTS questionnaire_responses (
     id SERIAL PRIMARY KEY,
     questionnaire_id INTEGER REFERENCES questionnaires(id),
     member_id INTEGER REFERENCES users(id),
+    tutor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    study_program_id INTEGER REFERENCES programs(id) ON DELETE SET NULL,
+    study_period VARCHAR(100),
     answers JSONB,
     score INTEGER DEFAULT 0,
     max_score INTEGER DEFAULT 0,
     started_at TIMESTAMP,
-    submitted_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(questionnaire_id, member_id)
+    submitted_at TIMESTAMP DEFAULT NOW()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS questionnaire_responses_teaching_scope_idx
+ON questionnaire_responses (questionnaire_id, member_id, tutor_id)
+WHERE tutor_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS questionnaire_responses_default_scope_idx
+ON questionnaire_responses (questionnaire_id, member_id)
+WHERE tutor_id IS NULL;
 
 CREATE TABLE IF NOT EXISTS member_reports (
     id SERIAL PRIMARY KEY,

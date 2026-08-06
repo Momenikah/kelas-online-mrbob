@@ -9,7 +9,7 @@ const { ensureCertificateDetailsColumn } = require('../utils/certificates');
 const { STUDY_TIME_SLOTS, PROGRAM_CATALOG } = require('../utils/catalog');
 const { ensureRenewalRequestsTable } = require('../utils/renewalRequests');
 const { getModuleMaterial } = require('../utils/moduleLinks');
-const { groupProofsByMeeting } = require('../utils/classProofs');
+const { ensureMemberPresenceTable } = require('../utils/memberPresence');
 const { isSemiPrivateStart } = require('../utils/semiPrivate');
 const { packagesForProgram, PRICE_LIST } = require('../utils/priceList');
 const { syncRenewal } = require('../utils/spreadsheetSync');
@@ -44,32 +44,6 @@ function calcLevel(score) {
   return            { level_num: 5, level_label: 'LEVEL 5', level_desc: 'Advanced' };
 }
 
-const timeToMinutes = (time) => {
-  const [hour, minute] = String(time || '').slice(0, 5).split(':').map(Number);
-  return hour * 60 + minute;
-};
-
-const scheduleWindow = (schedule) => {
-  const datePart = schedule.date instanceof Date
-    ? `${schedule.date.getFullYear()}-${String(schedule.date.getMonth() + 1).padStart(2, '0')}-${String(schedule.date.getDate()).padStart(2, '0')}`
-    : String(schedule.date).slice(0, 10);
-  const start = new Date(`${datePart}T${String(schedule.start_time).slice(0, 5)}:00`);
-  const end = new Date(`${datePart}T${String(schedule.end_time).slice(0, 5)}:00`);
-  return {
-    opensAt: new Date(start.getTime() - 15 * 60 * 1000),
-    startsAt: start,
-    closesAt: new Date(end.getTime() + 30 * 60 * 1000),
-  };
-};
-
-const canCheckInSchedule = (schedule) => {
-  if (!schedule || schedule.status === 'cancelled') return false;
-  if (['present', 'late'].includes(schedule.presence_status)) return false;
-  const now = new Date();
-  const window = scheduleWindow(schedule);
-  return now >= window.opensAt && now <= window.closesAt;
-};
-
 exports.dashboard = async (req, res) => {
   try {
     const userId = req.session.user.id;
@@ -93,25 +67,70 @@ exports.dashboard = async (req, res) => {
                 (SELECT COUNT(*) FROM presences WHERE member_id = $1 AND status = 'present') AS pres_present,
                 (SELECT COUNT(*) FROM certificates WHERE member_id = $1) AS certificates`, [userId]),
       query(`
-        WITH pending AS (
-          SELECT q.id, q.title, q.due_date, p.name as program_name,
+        WITH question_counts AS (
+          SELECT questionnaire_id, COUNT(*) AS cnt
+          FROM questions
+          GROUP BY questionnaire_id
+        ),
+        member_programs AS (
+          SELECT program_id
+          FROM enrollments
+          WHERE member_id = $1 AND status = 'active'
+          UNION
+          SELECT s.program_id
+          FROM schedule_members sm
+          JOIN schedules s ON s.id = sm.schedule_id
+          WHERE sm.member_id = $1 AND s.status <> 'cancelled'
+        ),
+        eligible_tutors AS (
+          SELECT DISTINCT s.program_id, s.tutor_id, t.name AS tutor_name
+          FROM schedule_members sm
+          JOIN schedules s ON s.id = sm.schedule_id
+          JOIN users t ON t.id = s.tutor_id
+          WHERE sm.member_id = $1
+            AND s.status <> 'cancelled'
+            AND t.is_active = true
+        ),
+        ranked AS (
+          SELECT q.id, q.title, q.due_date, q.created_at, q.program_id, p.name as program_name,
+                 COALESCE(qc.cnt, 0) AS question_count,
                  ROW_NUMBER() OVER (
                    PARTITION BY (CASE WHEN COALESCE(qc.cnt, 0) > 0 THEN 'c' || q.id ELSE 'p' || p.name END)
                    ORDER BY q.created_at DESC, q.id DESC
                  ) AS rn
           FROM questionnaires q
           JOIN programs p ON q.program_id = p.id
-          LEFT JOIN (SELECT questionnaire_id, COUNT(*) AS cnt FROM questions GROUP BY questionnaire_id) qc
-            ON qc.questionnaire_id = q.id
-          WHERE q.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
+          LEFT JOIN question_counts qc ON qc.questionnaire_id = q.id
+          WHERE q.program_id IN (SELECT program_id FROM member_programs)
             AND q.is_active = true
             AND (${teachingQuestionnaireFilter('q')} OR COALESCE(qc.cnt, 0) > 0)
-            AND NOT EXISTS (SELECT 1 FROM questionnaire_responses qr WHERE qr.questionnaire_id = q.id AND qr.member_id = $1)
+        ),
+        pending AS (
+          SELECT r.id, r.title, r.due_date, r.program_name, et.tutor_id, et.tutor_name
+          FROM ranked r
+          JOIN eligible_tutors et ON et.program_id = r.program_id
+          WHERE r.rn = 1
+            AND r.question_count = 0
+            AND ${teachingQuestionnaireFilter('r')}
+            AND NOT EXISTS (
+              SELECT 1 FROM questionnaire_responses qr
+              WHERE qr.questionnaire_id = r.id AND qr.member_id = $1 AND qr.tutor_id = et.tutor_id
+            )
+
+          UNION ALL
+
+          SELECT r.id, r.title, r.due_date, r.program_name, NULL::integer AS tutor_id, NULL::varchar AS tutor_name
+          FROM ranked r
+          WHERE r.rn = 1
+            AND r.question_count > 0
+            AND NOT EXISTS (
+              SELECT 1 FROM questionnaire_responses qr
+              WHERE qr.questionnaire_id = r.id AND qr.member_id = $1 AND qr.tutor_id IS NULL
+            )
         )
-        SELECT id, title, due_date, program_name
+        SELECT id, title, due_date, program_name, tutor_id, tutor_name
         FROM pending
-        WHERE rn = 1
-        ORDER BY due_date NULLS LAST
+        ORDER BY (tutor_id IS NULL), due_date NULLS LAST, program_name, tutor_name NULLS LAST
         LIMIT 5
       `, [userId]),
       query(`
@@ -308,7 +327,8 @@ exports.schedule = async (req, res) => {
 exports.module = async (req, res) => {
   try {
     const userId = req.session.user.id;
-    const programId = req.query.program_id || '';
+    const requestedProgramId = String(req.query.program_id || '');
+    const programId = /^\d+$/.test(requestedProgramId) ? requestedProgramId : '';
     const params = [userId];
     let progFilter = '';
     if (programId) { params.push(Number(programId)); progFilter = ` AND m.program_id = $${params.length}`; }
@@ -327,13 +347,22 @@ exports.module = async (req, res) => {
       query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE m.is_premium) AS premium
              FROM modules m
              WHERE m.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
-               AND m.is_active = true`, [userId]),
+               AND m.is_active = true${progFilter}`, params),
     ]);
     // Google Drive material link per enrolled program (member only sees links
     // for programs they are enrolled in — access is scoped to the chosen program).
     const programMaterials = programsRes.rows
       .map((p) => ({ id: p.id, name: p.name, material_url: getModuleMaterial(p.name) }))
       .filter((p) => p.material_url);
+    const visibleMaterialCount = programMaterials
+      .filter((p) => !programId || String(programId) === String(p.id))
+      .length;
+    const stats = {
+      ...statsRes.rows[0],
+      total: Number(statsRes.rows[0].total || 0) + visibleMaterialCount,
+      premium: Number(statsRes.rows[0].premium || 0),
+      manual: visibleMaterialCount,
+    };
 
     res.render('member/module', {
       title: 'Modul Belajar',
@@ -342,7 +371,7 @@ exports.module = async (req, res) => {
       programs: programsRes.rows,
       programMaterials,
       filters: { programId },
-      stats: statsRes.rows[0],
+      stats,
       isVip: req.session.user.is_vip || req.session.user.is_luxury,
       isLuxury: req.session.user.is_luxury,
     });
@@ -355,32 +384,42 @@ exports.module = async (req, res) => {
 exports.presence = async (req, res) => {
   try {
     const userId = req.session.user.id;
-    const [tutorsRes, periodsRes, programsRes, submissionsRes, schedulesRes] = await Promise.all([
-      query("SELECT id, name FROM users WHERE role = 'tutor' AND is_active = true ORDER BY name"),
+    await ensureMemberPresenceTable(query);
+    const [periodsRes, programsRes, submissionsRes, schedulesRes] = await Promise.all([
       query('SELECT period_start, label FROM periods ORDER BY period_start'),
-      // Full list of active programs. DISTINCT ON (name) collapses duplicate
-      // program rows that share the same name.
       query(`SELECT DISTINCT ON (p.name) p.id, p.name
              FROM programs p
-             WHERE p.is_active = true
-             ORDER BY p.name, p.id`),
-      query(`SELECT mp.*, t.name as tutor_name, p.name as program_name
+             JOIN enrollments e ON e.program_id = p.id
+             WHERE e.member_id = $1 AND e.status = 'active' AND p.is_active = true
+             ORDER BY p.name, p.id`, [userId]),
+      query(`SELECT mp.*, t.name as tutor_name, p.name as program_name,
+                    s.date as schedule_date, s.start_time as schedule_start_time, s.end_time as schedule_end_time
              FROM member_presences mp
              LEFT JOIN users t ON mp.tutor_id = t.id
              LEFT JOIN programs p ON mp.program_id = p.id
+             LEFT JOIN schedules s ON mp.schedule_id = s.id
              WHERE mp.member_id = $1 ORDER BY mp.created_at DESC`, [userId]),
       query(`
         SELECT s.*, u.name as tutor_name, u.phone as tutor_phone, p.name as program_name,
                COALESCE(pr.status, 'absent') as presence_status,
-               pr.check_in_time, pr.notes as presence_notes
+               pr.check_in_time, pr.notes as presence_notes,
+               mp.id as submission_id,
+               mp.screenshot as submission_screenshot,
+               mp.created_at as submission_created_at,
+               ROW_NUMBER() OVER (
+                 PARTITION BY sm.member_id, s.program_id
+                 ORDER BY s.date, s.start_time, s.id
+               ) as meeting_number_guess
         FROM schedule_members sm
         JOIN schedules s ON sm.schedule_id = s.id
         JOIN users u ON s.tutor_id = u.id
         JOIN programs p ON s.program_id = p.id
         LEFT JOIN presences pr ON s.id = pr.schedule_id AND pr.member_id = $1
+        LEFT JOIN member_presences mp ON mp.schedule_id = s.id AND mp.member_id = $1
         WHERE sm.member_id = $1
+          AND s.status <> 'cancelled'
         ORDER BY s.date DESC, s.start_time DESC
-        LIMIT 12
+        LIMIT 80
       `, [userId]),
     ]);
 
@@ -392,44 +431,22 @@ exports.presence = async (req, res) => {
       ...s,
       period_label: s.period_start ? at.formatPeriodLabel(s.period_start) : '-',
     }));
-    const scheduleIds = schedulesRes.rows.map((s) => s.id);
-    let proofsBySchedule = {};
-    if (scheduleIds.length) {
-      const proofsRes = await query(
-        `SELECT cp.*, u.photo as uploader_photo
-         FROM class_proofs cp LEFT JOIN users u ON cp.uploaded_by = u.id
-         WHERE cp.schedule_id = ANY($1::int[]) ORDER BY cp.created_at DESC`,
-        [scheduleIds]
-      );
-      proofsBySchedule = proofsRes.rows.reduce((acc, p) => {
-        (acc[p.schedule_id] = acc[p.schedule_id] || []).push(p);
-        return acc;
-      }, {});
-    }
     const schedules = schedulesRes.rows.map((schedule) => ({
       ...schedule,
-      can_check_in: canCheckInSchedule(schedule),
-      class_proofs: proofsBySchedule[schedule.id] || [],
-      class_proof_groups: groupProofsByMeeting(proofsBySchedule[schedule.id] || []),
+      period_start: at.mondayOf(schedule.date),
+      meeting_number_guess: Number(schedule.meeting_number_guess) || '',
     }));
-    const presenceStats = schedules.reduce((acc, schedule) => {
-      if (acc[schedule.presence_status] !== undefined) acc[schedule.presence_status] += 1;
-      acc.total += 1;
-      return acc;
-    }, { total: 0, present: 0, late: 0, excused: 0, absent: 0 });
     // Sampai 40 — mencakup paket terbesar (40 pertemuan), bukan hanya 24.
     const meetings = Array.from({ length: 40 }, (_, i) => i + 1);
 
     res.render('member/presence', {
       title: 'Presensi',
       user: req.session.user,
-      tutors: tutorsRes.rows,
       periods,
       programs: programsRes.rows,
       meetings,
       submissions,
       schedules,
-      presenceStats,
     });
   } catch (err) {
     console.error(err);
@@ -440,14 +457,22 @@ exports.presence = async (req, res) => {
 exports.submitPresence = async (req, res) => {
   try {
     const userId = req.session.user.id;
-    const tutorId = Number(req.body.tutor_id) || null;
-    const periodStart = req.body.period_start || null;
-    const programId = Number(req.body.program_id) || null;
+    await ensureMemberPresenceTable(query);
+    const scheduleId = Number(req.body.schedule_id) || null;
+    let tutorId = Number(req.body.tutor_id) || null;
+    let periodStart = req.body.period_start || null;
+    let programId = Number(req.body.program_id) || null;
     const meeting = Number(req.body.meeting_number) || null;
+    let schedule = null;
 
-    if (!tutorId || !periodStart || !programId || !meeting) {
+    if (!scheduleId && (!tutorId || !periodStart || !programId)) {
       removeUploadedFile(req.file);
-      req.flash('error', 'Lengkapi tutor, periode, program, dan meeting.');
+      req.flash('error', 'Pilih sesi presensi terlebih dahulu.');
+      return res.redirect('/member/presence');
+    }
+    if (!meeting) {
+      removeUploadedFile(req.file);
+      req.flash('error', 'Lengkapi nomor meeting.');
       return res.redirect('/member/presence');
     }
     if (!req.file) {
@@ -455,36 +480,81 @@ exports.submitPresence = async (req, res) => {
       return res.redirect('/member/presence');
     }
 
-    const screenshot = `/uploads/${req.file.filename}`;
-    await query(
-      `INSERT INTO member_presences (member_id, tutor_id, period_start, program_id, meeting_number, screenshot)
-       VALUES ($1,$2,$3,$4,$5,$6)`,
-      [userId, tutorId, periodStart, programId, meeting, screenshot]
-    );
+    if (scheduleId) {
+      const scheduleResult = await query(`
+        SELECT s.*
+        FROM schedule_members sm
+        JOIN schedules s ON s.id = sm.schedule_id
+        WHERE sm.schedule_id = $1 AND sm.member_id = $2
+        LIMIT 1
+      `, [scheduleId, userId]);
+      schedule = scheduleResult.rows[0];
+      if (!schedule || schedule.status === 'cancelled') {
+        removeUploadedFile(req.file);
+        req.flash('error', 'Sesi tidak ditemukan atau sudah dibatalkan.');
+        return res.redirect('/member/presence');
+      }
+      tutorId = schedule.tutor_id;
+      programId = schedule.program_id;
+      periodStart = at.mondayOf(schedule.date);
+    }
 
-    // Kaitkan presensi mandiri ke jadwal aslinya supaya TERHITUNG HADIR.
-    // Tanpa ini, member yang sudah mengisi presensi tetap berstatus 'absent'
-    // (check-in hanya terbuka di sekitar jam kelas). Dipilih satu sesi: yang
-    // tutornya cocok lebih dulu, lalu sesi terawal di periode yang belum hadir.
-    const marked = await query(
-      `INSERT INTO presences (schedule_id, member_id, status, check_in_time, updated_by, updated_at, source)
-       SELECT s.id, $1, 'present', NOW(), $1, NOW(), 'self-report'
-       FROM schedules s
-       JOIN schedule_members sm ON sm.schedule_id = s.id AND sm.member_id = $1
-       LEFT JOIN presences pr ON pr.schedule_id = s.id AND pr.member_id = $1
-       WHERE s.program_id = $2
-         AND date_trunc('week', s.date)::date = $3::date
-         AND s.status <> 'cancelled'
-         AND (pr.status IS NULL OR pr.status NOT IN ('present', 'late'))
-       ORDER BY (s.tutor_id = $4) DESC, s.date, s.start_time
-       LIMIT 1
-       ON CONFLICT (schedule_id, member_id)
-       DO UPDATE SET status = 'present',
-                     check_in_time = COALESCE(presences.check_in_time, NOW()),
-                     updated_by = EXCLUDED.updated_by, updated_at = NOW(), source = 'self-report'
-       RETURNING schedule_id`,
-      [userId, programId, periodStart, tutorId]
+    const screenshot = `/uploads/${req.file.filename}`;
+    const existingProof = scheduleId
+      ? await query('SELECT screenshot FROM member_presences WHERE member_id = $1 AND schedule_id = $2', [userId, scheduleId])
+      : { rows: [] };
+    await query(
+      `INSERT INTO member_presences (member_id, tutor_id, schedule_id, period_start, program_id, meeting_number, screenshot)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT (member_id, schedule_id)
+       DO UPDATE SET tutor_id = EXCLUDED.tutor_id,
+                     period_start = EXCLUDED.period_start,
+                     program_id = EXCLUDED.program_id,
+                     meeting_number = EXCLUDED.meeting_number,
+                     screenshot = EXCLUDED.screenshot,
+                     created_at = NOW()`,
+      [userId, tutorId, scheduleId, periodStart, programId, meeting, screenshot]
     );
+    if (existingProof.rows[0] && existingProof.rows[0].screenshot && existingProof.rows[0].screenshot !== screenshot) {
+      fs.unlink(path.join(__dirname, '../../public', existingProof.rows[0].screenshot), () => {});
+    }
+
+    let marked = { rows: [] };
+    if (scheduleId) {
+      marked = await query(
+        `INSERT INTO presences (schedule_id, member_id, status, check_in_time, updated_by, updated_at, source)
+         VALUES ($1,$2,'present',NOW(),$2,NOW(),'self-report')
+         ON CONFLICT (schedule_id, member_id)
+         DO UPDATE SET status = 'present',
+                       check_in_time = COALESCE(presences.check_in_time, NOW()),
+                       updated_by = EXCLUDED.updated_by,
+                       updated_at = NOW(),
+                       source = 'self-report'
+         RETURNING schedule_id`,
+        [scheduleId, userId]
+      );
+    } else {
+      // Fallback untuk request lama: tetap usahakan kaitkan ke satu jadwal.
+      marked = await query(
+        `INSERT INTO presences (schedule_id, member_id, status, check_in_time, updated_by, updated_at, source)
+         SELECT s.id, $1, 'present', NOW(), $1, NOW(), 'self-report'
+         FROM schedules s
+         JOIN schedule_members sm ON sm.schedule_id = s.id AND sm.member_id = $1
+         LEFT JOIN presences pr ON pr.schedule_id = s.id AND pr.member_id = $1
+         WHERE s.program_id = $2
+           AND date_trunc('week', s.date)::date = $3::date
+           AND s.status <> 'cancelled'
+           AND (pr.status IS NULL OR pr.status NOT IN ('present', 'late'))
+         ORDER BY (s.tutor_id = $4) DESC, s.date, s.start_time
+         LIMIT 1
+         ON CONFLICT (schedule_id, member_id)
+         DO UPDATE SET status = 'present',
+                       check_in_time = COALESCE(presences.check_in_time, NOW()),
+                       updated_by = EXCLUDED.updated_by, updated_at = NOW(), source = 'self-report'
+         RETURNING schedule_id`,
+        [userId, programId, periodStart, tutorId]
+      );
+    }
 
     req.flash('success', marked.rows.length
       ? 'Presensi berhasil dikirim. Kamu tercatat HADIR untuk sesi ini.'
@@ -499,79 +569,14 @@ exports.submitPresence = async (req, res) => {
 };
 
 exports.checkInPresence = async (req, res) => {
-  try {
-    const userId = req.session.user.id;
-    const scheduleId = req.params.schedule_id;
-    const result = await query(`
-      SELECT s.*, COALESCE(pr.status, 'absent') as presence_status
-      FROM schedule_members sm
-      JOIN schedules s ON sm.schedule_id = s.id
-      LEFT JOIN presences pr ON pr.schedule_id = s.id AND pr.member_id = sm.member_id
-      WHERE sm.schedule_id = $1 AND sm.member_id = $2
-    `, [scheduleId, userId]);
-
-    const schedule = result.rows[0];
-    if (!schedule) {
-      req.flash('error', 'Jadwal tidak ditemukan untuk akun kamu.');
-      return res.redirect('/member/presence');
-    }
-    if (!canCheckInSchedule(schedule)) {
-      req.flash('error', 'Presensi belum dibuka, sudah ditutup, atau sudah terisi.');
-      return res.redirect('/member/presence');
-    }
-
-    const window = scheduleWindow(schedule);
-    const status = new Date() > window.startsAt ? 'late' : 'present';
-    await query(`
-      INSERT INTO presences (schedule_id, member_id, status, check_in_time, updated_by, updated_at, source)
-      VALUES ($1,$2,$3,NOW(),$2,NOW(),'member')
-      ON CONFLICT (schedule_id, member_id)
-      DO UPDATE SET status = $3, check_in_time = COALESCE(presences.check_in_time, NOW()),
-                    updated_by = $2, updated_at = NOW(), source = 'member'
-    `, [scheduleId, userId, status]);
-
-    req.flash('success', status === 'late' ? 'Check-in berhasil. Status kamu terlambat.' : 'Check-in berhasil. Selamat belajar!');
-    return res.redirect('/member/presence');
-  } catch (err) {
-    console.error(err);
-    req.flash('error', 'Gagal check-in presensi.');
-    return res.redirect('/member/presence');
-  }
+  req.flash('error', 'Presensi sekarang hanya lewat form Upload Bukti Presensi.');
+  return res.redirect('/member/presence');
 };
 
 exports.uploadClassProof = async (req, res) => {
-  try {
-    const userId = req.session.user.id;
-    const scheduleId = req.params.schedule_id;
-    // pastikan member memang peserta sesi ini
-    const member = await query(
-      'SELECT 1 FROM schedule_members WHERE schedule_id = $1 AND member_id = $2',
-      [scheduleId, userId]
-    );
-    if (!member.rows.length) {
-      removeUploadedFile(req.file);
-      req.flash('error', 'Jadwal tidak ditemukan untuk akun kamu.');
-      return res.redirect('/member/presence');
-    }
-    if (!req.file) {
-      req.flash('error', 'Pilih gambar foto kelas terlebih dahulu.');
-      return res.redirect('/member/presence');
-    }
-    const meeting = Number(req.body.meeting_number) || null;
-    await query(
-      `INSERT INTO class_proofs (schedule_id, uploaded_by, uploader_role, uploader_name, image, caption, meeting_number)
-       VALUES ($1,$2,'member',$3,$4,$5,$6)`,
-      [scheduleId, userId, req.session.user.name, `/uploads/${req.file.filename}`,
-       (req.body.caption || '').trim() || null, meeting]
-    );
-    req.flash('success', meeting ? `Foto kelas Pertemuan ${meeting} berhasil diunggah.` : 'Foto kelas berhasil diunggah.');
-    return res.redirect('/member/presence');
-  } catch (err) {
-    console.error(err);
-    removeUploadedFile(req.file);
-    req.flash('error', 'Gagal mengunggah foto kelas.');
-    return res.redirect('/member/presence');
-  }
+  removeUploadedFile(req.file);
+  req.flash('error', 'Upload bukti presensi member hanya lewat form Upload Bukti Presensi.');
+  return res.redirect('/member/presence');
 };
 
 exports.deleteClassProof = async (req, res) => {
@@ -604,9 +609,32 @@ exports.questionnaire = async (req, res) => {
     const userId = req.session.user.id;
     await ensureTeachingQuestionnaires(query);
     const result = await query(`
-      WITH available AS (
+      WITH question_counts AS (
+        SELECT questionnaire_id, COUNT(*) AS cnt
+        FROM questions
+        GROUP BY questionnaire_id
+      ),
+      member_programs AS (
+        SELECT program_id
+        FROM enrollments
+        WHERE member_id = $1 AND status = 'active'
+        UNION
+        SELECT s.program_id
+        FROM schedule_members sm
+        JOIN schedules s ON s.id = sm.schedule_id
+        WHERE sm.member_id = $1 AND s.status <> 'cancelled'
+      ),
+      eligible_tutors AS (
+        SELECT DISTINCT s.program_id, s.tutor_id, t.name AS tutor_name
+        FROM schedule_members sm
+        JOIN schedules s ON s.id = sm.schedule_id
+        JOIN users t ON t.id = s.tutor_id
+        WHERE sm.member_id = $1
+          AND s.status <> 'cancelled'
+          AND t.is_active = true
+      ),
+      ranked_questionnaires AS (
         SELECT q.*,
-               qr.id as response_id, qr.score, qr.max_score, qr.submitted_at,
                p.name as program_name,
                COALESCE(qc.cnt, 0) AS question_count,
                ROW_NUMBER() OVER (
@@ -615,17 +643,49 @@ exports.questionnaire = async (req, res) => {
                ) AS rn
         FROM questionnaires q
         JOIN programs p ON q.program_id = p.id
-        LEFT JOIN questionnaire_responses qr ON q.id = qr.questionnaire_id AND qr.member_id = $1
-        LEFT JOIN (SELECT questionnaire_id, COUNT(*) AS cnt FROM questions GROUP BY questionnaire_id) qc
-          ON qc.questionnaire_id = q.id
-        WHERE q.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
+        LEFT JOIN question_counts qc ON qc.questionnaire_id = q.id
+        WHERE q.program_id IN (SELECT program_id FROM member_programs)
           AND q.is_active = true
           AND (${teachingQuestionnaireFilter('q')} OR COALESCE(qc.cnt, 0) > 0)
+      ),
+      available AS (
+        SELECT rq.*,
+               et.tutor_id,
+               et.tutor_name,
+               qr.id as response_id,
+               qr.score,
+               qr.max_score,
+               qr.submitted_at
+        FROM ranked_questionnaires rq
+        JOIN eligible_tutors et ON et.program_id = rq.program_id
+        LEFT JOIN questionnaire_responses qr
+          ON rq.id = qr.questionnaire_id
+         AND qr.member_id = $1
+         AND qr.tutor_id = et.tutor_id
+        WHERE rq.rn = 1
+          AND rq.question_count = 0
+          AND ${teachingQuestionnaireFilter('rq')}
+
+        UNION ALL
+
+        SELECT rq.*,
+               NULL::integer AS tutor_id,
+               NULL::varchar AS tutor_name,
+               qr.id as response_id,
+               qr.score,
+               qr.max_score,
+               qr.submitted_at
+        FROM ranked_questionnaires rq
+        LEFT JOIN questionnaire_responses qr
+          ON rq.id = qr.questionnaire_id
+         AND qr.member_id = $1
+         AND qr.tutor_id IS NULL
+        WHERE rq.rn = 1
+          AND rq.question_count > 0
       )
       SELECT *
       FROM available
-      WHERE rn = 1
-      ORDER BY created_at DESC
+      ORDER BY (tutor_id IS NULL), created_at DESC, program_name, tutor_name NULLS LAST
     `, [userId]);
     res.render('member/questionnaire', {
       title: 'Questionnaire',
@@ -645,20 +705,75 @@ exports.questionnaireShow = async (req, res) => {
     if (req.session.user.role === 'admin') return res.redirect(`/admin/questionnaire/${req.params.id}`);
     const { id } = req.params;
     const userId = req.session.user.id;
-    const [qResult, questionsResult, responseResult, tutorsRes, programsRes, periodsRes] = await Promise.all([
+    await ensureTeachingQuestionnaires(query);
+    const [qResult, questionsResult] = await Promise.all([
       query(`SELECT q.*, p.name as program_name
              FROM questionnaires q
              JOIN programs p ON q.program_id = p.id
              WHERE q.id = $1
-               AND q.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $2 AND status = 'active')`, [id, userId]),
+               AND q.is_active = true
+               AND q.program_id IN (
+                 SELECT program_id FROM enrollments WHERE member_id = $2 AND status = 'active'
+                 UNION
+                 SELECT s.program_id
+                 FROM schedule_members sm
+                 JOIN schedules s ON s.id = sm.schedule_id
+                 WHERE sm.member_id = $2 AND s.status <> 'cancelled'
+               )`, [id, userId]),
       query('SELECT * FROM questions WHERE questionnaire_id = $1 ORDER BY order_number', [id]),
-      query('SELECT * FROM questionnaire_responses WHERE questionnaire_id = $1 AND member_id = $2', [id, userId]),
-      query("SELECT id, name FROM users WHERE role = 'tutor' AND is_active = true ORDER BY name"),
-      query('SELECT id, name FROM programs WHERE is_active = true ORDER BY name'),
-      query('SELECT period_start, label FROM periods ORDER BY period_start DESC'),
     ]);
     const questionnaire = qResult.rows[0];
     if (!questionnaire) return res.redirect('/member/questionnaire');
+    const teachingMode = isTeachingMode(questionnaire, questionsResult.rows.length);
+    const requestedTutorId = Number(req.query.tutor_id) || null;
+    let tutors = [];
+    let selectedTutor = null;
+    let periods = [];
+
+    if (teachingMode) {
+      const tutorsRes = await query(`
+        SELECT DISTINCT t.id, t.name
+        FROM schedule_members sm
+        JOIN schedules s ON s.id = sm.schedule_id
+        JOIN users t ON t.id = s.tutor_id
+        WHERE sm.member_id = $1
+          AND s.program_id = $2
+          AND s.status <> 'cancelled'
+          AND t.is_active = true
+        ORDER BY t.name
+      `, [userId, questionnaire.program_id]);
+      tutors = tutorsRes.rows;
+      selectedTutor = tutors.find((t) => Number(t.id) === requestedTutorId) || (tutors.length === 1 ? tutors[0] : null);
+      if (!selectedTutor) {
+        req.flash('error', 'Pilih questionnaire dari kartu program dan tutor yang tersedia.');
+        return res.redirect('/member/questionnaire');
+      }
+      const periodsRes = await query(`
+        SELECT DISTINCT date_trunc('week', s.date)::date AS period_start
+        FROM schedule_members sm
+        JOIN schedules s ON s.id = sm.schedule_id
+        WHERE sm.member_id = $1
+          AND s.program_id = $2
+          AND s.tutor_id = $3
+          AND s.status <> 'cancelled'
+        ORDER BY period_start DESC
+      `, [userId, questionnaire.program_id, selectedTutor.id]);
+      periods = periodsRes.rows.map((p) => ({
+        value: at.toISODate(p.period_start),
+        label: at.formatPeriodLabel(p.period_start),
+      }));
+    } else {
+      const periodsRes = await query('SELECT period_start, label FROM periods ORDER BY period_start DESC');
+      periods = periodsRes.rows.map((p) => ({
+        value: at.toISODate(p.period_start),
+        label: p.label || at.formatPeriodLabel(p.period_start),
+      }));
+    }
+
+    const responseResult = teachingMode
+      ? await query('SELECT * FROM questionnaire_responses WHERE questionnaire_id = $1 AND member_id = $2 AND tutor_id = $3', [id, userId, selectedTutor.id])
+      : await query('SELECT * FROM questionnaire_responses WHERE questionnaire_id = $1 AND member_id = $2 AND tutor_id IS NULL', [id, userId]);
+
     res.render('member/questionnaire-take', {
       title: questionnaire.title,
       user: req.session.user,
@@ -668,17 +783,16 @@ exports.questionnaireShow = async (req, res) => {
       questionnaire,
       questions: questionsResult.rows,
       response: responseResult.rows[0] || null,
-      isTeachingQuestionnaire: isTeachingMode(questionnaire, questionsResult.rows.length),
+      isTeachingQuestionnaire: teachingMode,
       teachingRatings,
       teachingEssays,
       ratingLabels,
       teachingOptions: {
-        tutors: tutorsRes.rows,
-        programs: programsRes.rows,
-        periods: periodsRes.rows.map((p) => ({
-          value: at.toISODate(p.period_start),
-          label: p.label || at.formatPeriodLabel(p.period_start),
-        })),
+        tutors,
+        selectedTutor,
+        programs: [{ id: questionnaire.program_id, name: questionnaire.program_name }],
+        selectedProgram: { id: questionnaire.program_id, name: questionnaire.program_name },
+        periods,
       },
     });
   } catch (err) {
@@ -697,18 +811,65 @@ exports.questionnaireSubmit = async (req, res) => {
     const userId = req.session.user.id;
     const answers = req.body;
 
-    const qResult = await query('SELECT * FROM questionnaires WHERE id = $1', [id]);
+    await ensureTeachingQuestionnaires(query);
+    const qResult = await query(`
+      SELECT q.*, p.name as program_name
+      FROM questionnaires q
+      JOIN programs p ON p.id = q.program_id
+      WHERE q.id = $1
+        AND q.is_active = true
+        AND q.program_id IN (
+          SELECT program_id FROM enrollments WHERE member_id = $2 AND status = 'active'
+          UNION
+          SELECT s.program_id
+          FROM schedule_members sm
+          JOIN schedules s ON s.id = sm.schedule_id
+          WHERE sm.member_id = $2 AND s.status <> 'cancelled'
+        )
+    `, [id, userId]);
     const questionnaire = qResult.rows[0];
+    if (!questionnaire) {
+      req.flash('error', 'Questionnaire tidak tersedia untuk akun kamu.');
+      return res.redirect('/member/questionnaire');
+    }
     const questionsResult = await query('SELECT * FROM questions WHERE questionnaire_id = $1', [id]);
     const questions = questionsResult.rows;
 
     if (questionnaire && isTeachingMode(questionnaire, questions.length)) {
+      const tutorId = Number(req.body.tutor_id) || null;
+      if (!tutorId) {
+        req.flash('error', 'Tutor wajib dipilih dari kartu questionnaire.');
+        return res.redirect('/member/questionnaire');
+      }
+      const tutorResult = await query(`
+        SELECT DISTINCT t.id, t.name
+        FROM schedule_members sm
+        JOIN schedules s ON s.id = sm.schedule_id
+        JOIN users t ON t.id = s.tutor_id
+        WHERE sm.member_id = $1
+          AND s.program_id = $2
+          AND s.tutor_id = $3
+          AND s.status <> 'cancelled'
+          AND t.is_active = true
+        LIMIT 1
+      `, [userId, questionnaire.program_id, tutorId]);
+      const tutor = tutorResult.rows[0];
+      if (!tutor) {
+        req.flash('error', 'Tutor tidak sesuai dengan jadwal/program kamu.');
+        return res.redirect('/member/questionnaire');
+      }
       const built = buildTeachingQuestionnaireAnswer(req.body);
+      built.answers.tutor_id = String(tutor.id);
+      built.answers.tutor_name = tutor.name;
+      built.answers.study_program_id = String(questionnaire.program_id);
+      built.answers.study_program_name = questionnaire.program_name;
       await query(`
-        INSERT INTO questionnaire_responses (questionnaire_id, member_id, answers, score, max_score, started_at)
-        VALUES ($1, $2, $3, $4, $5, NOW())
-        ON CONFLICT (questionnaire_id, member_id) DO UPDATE SET answers=$3, score=$4, max_score=$5, submitted_at=NOW()
-      `, [id, userId, JSON.stringify(built.answers), built.score, built.maxScore]);
+        INSERT INTO questionnaire_responses
+          (questionnaire_id, member_id, tutor_id, study_program_id, study_period, answers, score, max_score, started_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+        ON CONFLICT (questionnaire_id, member_id, tutor_id) WHERE tutor_id IS NOT NULL
+        DO UPDATE SET study_program_id=$4, study_period=$5, answers=$6, score=$7, max_score=$8, submitted_at=NOW()
+      `, [id, userId, tutor.id, questionnaire.program_id, built.answers.study_period || null, JSON.stringify(built.answers), built.score, built.maxScore]);
       req.flash('success', `Questionnaire berhasil dikumpulkan. Skor: ${built.score}/${built.maxScore}`);
       return res.redirect('/member/questionnaire');
     }
@@ -732,10 +893,11 @@ exports.questionnaireSubmit = async (req, res) => {
     });
 
     await query(`
-      INSERT INTO questionnaire_responses (questionnaire_id, member_id, answers, score, max_score, started_at)
-      VALUES ($1, $2, $3, $4, $5, NOW())
-      ON CONFLICT (questionnaire_id, member_id) DO UPDATE SET answers=$3, score=$4, max_score=$5, submitted_at=NOW()
-    `, [id, userId, JSON.stringify(answerMap), score, maxScore]);
+      INSERT INTO questionnaire_responses (questionnaire_id, member_id, tutor_id, study_program_id, answers, score, max_score, started_at)
+      VALUES ($1, $2, NULL, $3, $4, $5, $6, NOW())
+      ON CONFLICT (questionnaire_id, member_id) WHERE tutor_id IS NULL
+      DO UPDATE SET study_program_id=$3, answers=$4, score=$5, max_score=$6, submitted_at=NOW()
+    `, [id, userId, questionnaire.program_id, JSON.stringify(answerMap), score, maxScore]);
 
     req.flash('success', `Kuis berhasil dikumpulkan! Skor kamu: ${score}/${maxScore}`);
     res.redirect('/member/questionnaire');

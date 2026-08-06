@@ -188,26 +188,14 @@
       z-index: 2;
       left: 30.6%;
       top: 73.7%;
-      width: 22%;
-      line-height: .8;
+      width: 11.8%;
       pointer-events: none;
     }
     .cert-stamp img {
       display: block;
-      width: 78%;
-      height: 4.15cqw;
-      object-fit: cover;
-      object-position: top left;
-      margin-bottom: .08cqw;
-    }
-    .cert-stamp strong {
-      display: block;
-      color: #0b4cff;
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 3.85cqw;
-      font-weight: 900;
-      letter-spacing: 0;
-      line-height: .76;
+      width: 100%;
+      height: auto;
+      object-fit: contain;
     }
     .report-name-label,
     .report-name-value,
@@ -390,9 +378,7 @@
         <div class="v l cert-label period-label">Date of Period :</div>
         <div class="v l cert-value cert-period"><%- ordinalHtml(periodLabel) %></div>
         <div class="cert-stamp" aria-hidden="true">
-          <img src="/img/logo-mrbob.webp" alt="">
-          <strong>Super</strong>
-          <strong>Seru!</strong>
+          <img src="/img/certificate-stamp-super-seru.png" alt="">
         </div>
       </section>
     <% } %>

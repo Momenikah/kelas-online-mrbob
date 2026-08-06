@@ -68,10 +68,12 @@ function parseCustomDays(text) {
   const found = new Set();
   text
     .split(/[,;/]+|\s+/)
-    .map((t) => t.trim().toLowerCase())
+    .map((t) => t.trim().toLowerCase().replace(/[\u2019`]/g, "'").replace(/^[^\p{L}']+|[^\p{L}']+$/gu, ''))
     .filter(Boolean)
     .forEach((token) => {
+      const compactToken = token.replace(/[^\p{L}]/gu, '');
       if (token in DAY_LOOKUP) found.add(DAY_LOOKUP[token]);
+      else if (compactToken in DAY_LOOKUP) found.add(DAY_LOOKUP[compactToken]);
     });
   return [...found].sort((a, b) => a - b);
 }

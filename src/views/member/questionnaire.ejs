@@ -17,6 +17,7 @@
     <% } else { %>
       <div class="quiz-grid">
         <% questionnaires.forEach(q => { %>
+        <% const qHref = `${questionnaireBasePath}/${q.id}${q.tutor_id ? `?tutor_id=${q.tutor_id}` : ''}`; %>
         <div class="quiz-card">
           <div class="quiz-card-header">
             <div class="quiz-icon"><i class="fas fa-clipboard-question"></i></div>
@@ -24,18 +25,15 @@
               <span class="quiz-program"><%= q.program_name %></span>
               <% if (q.submitted_at) { %>
                 <span class="quiz-status-done"><i class="fas fa-check-circle"></i> Selesai</span>
-              <% } else if (q.due_date && new Date(q.due_date) < new Date()) { %>
-                <span class="quiz-status-expired"><i class="fas fa-times-circle"></i> Berakhir</span>
               <% } else { %>
-                <span class="quiz-status-open"><i class="fas fa-clock"></i> Terbuka</span>
+                <span class="quiz-status-open"><i class="fas fa-circle"></i> Terbuka</span>
               <% } %>
             </div>
           </div>
           <h3 class="quiz-title"><%= q.title %></h3>
           <% if (q.description) { %><p class="quiz-desc"><%= q.description %></p><% } %>
           <div class="quiz-info">
-            <span><i class="fas fa-clock"></i> Durasi: <%= q.duration_minutes %> menit</span>
-            <% if (q.due_date) { %><span><i class="fas fa-calendar"></i> Deadline: <%= formatDate(q.due_date) %></span><% } %>
+            <% if (q.tutor_name) { %><span><i class="fas fa-chalkboard-teacher"></i> Tutor: <%= q.tutor_name %></span><% } %>
           </div>
           <% if (q.submitted_at) { %>
             <div class="quiz-result">
@@ -45,11 +43,11 @@
               </div>
               <span>Skor kamu</span>
             </div>
-            <a href="<%= questionnaireBasePath %>/<%= q.id %>" class="btn btn-outline btn-full">
+            <a href="<%= qHref %>" class="btn btn-outline btn-full">
               <i class="fas fa-eye"></i> Lihat Hasil
             </a>
           <% } else { %>
-            <a href="<%= questionnaireBasePath %>/<%= q.id %>" class="btn btn-primary btn-full">
+            <a href="<%= qHref %>" class="btn btn-primary btn-full">
               <i class="fas fa-pen"></i> Isi Questionnaire
             </a>
           <% } %>

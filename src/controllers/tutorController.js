@@ -7,7 +7,11 @@ const { toCsv } = require('../utils/csv');
 const { syncTutorAvailableTime, syncCertificate } = require('../utils/spreadsheetSync');
 const { sendScheduleNotificationEmails } = require('../utils/scheduleEmail');
 const { emptyReportDays, normalizeReportDays, ensureMemberReportsTable } = require('../utils/memberReports');
-const { ensureCertificateDetailsColumn, normalizeCertificateDetails } = require('../utils/certificates');
+const {
+  ensureCertificateDetailsColumn,
+  normalizeCertificateDetails,
+  missingRequiredPersonalReportFields,
+} = require('../utils/certificates');
 const { SUPPORT_EMAIL, sendSupportFeedback } = require('../utils/supportEmail');
 const { saveSupportFeedback, updateSupportFeedbackEmailStatus } = require('../utils/supportFeedback');
 const {
@@ -460,11 +464,15 @@ exports.saveAvailableTime = async (req, res) => {
     const entries = [];
     const seen = new Set();
     const daySlots = new Map();
+    let legacyCustomIndex = 0;
     for (let i = 0; i < jam.length; i += 1) {
       const slot = at.parseSlot(jam[i]);
       if (!slot) continue;
       const category = ['weekdays', 'weekend', 'custom'].includes(hari[i]) ? hari[i] : 'weekdays';
-      const customDays = category === 'custom' ? (custom[i] || '').trim() : null;
+      const rawCustom = category === 'custom'
+        ? (custom.length === jam.length ? custom[i] : custom[legacyCustomIndex++])
+        : '';
+      const customDays = category === 'custom' ? (rawCustom || '').trim() : null;
       const expandedDays = at.expandDays(category, customDays);
 
       if (slot.end_time <= slot.start_time) {
@@ -806,14 +814,14 @@ exports.questionnaire = async (req, res) => {
     const programId = req.query.program_id || '';
     const period = String(req.query.period || '').trim();
     const params = [String(tutorId)];
-    const where = [`qr.answers->>'tutor_id' = $1`, teachingQuestionnaireFilter('q')];
+    const where = [`COALESCE(qr.tutor_id::text, qr.answers->>'tutor_id') = $1`, teachingQuestionnaireFilter('q')];
     if (programId) {
       params.push(Number(programId));
       where.push(`q.program_id = $${params.length}`);
     }
     if (period) {
       params.push(period);
-      where.push(`qr.answers->>'study_period' = $${params.length}`);
+      where.push(`COALESCE(qr.study_period, qr.answers->>'study_period') = $${params.length}`);
     }
 
     const [responsesResult, programsResult, periodsResult] = await Promise.all([
@@ -829,12 +837,12 @@ exports.questionnaire = async (req, res) => {
       `, params),
       query('SELECT id, name FROM programs WHERE is_active = true ORDER BY name'),
       query(`
-        SELECT DISTINCT qr.answers->>'study_period' as period
+        SELECT DISTINCT COALESCE(qr.study_period, qr.answers->>'study_period') as period
         FROM questionnaire_responses qr
         JOIN questionnaires q ON q.id = qr.questionnaire_id
-        WHERE qr.answers->>'tutor_id' = $1
+        WHERE COALESCE(qr.tutor_id::text, qr.answers->>'tutor_id') = $1
           AND ${teachingQuestionnaireFilter('q')}
-          AND COALESCE(qr.answers->>'study_period', '') <> ''
+          AND COALESCE(qr.study_period, qr.answers->>'study_period', '') <> ''
         ORDER BY period DESC
       `, [String(tutorId)]),
     ]);
@@ -933,11 +941,11 @@ exports.createQuestionnaire = async (req, res) => {
       return res.redirect('/admin/questionnaire');
     }
     const tutorId = req.session.user.id;
-    const { title, description, program_id, due_date, duration_minutes } = req.body;
+    const { title, description, program_id } = req.body;
     await query(
       `INSERT INTO questionnaires (title, description, program_id, created_by, due_date, duration_minutes)
        VALUES ($1,$2,$3,$4,$5,$6)`,
-      [title, description, program_id, tutorId, due_date || null, duration_minutes || 60]
+      [title, description, program_id, tutorId, null, null]
     );
     req.flash('success', 'Kuesioner berhasil dibuat.');
     res.redirect('/tutor/questionnaire');
@@ -1091,15 +1099,25 @@ exports.questionnaireAnswerSubmit = async (req, res) => {
     const { id } = req.params;
     const userId = req.session.user.id;
     const answers = req.body;
-    const qResult = await query('SELECT * FROM questionnaires WHERE id = $1', [id]);
+    await ensureTeachingQuestionnaires(query);
+    const qResult = await query('SELECT q.*, p.name as program_name FROM questionnaires q JOIN programs p ON p.id = q.program_id WHERE q.id = $1', [id]);
     const questionnaire = qResult.rows[0];
     if (questionnaire && isTeachingQuestionnaire(questionnaire)) {
       const built = buildTeachingQuestionnaireAnswer(req.body);
+      const tutorId = Number(built.answers.tutor_id) || null;
+      if (!tutorId) {
+        req.flash('error', 'Tutor wajib dipilih.');
+        return res.redirect(`/tutor/questionnaire/answer/${id}`);
+      }
+      built.answers.study_program_id = String(questionnaire.program_id);
+      built.answers.study_program_name = questionnaire.program_name;
       await query(`
-        INSERT INTO questionnaire_responses (questionnaire_id, member_id, answers, score, max_score, started_at)
-        VALUES ($1, $2, $3, $4, $5, NOW())
-        ON CONFLICT (questionnaire_id, member_id) DO UPDATE SET answers=$3, score=$4, max_score=$5, submitted_at=NOW()
-      `, [id, userId, JSON.stringify(built.answers), built.score, built.maxScore]);
+        INSERT INTO questionnaire_responses
+          (questionnaire_id, member_id, tutor_id, study_program_id, study_period, answers, score, max_score, started_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+        ON CONFLICT (questionnaire_id, member_id, tutor_id) WHERE tutor_id IS NOT NULL
+        DO UPDATE SET study_program_id=$4, study_period=$5, answers=$6, score=$7, max_score=$8, submitted_at=NOW()
+      `, [id, userId, tutorId, questionnaire.program_id, built.answers.study_period || null, JSON.stringify(built.answers), built.score, built.maxScore]);
       req.flash('success', 'Questionnaire berhasil dikumpulkan.');
       return res.redirect('/tutor/questionnaire/answer');
     }
@@ -1124,10 +1142,11 @@ exports.questionnaireAnswerSubmit = async (req, res) => {
     });
 
     await query(`
-      INSERT INTO questionnaire_responses (questionnaire_id, member_id, answers, score, max_score, started_at)
-      VALUES ($1, $2, $3, $4, $5, NOW())
-      ON CONFLICT (questionnaire_id, member_id) DO UPDATE SET answers=$3, score=$4, max_score=$5, submitted_at=NOW()
-    `, [id, userId, JSON.stringify(answerMap), score, maxScore]);
+      INSERT INTO questionnaire_responses (questionnaire_id, member_id, tutor_id, study_program_id, answers, score, max_score, started_at)
+      VALUES ($1, $2, NULL, $3, $4, $5, $6, NOW())
+      ON CONFLICT (questionnaire_id, member_id) WHERE tutor_id IS NULL
+      DO UPDATE SET study_program_id=$3, answers=$4, score=$5, max_score=$6, submitted_at=NOW()
+    `, [id, userId, questionnaire ? questionnaire.program_id : null, JSON.stringify(answerMap), score, maxScore]);
 
     req.flash('success', 'Questionnaire berhasil dikumpulkan.');
     res.redirect('/tutor/questionnaire/answer');
@@ -1293,10 +1312,21 @@ exports.saveReport = async (req, res) => {
     const periodStart = req.body.period_start;
     const packageName = String(req.body.package_name || '').trim();
     const days = normalizeReportDays(req.body.days || {});
+    const backToEdit = () => {
+      const params = new URLSearchParams();
+      if (memberId) params.set('member_id', String(memberId));
+      if (programId) params.set('program_id', String(programId));
+      if (periodStart) params.set('period_start', String(periodStart));
+      return `/tutor/report/edit${params.toString() ? `?${params.toString()}` : ''}`;
+    };
 
     if (!memberId || !programId || !periodStart) {
       req.flash('error', 'Member, program, dan periode wajib diisi.');
-      return res.redirect('/tutor/report/edit');
+      return res.redirect(backToEdit());
+    }
+    if (!Object.values(days).some(Boolean)) {
+      req.flash('error', 'Personal Report wajib diisi minimal satu catatan harian.');
+      return res.redirect(backToEdit());
     }
     const allowed = await query(`
       SELECT 1
@@ -1307,7 +1337,7 @@ exports.saveReport = async (req, res) => {
     `, [tutorId, memberId, programId]);
     if (!allowed.rows.length) {
       req.flash('error', 'Member/program tidak sesuai dengan jadwal tutor.');
-      return res.redirect('/tutor/report/edit');
+      return res.redirect(backToEdit());
     }
 
     await ensureMemberReportsTable(query);
@@ -1473,6 +1503,11 @@ exports.issueCertificate = async (req, res) => {
     }
 
     await ensureCertificateDetailsColumn(query);
+    const missingPersonalReport = missingRequiredPersonalReportFields(req.body);
+    if (missingPersonalReport.length) {
+      req.flash('error', `Personal Report wajib diisi: ${missingPersonalReport.join(', ')}.`);
+      return res.redirect('/tutor/certificate');
+    }
     const details = normalizeCertificateDetails(req.body);
     const certNum = `CERT-${Date.now()}-${member_id}`;
     const inserted = await query(
@@ -1499,6 +1534,11 @@ exports.issueCertificate = async (req, res) => {
 exports.updateCertificate = async (req, res) => {
   try {
     await ensureCertificateDetailsColumn(query);
+    const missingPersonalReport = missingRequiredPersonalReportFields(req.body);
+    if (missingPersonalReport.length) {
+      req.flash('error', `Personal Report wajib diisi: ${missingPersonalReport.join(', ')}.`);
+      return res.redirect('/tutor/certificate');
+    }
     const details = normalizeCertificateDetails(req.body);
     const title = String(req.body.title || '').trim() || 'Sertifikat Kelulusan';
     const updated = await query(

@@ -174,8 +174,8 @@ async function migrate() {
         'Evaluasi pemahaman materi listening dan structure',
         p.id,
         u.id,
-        NOW() + INTERVAL '7 days',
-        30
+        NULL,
+        NULL
       FROM programs p, users u
       WHERE p.name = 'TOEFL Preparation' AND u.role = 'tutor'
     `);

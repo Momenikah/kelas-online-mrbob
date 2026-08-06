@@ -73,7 +73,8 @@
             <select name="hari[]" class="form-input" data-hari>
               <% dayCategories.forEach(c => { %><option value="<%= c.value %>"><%= c.label %></option><% }) %>
             </select>
-            <input type="text" name="custom[]" class="form-input" data-custom placeholder="Senin, Rabu, Jumat" disabled>
+            <input type="hidden" name="custom[]" data-custom-value>
+            <input type="text" class="form-input" data-custom placeholder="Senin, Rabu, Jumat" disabled>
             <div class="repeater-actions">
               <button type="button" class="btn-icon btn-add" data-add title="Tambah baris"><i class="fas fa-plus"></i></button>
               <button type="button" class="btn-icon btn-remove" data-remove title="Hapus baris"><i class="fas fa-minus"></i></button>
@@ -199,15 +200,19 @@
   function syncCustom(row) {
     var hari = row.querySelector('[data-hari]');
     var custom = row.querySelector('[data-custom]');
+    var customValue = row.querySelector('[data-custom-value]');
     if (!hari || !custom) return;
     var isCustom = hari.value === 'custom';
     custom.disabled = !isCustom;
     if (!isCustom) custom.value = '';
+    if (customValue) customValue.value = isCustom ? custom.value.trim() : '';
   }
 
   function bindRow(row) {
     var hari = row.querySelector('[data-hari]');
     if (hari) hari.addEventListener('change', function () { syncCustom(row); refresh(); });
+    var custom = row.querySelector('[data-custom]');
+    if (custom) custom.addEventListener('input', function () { syncCustom(row); refresh(); });
     syncCustom(row);
   }
 
@@ -225,6 +230,7 @@
       var jam = row.querySelector('[name="jam_belajar[]"]');
       var hari = row.querySelector('[data-hari]');
       var custom = row.querySelector('[data-custom]');
+      syncCustom(row);
       if (!jam) return;
       var chip = document.createElement('span');
       chip.className = 'at-chip cat-' + (hari ? hari.value : 'weekdays');
@@ -262,6 +268,9 @@
 
   repeater.addEventListener('change', refresh);
   repeater.addEventListener('input', refresh);
+  form.addEventListener('submit', function () {
+    repeater.querySelectorAll('[data-row]').forEach(syncCustom);
+  });
 
   function setRowCount(n) {
     var rows = repeater.querySelectorAll('[data-row]');
@@ -282,6 +291,7 @@
       if (hari) hari.value = slot.hari;
       syncCustom(row);
       if (custom && slot.hari === 'custom') custom.value = slot.custom || '';
+      syncCustom(row);
     });
     if (data.periode) periodeSelect.value = data.periode;
     notesField.value = data.notes || '';

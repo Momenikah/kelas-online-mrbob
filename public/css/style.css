@@ -3397,28 +3397,16 @@ h1, h2, h3, h4, h5, h6 { line-height: 1.3; color: var(--gray-900); font-weight: 
 .cm-stamp {
   left: 30.6%;
   top: 73.7%;
-  width: 22%;
-  line-height: .8;
+  width: 11.8%;
   pointer-events: none;
 }
 .cm-stamp img {
   position: static;
   inset: auto;
   display: block;
-  width: 78%;
-  height: 4.15cqw;
-  object-fit: cover;
-  object-position: top left;
-  margin-bottom: .08cqw;
-}
-.cm-stamp strong {
-  display: block;
-  color: #0b4cff;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 3.85cqw;
-  font-weight: 900;
-  letter-spacing: 0;
-  line-height: .76;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 .cm-test-name {
   left: 10.8%;
@@ -8023,28 +8011,15 @@ select.form-input,
 .pv-stamp {
   left: 30.6%;
   top: 73.7%;
-  width: 22%;
-  line-height: .8;
+  width: 11.8%;
   pointer-events: none;
 }
 .cert-mini-test .pv-stamp { display: none; }
 .pv-stamp img {
   display: block;
-  width: 78%;
-  height: 4.15cqw;
-  object-fit: cover;
-  object-position: top left;
-  margin-bottom: .08cqw;
-}
-.pv-stamp strong {
-  position: static !important;
-  display: block;
-  color: #0b4cff !important;
-  font-family: Arial, Helvetica, sans-serif !important;
-  font-size: clamp(9px, 1.12vw, 16px);
-  font-weight: 900;
-  letter-spacing: 0;
-  line-height: .76;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 .pv-score-list {
   left: 11%;

@@ -15,8 +15,6 @@
       <div class="presence-selected-meta">
         <span><i class="fas fa-book-open"></i> <%= questionnaire.program_name %></span>
         <span><i class="fas fa-user"></i> <%= questionnaire.creator_name || '-' %></span>
-        <span><i class="fas fa-clock"></i> <%= questionnaire.duration_minutes %> menit</span>
-        <% if (questionnaire.due_date) { %><span><i class="fas fa-calendar"></i> <%= formatDate(questionnaire.due_date) %></span><% } %>
       </div>
       <% if (questionnaire.description) { %><p class="quiz-desc" style="margin-top:10px"><%= questionnaire.description %></p><% } %>
       <% if (!isTeachingQuestionnaire) { %>

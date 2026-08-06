@@ -141,34 +141,34 @@
           <h4>Personal Report</h4>
           <p class="field-hint">Hanya untuk kategori Speaking dan Holiday.</p>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Speaking (1-5)</label><input type="number" min="1" max="5" name="speaking_score" class="form-input"></div>
-            <div class="form-group"><label class="form-label">Pronunciation (1-5)</label><input type="number" min="1" max="5" name="pronunciation_score" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Speaking (1-5) <span class="req">*</span></label><input type="number" min="1" max="5" name="speaking_score" class="form-input" required></div>
+            <div class="form-group"><label class="form-label">Pronunciation (1-5) <span class="req">*</span></label><input type="number" min="1" max="5" name="pronunciation_score" class="form-input" required></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Vocabulary (1-5)</label><input type="number" min="1" max="5" name="vocabulary_score" class="form-input"></div>
-            <div class="form-group"><label class="form-label">Grammar (1-5)</label><input type="number" min="1" max="5" name="grammar_score" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Vocabulary (1-5) <span class="req">*</span></label><input type="number" min="1" max="5" name="vocabulary_score" class="form-input" required></div>
+            <div class="form-group"><label class="form-label">Grammar (1-5) <span class="req">*</span></label><input type="number" min="1" max="5" name="grammar_score" class="form-input" required></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Understanding (1-5)</label><input type="number" min="1" max="5" name="understanding_score" class="form-input"></div>
-            <div class="form-group"><label class="form-label">CEFR</label><input type="text" name="cefr_score" class="form-input" placeholder="Contoh: B2 Proficiency"></div>
+            <div class="form-group"><label class="form-label">Understanding (1-5) <span class="req">*</span></label><input type="number" min="1" max="5" name="understanding_score" class="form-input" required></div>
+            <div class="form-group"><label class="form-label">CEFR <span class="req">*</span></label><input type="text" name="cefr_score" class="form-input" placeholder="Contoh: B2 Proficiency" required></div>
           </div>
           <h4 style="margin-top:18px;">Notes per Section</h4>
           <p class="field-hint">Catatan singkat tiap bagian dari tutor — tampil di kolom <strong>Notes</strong> pada Personal Report.</p>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Notes Speaking</label><input type="text" name="speaking_note" class="form-input" placeholder="mis. Lancar, perlu latihan intonasi"></div>
-            <div class="form-group"><label class="form-label">Notes Vocabulary</label><input type="text" name="vocabulary_note" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Notes Speaking <span class="req">*</span></label><input type="text" name="speaking_note" class="form-input" placeholder="mis. Lancar, perlu latihan intonasi" required></div>
+            <div class="form-group"><label class="form-label">Notes Vocabulary <span class="req">*</span></label><input type="text" name="vocabulary_note" class="form-input" required></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Notes Grammar</label><input type="text" name="grammar_note" class="form-input"></div>
-            <div class="form-group"><label class="form-label">Notes Pronunciation</label><input type="text" name="pronunciation_note" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Notes Grammar <span class="req">*</span></label><input type="text" name="grammar_note" class="form-input" required></div>
+            <div class="form-group"><label class="form-label">Notes Pronunciation <span class="req">*</span></label><input type="text" name="pronunciation_note" class="form-input" required></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Notes Understanding</label><input type="text" name="understanding_note" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Notes Understanding <span class="req">*</span></label><input type="text" name="understanding_note" class="form-input" required></div>
             <div class="form-group"></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Before</label><textarea name="before" class="form-textarea" rows="3"></textarea></div>
-            <div class="form-group"><label class="form-label">After</label><textarea name="after" class="form-textarea" rows="3"></textarea></div>
+            <div class="form-group"><label class="form-label">Before <span class="req">*</span></label><textarea name="before" class="form-textarea" rows="3" required></textarea></div>
+            <div class="form-group"><label class="form-label">After <span class="req">*</span></label><textarea name="after" class="form-textarea" rows="3" required></textarea></div>
           </div>
         </div>
 
@@ -224,9 +224,7 @@
                   <span class="pv-static pv-period-label">Date of Period :</span>
                   <strong class="pv-period" id="previewPeriod">-</strong>
                   <div class="pv-stamp" aria-hidden="true">
-                    <img src="/img/logo-mrbob.webp" alt="">
-                    <strong>Super</strong>
-                    <strong>Seru!</strong>
+                    <img src="/img/certificate-stamp-super-seru.png" alt="">
                   </div>
                   <div class="pv-score-list" id="previewScoreList">
                     <span><b>Listening</b><i>:</i><em id="pvListening">-</em></span>

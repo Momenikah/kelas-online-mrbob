@@ -7,187 +7,105 @@
   <div class="sub-banner">
     <a href="/member" class="back-link"><i class="fas fa-arrow-left"></i></a>
     <h1>Presensi Kelas</h1>
-    <p class="sub-banner-desc">Check-in jadwal kelas dan kirim bukti kehadiran dari satu halaman.</p>
   </div>
 
+  <%
+    const uploadSessions = schedules || [];
+  %>
+
   <div class="container">
-    <div class="section-card">
-      <div class="presence-header">
-        <div>
-          <h3>Presensi Jadwal</h3>
-          <p>Member bisa check-in saat sesi dibuka. Tutor tetap dapat memperbarui status dari halaman tutor.</p>
+    <form action="/member/presence" method="POST" enctype="multipart/form-data" class="modal-form" id="presenceForm">
+      <input type="hidden" name="tutor_id" id="presenceTutorId">
+
+      <div class="section-card presence-session-card">
+        <div class="presence-session-head">
+          <h3 class="section-title"><i class="fas fa-magnifying-glass"></i> Pilih Sesi</h3>
+          <span class="presence-session-count"><i class="fas fa-calendar-check"></i> <%= uploadSessions.length %> sesi</span>
         </div>
-        <span class="presence-session-count"><i class="fas fa-calendar-check"></i> <%= presenceStats.total %> sesi</span>
-      </div>
 
-      <div class="presence-summary">
-        <span class="ps-chip ps-present"><i class="fas fa-check"></i> Hadir: <strong><%= presenceStats.present %></strong></span>
-        <span class="ps-chip ps-late"><i class="fas fa-clock"></i> Terlambat: <strong><%= presenceStats.late %></strong></span>
-        <span class="ps-chip ps-excused"><i class="fas fa-envelope"></i> Izin: <strong><%= presenceStats.excused %></strong></span>
-        <span class="ps-chip ps-absent"><i class="fas fa-xmark"></i> Absen: <strong><%= presenceStats.absent %></strong></span>
-      </div>
+        <div class="form-group">
+          <label class="presence-session-label"><i class="fas fa-list"></i> Ganti sesi presensi</label>
+          <select name="schedule_id" id="presenceSchedule" class="form-input presence-session-select" required <%= uploadSessions.length === 0 ? 'disabled' : '' %>>
+            <option value="">Pilih sesi yang akan diisi presensinya</option>
+            <% uploadSessions.forEach(s => { %>
+              <option value="<%= s.id %>"
+                      data-tutor-id="<%= s.tutor_id %>"
+                      data-program-id="<%= s.program_id %>"
+                      data-period-start="<%= s.period_start %>"
+                      data-meeting="<%= s.meeting_number_guess %>"
+                      data-submitted="<%= s.submission_id ? '1' : '' %>">
+                <%= formatDate(s.date) %> | <%= formatTime(s.start_time) %>-<%= formatTime(s.end_time) %> | <%= s.program_name %> | <%= s.tutor_name %><%= s.submission_id ? ' | Sudah terkirim' : '' %>
+              </option>
+            <% }) %>
+          </select>
+          <p class="field-hint">Jika presensi sesi ini sudah pernah dikirim, submit ulang akan memperbarui bukti presensi lama.</p>
+        </div>
 
-      <% if (schedules.length === 0) { %>
-        <div class="empty-state compact"><i class="fas fa-calendar-xmark"></i><p>Belum ada jadwal untuk presensi.</p></div>
-      <% } else { %>
-        <div class="schedule-cards presence-checkin-list">
-          <% schedules.forEach(s => { %>
-            <div class="sched-card <%= s.status %>">
-              <div class="sched-card-header">
-                <div class="sched-date">
-                  <span class="sched-day"><%= new Date(s.date).toLocaleDateString('id-ID', {day:'2-digit'}) %></span>
-                  <span class="sched-month"><%= new Date(s.date).toLocaleDateString('id-ID', {month:'short', year:'numeric'}) %></span>
-                </div>
-                <div class="sched-status-badge">
-                  <% if (s.status === 'completed') { %>
-                    <span class="badge-pill badge-completed"><i class="fas fa-check"></i> Selesai</span>
-                  <% } else if (s.status === 'upcoming') { %>
-                    <span class="badge-pill badge-upcoming"><i class="fas fa-clock"></i> Akan Datang</span>
-                  <% } else if (s.status === 'cancelled') { %>
-                    <span class="badge-pill badge-cancelled"><i class="fas fa-times"></i> Dibatalkan</span>
-                  <% } %>
-                </div>
-              </div>
-              <div class="sched-body">
-                <h3 class="sched-title"><%= s.title %></h3>
-                <div class="sched-meta">
-                  <span><i class="fas fa-book"></i> <%= s.program_name %></span>
-                  <span><i class="fas fa-chalkboard-teacher"></i> <%= s.tutor_name %></span>
-                  <span><i class="fas fa-clock"></i> <%= formatTime(s.start_time) %> - <%= formatTime(s.end_time) %></span>
-                </div>
-              </div>
-              <div class="sched-footer">
-                <span class="presence-pill presence-<%= s.presence_status %>">
-                  <i class="fas fa-<%= s.presence_status === 'present' ? 'check' : s.presence_status === 'late' ? 'clock' : s.presence_status === 'excused' ? 'envelope' : 'times' %>"></i>
-                  <%= s.presence_status === 'present' ? 'Hadir' : s.presence_status === 'late' ? 'Terlambat' : s.presence_status === 'excused' ? 'Izin' : 'Belum Hadir' %>
-                </span>
-                <% if (s.can_check_in) { %>
-                  <form action="/member/presence/<%= s.id %>/check-in" method="POST" style="display:inline">
-                    <button class="btn btn-sm btn-primary"><i class="fas fa-user-check"></i> Check-in</button>
-                  </form>
-                <% } %>
-                <% if (s.check_in_time) { %>
-                  <span class="table-subtext"><i class="fas fa-clock"></i> <%= new Date(s.check_in_time).toLocaleString('id-ID', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) %></span>
-                <% } %>
-              </div>
-
-              <details class="sched-proofs"<%= (s.class_proofs && s.class_proofs.length) ? ' open' : '' %>>
-                <summary>
-                  <span><i class="fas fa-camera-retro"></i> Foto Kelas</span>
-                  <span class="sched-proofs-count"><%= (s.class_proofs || []).length %></span>
-                </summary>
-                <% (s.class_proof_groups || []).forEach(g => { %>
-                  <div class="cp-meeting-group">
-                    <div class="cp-meeting-head">
-                      <span class="cp-meeting-label">
-                        <i class="fas fa-<%= g.meeting ? 'hashtag' : 'folder-open' %>"></i>
-                        <%= g.meeting ? 'Pertemuan ' + g.meeting : 'Tanpa nomor pertemuan' %>
-                      </span>
-                      <span class="cp-meeting-count"><%= g.items.length %> foto</span>
-                    </div>
-                    <div class="class-proof-gallery compact">
-                      <% g.items.forEach(cp => { %>
-                        <figure class="class-proof-item">
-                          <a href="<%= cp.image %>" target="_blank" rel="noopener">
-                            <img src="<%= cp.image %>" alt="<%= cp.caption || 'Foto kelas' %>" loading="lazy">
-                          </a>
-                          <figcaption>
-                            <span class="cp-meta">
-                              <b><%= cp.caption || 'Foto kelas' %></b>
-                              <small>
-                                <i class="fas fa-<%= cp.uploader_role === 'member' ? 'user-graduate' : 'chalkboard-teacher' %>"></i>
-                                <%= cp.uploader_name || (cp.uploader_role === 'member' ? 'Member' : 'Tutor') %>
-                              </small>
-                            </span>
-                            <% if (cp.uploaded_by == user.id) { %>
-                              <form action="/member/presence/class-proof/<%= cp.id %>/delete" method="POST" onsubmit="return confirm('Hapus foto ini?')">
-                                <button class="cp-del" title="Hapus"><i class="fas fa-trash"></i></button>
-                              </form>
-                            <% } %>
-                          </figcaption>
-                        </figure>
-                      <% }) %>
-                    </div>
-                  </div>
-                <% }) %>
-                <form action="/member/presence/<%= s.id %>/class-proof" method="POST" enctype="multipart/form-data" class="sched-proof-form">
-                  <label class="sched-proof-file">
-                    <i class="fas fa-cloud-arrow-up"></i> <span>Pilih gambar</span>
-                    <input type="file" name="class_photo" accept="image/*" required onchange="this.closest('form').querySelector('.sched-proof-name').textContent = (this.files[0] ? this.files[0].name : '');">
-                  </label>
-                  <span class="sched-proof-name"></span>
-                  <select name="meeting_number" class="form-input cp-meeting-select" required title="Foto ini untuk pertemuan ke berapa?">
-                    <option value="">Pertemuan ke-</option>
-                    <% meetings.forEach(n => { %><option value="<%= n %>">Pertemuan <%= n %></option><% }) %>
-                  </select>
-                  <input type="text" name="caption" class="form-input" maxlength="255" placeholder="Keterangan (opsional)">
-                  <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-upload"></i> Unggah</button>
-                </form>
-              </details>
+        <div id="presenceSelectedSession" class="presence-selected-session" style="display:none">
+          <div class="presence-date-tile">
+            <strong id="selectedSessionDay">--</strong>
+            <span id="selectedSessionMonth">--</span>
+          </div>
+          <div class="presence-selected-body">
+            <div class="presence-selected-title">
+              <h4 id="selectedSessionProgram">Pilih sesi</h4>
+              <span class="badge-pill badge-upcoming" id="selectedSessionMeeting">Meeting</span>
             </div>
-          <% }) %>
+            <div class="presence-selected-meta">
+              <span><i class="fas fa-chalkboard-teacher"></i> <b id="selectedSessionTutor">-</b></span>
+              <span><i class="fas fa-clock"></i> <b id="selectedSessionTime">-</b></span>
+            </div>
+          </div>
         </div>
-      <% } %>
-    </div>
 
-    <!-- Submission form -->
-    <div class="section-card">
-      <h3 class="section-title"><i class="fas fa-camera"></i> Upload Bukti Presensi</h3>
-      <form action="/member/presence" method="POST" enctype="multipart/form-data" class="modal-form" id="presenceForm">
+        <% if (uploadSessions.length === 0) { %>
+          <div class="empty-state compact"><i class="fas fa-calendar-xmark"></i><p>Belum ada sesi untuk presensi.</p></div>
+        <% } %>
+      </div>
+
+      <div class="section-card">
+        <h3 class="section-title"><i class="fas fa-camera"></i> Upload Bukti Presensi</h3>
+
         <div class="form-group">
           <label class="form-label">Full Name <span class="req">*</span></label>
           <input type="text" class="form-input ff-read-only" value="<%= user.name %>" readonly>
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Choose The Tutor <span class="req">*</span></label>
-          <select name="tutor_id" class="form-input" required>
-            <option value="">- Select -</option>
-            <% tutors.forEach(t => { %><option value="<%= t.id %>"><%= t.name %></option><% }) %>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Study Period <span class="req">*</span></label>
-          <select name="period_start" class="form-input" required>
-            <option value="">- Select -</option>
-            <% periods.forEach(p => { %><option value="<%= p.value %>"><%= p.label %></option><% }) %>
-          </select>
-        </div>
-
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Program <span class="req">*</span></label>
-            <select name="program_id" class="form-input" required>
+            <select name="program_id" id="presenceProgram" class="form-input" required <%= uploadSessions.length === 0 ? 'disabled' : '' %>>
               <option value="">- Select -</option>
-              <% programs.forEach(p => { %><option value="<%= p.id %>" <%= programs.length === 1 ? 'selected' : '' %>><%= p.name %></option><% }) %>
+              <% programs.forEach(p => { %><option value="<%= p.id %>"><%= p.name %></option><% }) %>
             </select>
-            <% if (programs.length === 0) { %>
-              <small class="field-hint">Belum ada program terdaftar. Hubungi admin bila kelasmu belum muncul.</small>
-            <% } else { %>
-              <small class="field-hint">Sesuai program pendaftaranmu.</small>
-            <% } %>
           </div>
           <div class="form-group">
-            <label class="form-label">Meeting <span class="req">*</span></label>
-            <select name="meeting_number" class="form-input" required>
+            <label class="form-label">Study Period <span class="req">*</span></label>
+            <select name="period_start" id="presencePeriod" class="form-input" required <%= uploadSessions.length === 0 ? 'disabled' : '' %>>
               <option value="">- Select -</option>
-              <% meetings.forEach(m => { %><option value="<%= m %>"><%= m %></option><% }) %>
+              <% periods.forEach(p => { %><option value="<%= p.value %>"><%= p.label %></option><% }) %>
             </select>
           </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Meeting <span class="req">*</span></label>
+          <select name="meeting_number" id="presenceMeeting" class="form-input" required <%= uploadSessions.length === 0 ? 'disabled' : '' %>>
+            <option value="">- Select -</option>
+            <% meetings.forEach(m => { %><option value="<%= m %>"><%= m %></option><% }) %>
+          </select>
         </div>
 
         <div class="form-group">
           <label class="form-label">Class Screenshot <span class="req">*</span></label>
-          <input type="file" name="class_screenshot" class="form-input" accept="image/*" required>
+          <input type="file" name="class_screenshot" class="form-input" accept="image/*" required <%= uploadSessions.length === 0 ? 'disabled' : '' %>>
           <p class="field-hint">Unggah screenshot kelas (JPG/PNG/WEBP, maks. 5MB) sebagai bukti kehadiran.</p>
         </div>
 
-        <button type="submit" class="btn btn-primary btn-full"><i class="fas fa-paper-plane"></i> Submit</button>
-      </form>
-    </div>
+        <button type="submit" class="btn btn-primary btn-full" <%= uploadSessions.length === 0 ? 'disabled' : '' %>><i class="fas fa-paper-plane"></i> Submit</button>
+      </div>
+    </form>
 
-    <!-- History -->
     <div class="section-card">
       <div class="presence-history-head">
         <h3 class="section-title"><i class="fas fa-clock-rotate-left"></i> Riwayat Presensi Saya</h3>
@@ -242,5 +160,63 @@
     </div>
   </div>
 </div>
+
+<script>
+(() => {
+  const schedule = document.getElementById('presenceSchedule');
+  if (!schedule) return;
+
+  const tutor = document.getElementById('presenceTutorId');
+  const program = document.getElementById('presenceProgram');
+  const period = document.getElementById('presencePeriod');
+  const meeting = document.getElementById('presenceMeeting');
+  const panel = document.getElementById('presenceSelectedSession');
+  const day = document.getElementById('selectedSessionDay');
+  const month = document.getElementById('selectedSessionMonth');
+  const title = document.getElementById('selectedSessionProgram');
+  const sessionTutor = document.getElementById('selectedSessionTutor');
+  const time = document.getElementById('selectedSessionTime');
+  const sessionMeeting = document.getElementById('selectedSessionMeeting');
+
+  const parseLabel = (label) => {
+    const parts = String(label || '').split('|').map((part) => part.trim());
+    return {
+      date: parts[0] || '-',
+      time: parts[1] || '-',
+      program: parts[2] || '-',
+      tutor: parts[3] || '-',
+    };
+  };
+
+  const updateFields = () => {
+    const option = schedule.options[schedule.selectedIndex];
+    if (!option || !option.value) {
+      tutor.value = '';
+      program.value = '';
+      period.value = '';
+      meeting.value = '';
+      panel.style.display = 'none';
+      return;
+    }
+
+    tutor.value = option.dataset.tutorId || '';
+    program.value = option.dataset.programId || '';
+    period.value = option.dataset.periodStart || '';
+    meeting.value = option.dataset.meeting || '';
+
+    const label = parseLabel(option.textContent);
+    const dateParts = label.date.split(' ');
+    day.textContent = dateParts[0] || '--';
+    month.textContent = dateParts.slice(1).join(' ') || '--';
+    title.textContent = label.program;
+    sessionTutor.textContent = label.tutor;
+    time.textContent = label.time;
+    sessionMeeting.textContent = meeting.value ? `Meeting ${meeting.value}` : 'Meeting';
+    panel.style.display = 'flex';
+  };
+
+  schedule.addEventListener('change', updateFields);
+})();
+</script>
 
 <%- include('../partials/footer') %>

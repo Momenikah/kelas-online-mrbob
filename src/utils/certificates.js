@@ -7,6 +7,29 @@ const certificateCategoryAllowsPersonalReport = (category = '') => {
   return value.includes('speaking') || value.includes('holiday');
 };
 
+const PERSONAL_REPORT_REQUIRED_FIELDS = [
+  ['speaking_score', 'Speaking score'],
+  ['pronunciation_score', 'Pronunciation score'],
+  ['vocabulary_score', 'Vocabulary score'],
+  ['grammar_score', 'Grammar score'],
+  ['understanding_score', 'Understanding score'],
+  ['cefr_score', 'CEFR'],
+  ['speaking_note', 'Notes Speaking'],
+  ['vocabulary_note', 'Notes Vocabulary'],
+  ['grammar_note', 'Notes Grammar'],
+  ['pronunciation_note', 'Notes Pronunciation'],
+  ['understanding_note', 'Notes Understanding'],
+  ['before', 'Before'],
+  ['after', 'After'],
+];
+
+const missingRequiredPersonalReportFields = (body = {}) => {
+  if (!certificateCategoryAllowsPersonalReport(body.category)) return [];
+  return PERSONAL_REPORT_REQUIRED_FIELDS
+    .filter(([key]) => String(body[key] || '').trim() === '')
+    .map(([, label]) => label);
+};
+
 const normalizeCertificateDetails = (body = {}) => {
   const category = String(body.category || '').trim();
   const details = {
@@ -55,4 +78,5 @@ module.exports = {
   ensureCertificateDetailsColumn,
   normalizeCertificateDetails,
   certificateCategoryAllowsPersonalReport,
+  missingRequiredPersonalReportFields,
 };

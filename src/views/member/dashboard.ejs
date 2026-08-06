@@ -120,9 +120,9 @@
         <div class="quiz-pending-item">
           <div>
             <strong><%= q.title %></strong>
-            <span class="table-subtext"><%= q.program_name %><% if (q.due_date) { %> &middot; deadline <%= formatDate(q.due_date) %><% } %></span>
+            <span class="table-subtext"><%= q.program_name %><% if (q.tutor_name) { %> &middot; <%= q.tutor_name %><% } %></span>
           </div>
-          <a href="/member/questionnaire/<%= q.id %>" class="btn btn-sm btn-primary"><i class="fas fa-pen"></i> Kerjakan</a>
+          <a href="/member/questionnaire/<%= q.id %><%= q.tutor_id ? '?tutor_id=' + q.tutor_id : '' %>" class="btn btn-sm btn-primary"><i class="fas fa-pen"></i> Kerjakan</a>
         </div>
         <% }) %>
       </div>

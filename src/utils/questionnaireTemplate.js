@@ -64,7 +64,45 @@ const buildTeachingQuestionnaireAnswer = (body = {}) => {
   };
 };
 
+const ensureQuestionnaireResponseScope = async (query) => {
+  await query(`ALTER TABLE questionnaire_responses ADD COLUMN IF NOT EXISTS tutor_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
+  await query(`ALTER TABLE questionnaire_responses ADD COLUMN IF NOT EXISTS study_program_id INTEGER REFERENCES programs(id) ON DELETE SET NULL`);
+  await query(`ALTER TABLE questionnaire_responses ADD COLUMN IF NOT EXISTS study_period VARCHAR(100)`);
+  await query(`
+    UPDATE questionnaire_responses qr
+    SET tutor_id = NULLIF(qr.answers->>'tutor_id', '')::int
+    WHERE qr.tutor_id IS NULL
+      AND qr.answers ? 'tutor_id'
+      AND (qr.answers->>'tutor_id') ~ '^[0-9]+$'
+  `);
+  await query(`
+    UPDATE questionnaire_responses qr
+    SET study_program_id = NULLIF(qr.answers->>'study_program_id', '')::int
+    WHERE qr.study_program_id IS NULL
+      AND qr.answers ? 'study_program_id'
+      AND (qr.answers->>'study_program_id') ~ '^[0-9]+$'
+  `);
+  await query(`
+    UPDATE questionnaire_responses qr
+    SET study_period = NULLIF(qr.answers->>'study_period', '')
+    WHERE qr.study_period IS NULL
+      AND qr.answers ? 'study_period'
+  `);
+  await query(`ALTER TABLE questionnaire_responses DROP CONSTRAINT IF EXISTS questionnaire_responses_questionnaire_id_member_id_key`);
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS questionnaire_responses_teaching_scope_idx
+    ON questionnaire_responses (questionnaire_id, member_id, tutor_id)
+    WHERE tutor_id IS NOT NULL
+  `);
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS questionnaire_responses_default_scope_idx
+    ON questionnaire_responses (questionnaire_id, member_id)
+    WHERE tutor_id IS NULL
+  `);
+};
+
 const ensureTeachingQuestionnaires = async (query) => {
+  await ensureQuestionnaireResponseScope(query);
   const creatorResult = await query(`
     SELECT id
     FROM users
@@ -83,7 +121,7 @@ const ensureTeachingQuestionnaires = async (query) => {
       p.id,
       $1,
       NULL,
-      30,
+      NULL,
       true
     FROM programs p
     WHERE p.is_active = true
@@ -108,5 +146,6 @@ module.exports = {
   teachingEssays,
   ratingLabels,
   buildTeachingQuestionnaireAnswer,
+  ensureQuestionnaireResponseScope,
   ensureTeachingQuestionnaires,
 };
