@@ -15,9 +15,12 @@ const { pool, query } = require('../src/config/database');
 const { buildQuestionnairePayload } = require('../src/utils/spreadsheetSync');
 
 const WEBHOOK_URL = process.env.QUESTIONNAIRE_WEBHOOK_URL || process.env.SHEET_WEBHOOK_URL;
-const REQUEST_TIMEOUT_MS = 30000;
-const DELAY_BETWEEN_MS = 500;
-const MAX_ATTEMPTS = 3;
+// Apps Script men-serialize via LockService — request yang tumpang tindih saling
+// menunggu lock lalu time out. Jeda besar (4s) membuat tiap call berjalan terisolasi
+// seperti pengiriman tunggal (yang terbukti ~3s sukses), jadi nyaris tanpa gagal.
+const REQUEST_TIMEOUT_MS = 20000;
+const DELAY_BETWEEN_MS = 4000;
+const MAX_ATTEMPTS = 4;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -66,7 +69,7 @@ async function postOnce(payload) {
           failed += 1;
           console.error(`  #${id} GAGAL (${attempt}x): ${e.message}`);
         } else {
-          await sleep(1500 * attempt); // backoff sebelum retry
+          await sleep(4000 * attempt); // backoff makin lama sebelum retry
         }
       }
     }
