@@ -15,12 +15,13 @@ const { pool, query } = require('../src/config/database');
 const { buildQuestionnairePayload } = require('../src/utils/spreadsheetSync');
 
 const WEBHOOK_URL = process.env.QUESTIONNAIRE_WEBHOOK_URL || process.env.SHEET_WEBHOOK_URL;
-// Apps Script men-serialize via LockService — request yang tumpang tindih saling
-// menunggu lock lalu time out. Jeda besar (4s) membuat tiap call berjalan terisolasi
-// seperti pengiriman tunggal (yang terbukti ~3s sukses), jadi nyaris tanpa gagal.
-const REQUEST_TIMEOUT_MS = 20000;
-const DELAY_BETWEEN_MS = 4000;
-const MAX_ATTEMPTS = 4;
+// Apps Script memakai LockService.waitLock(30000). Kalau client ABORT sebelum 30s,
+// eksekusi server tetap jalan & MENAHAN lock -> call berikutnya nunggu lock lalu
+// ikut time out (cascade). Maka timeout client dibuat > 30s supaya tidak pernah
+// meninggalkan lock "zombie". Jeda kecil cukup karena tiap call sudah berurutan.
+const REQUEST_TIMEOUT_MS = 40000;
+const DELAY_BETWEEN_MS = 1500;
+const MAX_ATTEMPTS = 3;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -69,7 +70,9 @@ async function postOnce(payload) {
           failed += 1;
           console.error(`  #${id} GAGAL (${attempt}x): ${e.message}`);
         } else {
-          await sleep(4000 * attempt); // backoff makin lama sebelum retry
+          // Tunggu > lock server (30s) agar eksekusi yang mungkin masih menahan
+          // lock benar-benar lepas sebelum coba lagi.
+          await sleep(32000);
         }
       }
     }
