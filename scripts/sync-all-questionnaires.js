@@ -5,17 +5,42 @@
 // Jalankan:
 //   node -r dotenv/config scripts/sync-all-questionnaires.js
 //
-// Butuh QUESTIONNAIRE_WEBHOOK_URL (atau fallback SHEET_WEBHOOK_URL) terkonfigurasi,
-// dan Apps Script sudah di-deploy ulang dengan handler event 'questionnaire'.
+// Berbeda dgn sync live (submit tunggal, timeout 10s), backfill mengirim ratusan
+// baris berturut-turut ke satu Apps Script yang men-serialize lewat LockService.
+// Karena itu di sini: timeout lebih longgar (30s), ada jeda antar-request, dan retry
+// — supaya tidak terjadi penumpukan lock yang bikin request beruntun ke-abort.
 // =============================================
 
 const { pool, query } = require('../src/config/database');
-const { syncQuestionnaire } = require('../src/utils/spreadsheetSync');
+const { buildQuestionnairePayload } = require('../src/utils/spreadsheetSync');
 
-const hasWebhook = Boolean(process.env.QUESTIONNAIRE_WEBHOOK_URL || process.env.SHEET_WEBHOOK_URL);
+const WEBHOOK_URL = process.env.QUESTIONNAIRE_WEBHOOK_URL || process.env.SHEET_WEBHOOK_URL;
+const REQUEST_TIMEOUT_MS = 30000;
+const DELAY_BETWEEN_MS = 500;
+const MAX_ATTEMPTS = 3;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function postOnce(payload) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      redirect: 'follow',
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return true;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 (async () => {
-  if (!hasWebhook) {
+  if (!WEBHOOK_URL) {
     console.error('QUESTIONNAIRE_WEBHOOK_URL / SHEET_WEBHOOK_URL belum diset. Batal.');
     process.exit(1);
   }
@@ -25,18 +50,28 @@ const hasWebhook = Boolean(process.env.QUESTIONNAIRE_WEBHOOK_URL || process.env.
 
   let ok = 0;
   let failed = 0;
-  // Berurutan (bukan paralel) supaya lock Apps Script tidak tabrakan.
   for (let i = 0; i < ids.length; i += 1) {
     const id = ids[i];
-    try {
-      const r = await syncQuestionnaire(id);
-      if (r && r.skipped) { failed += 1; console.warn(`  #${id} dilewati (payload kosong)`); }
-      else { ok += 1; }
-    } catch (e) {
-      failed += 1;
-      console.error(`  #${id} GAGAL: ${e.message}`);
+    const payload = await buildQuestionnairePayload(id);
+    if (!payload) { failed += 1; console.warn(`  #${id} dilewati (payload kosong)`); continue; }
+
+    let done = false;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS && !done; attempt += 1) {
+      try {
+        await postOnce(payload);
+        done = true;
+        ok += 1;
+      } catch (e) {
+        if (attempt === MAX_ATTEMPTS) {
+          failed += 1;
+          console.error(`  #${id} GAGAL (${attempt}x): ${e.message}`);
+        } else {
+          await sleep(1500 * attempt); // backoff sebelum retry
+        }
+      }
     }
-    if ((i + 1) % 25 === 0) console.log(`  ...progres ${i + 1}/${ids.length}`);
+    if ((i + 1) % 25 === 0) console.log(`  ...progres ${i + 1}/${ids.length} (ok ${ok}, gagal ${failed})`);
+    await sleep(DELAY_BETWEEN_MS); // beri jeda agar lock Apps Script lepas
   }
 
   console.log(`Selesai. Terkirim: ${ok} | Gagal: ${failed} | Total: ${ids.length}`);
