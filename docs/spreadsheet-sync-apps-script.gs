@@ -23,6 +23,7 @@
  *   - Jadwal hasil plot             -> tab "Jadwal"        (1 baris per schedule_id, upsert)
  *   - Sertifikat + Personal Report  -> tab "Sertifikat"    (1 baris per certificate_id, upsert)
  *   - Renewal                       -> tab "Renewal"       (1 baris per renewal_id, upsert)
+ *   - Questionnaire (evaluasi tutor)-> tab "Questionnaire" (1 baris per response_id, upsert)
  * Selain itu, doGet melayani import "Master Jadwal" (dipakai SCHEDULE_SOURCE_URL).
  */
 
@@ -65,6 +66,15 @@ var RENEWAL_HEADERS = [
   'preferred_start_date', 'study_time', 'status', 'notes', 'transfer_proof_url'
 ];
 
+var QUESTIONNAIRE_SHEET_NAME = 'Questionnaire';
+var QUESTIONNAIRE_HEADERS = [
+  'timestamp', 'response_id', 'questionnaire_id', 'questionnaire_title',
+  'member_name', 'member_email', 'tutor_name', 'program_name', 'study_period',
+  'overall_rating', 'material_quality', 'material_relevance', 'tutor_mastery', 'tutor_performance',
+  'score', 'max_score', 'change_after_meetings', 'testimonial', 'suggestion',
+  'self_study_reference', 'submitted_at', 'answers_json'
+];
+
 function doPost(e) {
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -81,6 +91,9 @@ function doPost(e) {
     }
     if (data.event === 'renewal') {
       return handleUpsert(data, RENEWAL_SHEET_NAME, RENEWAL_HEADERS, 'renewal_id');
+    }
+    if (data.event === 'questionnaire') {
+      return handleUpsert(data, QUESTIONNAIRE_SHEET_NAME, QUESTIONNAIRE_HEADERS, 'response_id');
     }
     return handleRegistration(data);
   } catch (err) {

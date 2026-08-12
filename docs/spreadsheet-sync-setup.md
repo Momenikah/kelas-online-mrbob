@@ -84,6 +84,26 @@ Setiap pengajuan renewal dari member dikirim ke tab **"Renewal"**
 > Handler event `sertifikat` & `renewal` sekarang sudah ada di Apps Script, jadi
 > **deploy ulang** web app (Manage deployments → Edit → Version: New version).
 
+## Questionnaire / Evaluasi Tutor (tab "Questionnaire")
+
+Setiap member/tutor mengumpulkan questionnaire, jawabannya dikirim ke tab
+**"Questionnaire"** (1 baris per `response_id`, upsert — kirim ulang memperbarui baris yang sama).
+
+- Kolom: `timestamp, response_id, questionnaire_id, questionnaire_title, member_name,
+  member_email, tutor_name, program_name, study_period, overall_rating, material_quality,
+  material_relevance, tutor_mastery, tutor_performance, score, max_score,
+  change_after_meetings, testimonial, suggestion, self_study_reference, submitted_at, answers_json`.
+- Default memakai `SHEET_WEBHOOK_URL`; untuk **spreadsheet terpisah** isi `QUESTIONNAIRE_WEBHOOK_URL`.
+
+**Sinkron semua data lama** (sekali jalan, setelah Apps Script di-deploy ulang):
+
+```
+node -r dotenv/config scripts/sync-all-questionnaires.js
+```
+
+> Handler event `questionnaire` baru ditambahkan ke Apps Script, jadi **deploy ulang**
+> web app (Manage deployments → Edit → Version: New version) agar tab "Questionnaire" aktif.
+
 ## Memisah tiap data ke spreadsheet berbeda
 
 Satu file [`spreadsheet-sync-apps-script.gs`](spreadsheet-sync-apps-script.gs) menangani
@@ -98,6 +118,7 @@ dikirim ke URL yang ditunjuk env var-nya, spreadsheet lain tidak menerima event 
 | Jadwal hasil plot | app → sheet | `SCHEDULE_WEBHOOK_URL` | `Jadwal` |
 | Sertifikat + report | app → sheet | `CERTIFICATE_WEBHOOK_URL` | `Sertifikat` |
 | Renewal | app → sheet | `RENEWAL_WEBHOOK_URL` | `Renewal` |
+| Questionnaire (evaluasi tutor) | app → sheet | `QUESTIONNAIRE_WEBHOOK_URL` | `Questionnaire` |
 | Master jadwal (import) | **sheet → app** | `SCHEDULE_SOURCE_URL` | `Master Jadwal` |
 
 - Env var yang **dibiarkan kosong** otomatis jatuh ke `SHEET_WEBHOOK_URL`.

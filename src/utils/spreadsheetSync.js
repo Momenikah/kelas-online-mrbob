@@ -315,12 +315,75 @@ async function syncRenewal(renewalId) {
   return postToWebhook(url, payload);
 }
 
+// Build a single questionnaire-response row for the spreadsheet "Questionnaire" tab.
+// Meratakan template evaluasi tutor (ratings + essays); answers_json menyimpan
+// jawaban mentah agar kuesioner custom pun tidak ada yang hilang.
+async function buildQuestionnairePayload(responseId) {
+  const res = await query(
+    `SELECT qr.*, q.title AS questionnaire_title,
+            m.name AS member_name, m.email AS member_email,
+            t.name AS tutor_name_join, p.name AS program_name_join
+     FROM questionnaire_responses qr
+     JOIN questionnaires q ON q.id = qr.questionnaire_id
+     JOIN users m ON m.id = qr.member_id
+     LEFT JOIN users t ON t.id = qr.tutor_id
+     LEFT JOIN programs p ON p.id = qr.study_program_id
+     WHERE qr.id = $1`,
+    [responseId]
+  );
+  const r = res.rows[0];
+  if (!r) return null;
+
+  const answers = (r.answers && typeof r.answers === 'object') ? r.answers : {};
+  const ratings = answers.ratings || {};
+  const essays = answers.essays || {};
+
+  return {
+    event: 'questionnaire',
+    timestamp: nowWIB(r.submitted_at ? new Date(r.submitted_at) : new Date()),
+    response_id: r.id,
+    questionnaire_id: r.questionnaire_id,
+    questionnaire_title: r.questionnaire_title || '',
+    member_name: r.member_name || '',
+    member_email: r.member_email || '',
+    tutor_name: answers.tutor_name || r.tutor_name_join || '',
+    program_name: answers.study_program_name || r.program_name_join || '',
+    study_period: r.study_period || answers.study_period || '',
+    overall_rating: ratings.overall_rating || '',
+    material_quality: ratings.material_quality || '',
+    material_relevance: ratings.material_relevance || '',
+    tutor_mastery: ratings.tutor_mastery || '',
+    tutor_performance: ratings.tutor_performance || '',
+    score: r.score != null ? r.score : '',
+    max_score: r.max_score != null ? r.max_score : '',
+    change_after_meetings: essays.change_after_meetings || '',
+    testimonial: essays.testimonial || '',
+    suggestion: essays.suggestion || '',
+    self_study_reference: answers.self_study_reference || '',
+    submitted_at: dateOnly(r.submitted_at),
+    answers_json: JSON.stringify(answers),
+  };
+}
+
+// Push (upsert) a single questionnaire response to the "Questionnaire" tab.
+async function syncQuestionnaire(responseId) {
+  const url = process.env.QUESTIONNAIRE_WEBHOOK_URL || process.env.SHEET_WEBHOOK_URL;
+  if (!url) {
+    console.warn('Webhook spreadsheet belum dikonfigurasi. Sinkronisasi questionnaire dilewati.');
+    return { skipped: true };
+  }
+  const payload = await buildQuestionnairePayload(responseId);
+  if (!payload) return { skipped: true };
+  return postToWebhook(url, payload);
+}
+
 module.exports = {
   buildPayload,
   buildAvailableTimePayload,
   buildSchedulePayload,
   buildCertificatePayload,
   buildRenewalPayload,
+  buildQuestionnairePayload,
   syncToSpreadsheet,
   syncRegistration,
   syncConfirmation,
@@ -328,4 +391,5 @@ module.exports = {
   syncSchedule,
   syncCertificate,
   syncRenewal,
+  syncQuestionnaire,
 };

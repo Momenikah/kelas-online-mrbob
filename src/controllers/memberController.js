@@ -12,7 +12,7 @@ const { getModuleMaterial } = require('../utils/moduleLinks');
 const { ensureMemberPresenceTable } = require('../utils/memberPresence');
 const { isSemiPrivateStart } = require('../utils/semiPrivate');
 const { packagesForProgram, PRICE_LIST } = require('../utils/priceList');
-const { syncRenewal } = require('../utils/spreadsheetSync');
+const { syncRenewal, syncQuestionnaire } = require('../utils/spreadsheetSync');
 const { sendRenewalEmail, sendRenewalAdminEmail } = require('../utils/registrationEmail');
 const { SUPPORT_EMAIL, sendSupportFeedback } = require('../utils/supportEmail');
 const { saveSupportFeedback, updateSupportFeedbackEmailStatus } = require('../utils/supportFeedback');
@@ -878,13 +878,16 @@ exports.questionnaireSubmit = async (req, res) => {
       built.answers.tutor_name = tutor.name;
       built.answers.study_program_id = String(questionnaire.program_id);
       built.answers.study_program_name = questionnaire.program_name;
-      await query(`
+      const inserted = await query(`
         INSERT INTO questionnaire_responses
           (questionnaire_id, member_id, tutor_id, study_program_id, study_period, answers, score, max_score, started_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
         ON CONFLICT (questionnaire_id, member_id, tutor_id) WHERE tutor_id IS NOT NULL
         DO UPDATE SET study_program_id=$4, study_period=$5, answers=$6, score=$7, max_score=$8, submitted_at=NOW()
+        RETURNING id
       `, [id, userId, tutor.id, questionnaire.program_id, built.answers.study_period || null, JSON.stringify(built.answers), built.score, built.maxScore]);
+      syncQuestionnaire(inserted.rows[0].id)
+        .catch((e) => console.error('Gagal sinkronisasi questionnaire ke spreadsheet:', e.message));
       req.flash('success', `Questionnaire berhasil dikumpulkan. Skor: ${built.score}/${built.maxScore}`);
       return res.redirect('/member/questionnaire');
     }
@@ -907,12 +910,15 @@ exports.questionnaireSubmit = async (req, res) => {
       }
     });
 
-    await query(`
+    const insertedCustom = await query(`
       INSERT INTO questionnaire_responses (questionnaire_id, member_id, tutor_id, study_program_id, answers, score, max_score, started_at)
       VALUES ($1, $2, NULL, $3, $4, $5, $6, NOW())
       ON CONFLICT (questionnaire_id, member_id) WHERE tutor_id IS NULL
       DO UPDATE SET study_program_id=$3, answers=$4, score=$5, max_score=$6, submitted_at=NOW()
+      RETURNING id
     `, [id, userId, questionnaire.program_id, JSON.stringify(answerMap), score, maxScore]);
+    syncQuestionnaire(insertedCustom.rows[0].id)
+      .catch((e) => console.error('Gagal sinkronisasi questionnaire ke spreadsheet:', e.message));
 
     req.flash('success', `Kuis berhasil dikumpulkan! Skor kamu: ${score}/${maxScore}`);
     res.redirect('/member/questionnaire');

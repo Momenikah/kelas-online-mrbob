@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const at = require('../utils/availableTime');
 const { toCsv } = require('../utils/csv');
-const { syncTutorAvailableTime, syncCertificate } = require('../utils/spreadsheetSync');
+const { syncTutorAvailableTime, syncCertificate, syncQuestionnaire } = require('../utils/spreadsheetSync');
 const { sendScheduleNotificationEmails } = require('../utils/scheduleEmail');
 const { emptyReportDays, normalizeReportDays, ensureMemberReportsTable } = require('../utils/memberReports');
 const {
@@ -1111,13 +1111,16 @@ exports.questionnaireAnswerSubmit = async (req, res) => {
       }
       built.answers.study_program_id = String(questionnaire.program_id);
       built.answers.study_program_name = questionnaire.program_name;
-      await query(`
+      const insertedT = await query(`
         INSERT INTO questionnaire_responses
           (questionnaire_id, member_id, tutor_id, study_program_id, study_period, answers, score, max_score, started_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
         ON CONFLICT (questionnaire_id, member_id, tutor_id) WHERE tutor_id IS NOT NULL
         DO UPDATE SET study_program_id=$4, study_period=$5, answers=$6, score=$7, max_score=$8, submitted_at=NOW()
+        RETURNING id
       `, [id, userId, tutorId, questionnaire.program_id, built.answers.study_period || null, JSON.stringify(built.answers), built.score, built.maxScore]);
+      syncQuestionnaire(insertedT.rows[0].id)
+        .catch((e) => console.error('Gagal sinkronisasi questionnaire ke spreadsheet:', e.message));
       req.flash('success', 'Questionnaire berhasil dikumpulkan.');
       return res.redirect('/tutor/questionnaire/answer');
     }
@@ -1141,12 +1144,15 @@ exports.questionnaireAnswerSubmit = async (req, res) => {
       }
     });
 
-    await query(`
+    const insertedTC = await query(`
       INSERT INTO questionnaire_responses (questionnaire_id, member_id, tutor_id, study_program_id, answers, score, max_score, started_at)
       VALUES ($1, $2, NULL, $3, $4, $5, $6, NOW())
       ON CONFLICT (questionnaire_id, member_id) WHERE tutor_id IS NULL
       DO UPDATE SET study_program_id=$3, answers=$4, score=$5, max_score=$6, submitted_at=NOW()
+      RETURNING id
     `, [id, userId, questionnaire ? questionnaire.program_id : null, JSON.stringify(answerMap), score, maxScore]);
+    syncQuestionnaire(insertedTC.rows[0].id)
+      .catch((e) => console.error('Gagal sinkronisasi questionnaire ke spreadsheet:', e.message));
 
     req.flash('success', 'Questionnaire berhasil dikumpulkan.');
     res.redirect('/tutor/questionnaire/answer');
