@@ -333,7 +333,7 @@ exports.module = async (req, res) => {
     let progFilter = '';
     if (programId) { params.push(Number(programId)); progFilter = ` AND m.program_id = $${params.length}`; }
 
-    const [result, programsRes, statsRes] = await Promise.all([
+    const [result, programsRes, statsRes, ebooksRes] = await Promise.all([
       query(`
         SELECT m.*, p.name as program_name
         FROM modules m JOIN programs p ON m.program_id = p.id
@@ -348,7 +348,15 @@ exports.module = async (req, res) => {
              FROM modules m
              WHERE m.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
                AND m.is_active = true${progFilter}`, params),
+      // Module Premium = modul tanpa program (program_id NULL) yang premium: bonus
+      // umum khusus member Luxury (mis. koleksi e-book).
+      query(`SELECT id, title, description, file_url, order_number
+             FROM modules
+             WHERE program_id IS NULL AND is_premium = true AND is_active = true
+             ORDER BY order_number, title`),
     ]);
+    const isLuxury = req.session.user.is_luxury;
+    const premiumEbooks = isLuxury ? ebooksRes.rows : [];
     // Google Drive material link per enrolled program (member only sees links
     // for programs they are enrolled in — access is scoped to the chosen program).
     const programMaterials = programsRes.rows
@@ -359,8 +367,8 @@ exports.module = async (req, res) => {
       .length;
     const stats = {
       ...statsRes.rows[0],
-      total: Number(statsRes.rows[0].total || 0) + visibleMaterialCount,
-      premium: Number(statsRes.rows[0].premium || 0),
+      total: Number(statsRes.rows[0].total || 0) + visibleMaterialCount + premiumEbooks.length,
+      premium: Number(statsRes.rows[0].premium || 0) + premiumEbooks.length,
       manual: visibleMaterialCount,
     };
 
@@ -370,6 +378,7 @@ exports.module = async (req, res) => {
       modules: result.rows,
       programs: programsRes.rows,
       programMaterials,
+      premiumEbooks,
       filters: { programId },
       stats,
       isVip: req.session.user.is_vip || req.session.user.is_luxury,
