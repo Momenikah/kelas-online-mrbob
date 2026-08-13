@@ -3,6 +3,7 @@
 // tutor & admin view only.
 // =============================================
 
+// Skema saja — aman & cepat, boleh dipanggil per-request (semua IF NOT EXISTS).
 async function ensureMemberPresenceTable(query) {
   await query(`
     CREATE TABLE IF NOT EXISTS member_presences (
@@ -18,6 +19,17 @@ async function ensureMemberPresenceTable(query) {
     )
   `);
   await query(`ALTER TABLE member_presences ADD COLUMN IF NOT EXISTS schedule_id INTEGER REFERENCES schedules(id) ON DELETE SET NULL`);
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS member_presences_member_schedule_idx
+    ON member_presences (member_id, schedule_id)
+  `);
+}
+
+// Backfill SEKALI JALAN (dipanggil saat boot, BUKAN per-request). Menautkan baris
+// presensi lama (schedule_id NULL) ke jadwal yang cocok, lalu menandai kehadirannya.
+// Kalau dijalankan tiap request, UPDATE-nya bisa balapan dengan submit/refresh member
+// lain dan memicu "duplicate key ... member_presences_member_schedule_idx".
+async function backfillMemberPresenceSchedules(query) {
   await query(`
     WITH ranked_sessions AS (
       SELECT
@@ -77,10 +89,6 @@ async function ensureMemberPresenceTable(query) {
                   source = 'self-report'
     WHERE presences.status NOT IN ('present', 'late')
   `);
-  await query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS member_presences_member_schedule_idx
-    ON member_presences (member_id, schedule_id)
-  `);
 }
 
-module.exports = { ensureMemberPresenceTable };
+module.exports = { ensureMemberPresenceTable, backfillMemberPresenceSchedules };

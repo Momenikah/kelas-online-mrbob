@@ -145,8 +145,9 @@ app.listen(PORT, () => {
   seedPeriods(query)
     .then((n) => console.log(`Periode: ${n} periode tersedia.`))
     .catch((err) => console.error('Gagal menyiapkan periode:', err.message));
-  const { ensureMemberPresenceTable } = require('./utils/memberPresence');
+  const { ensureMemberPresenceTable, backfillMemberPresenceSchedules } = require('./utils/memberPresence');
   ensureMemberPresenceTable(query)
+    .then(() => backfillMemberPresenceSchedules(query)) // backfill sekali saat boot
     .then(() => console.log('Tabel member_presences siap.'))
     .catch((err) => console.error('Gagal menyiapkan tabel presensi member:', err.message));
   const { ensureClassProofTable } = require('./utils/classProofs');
