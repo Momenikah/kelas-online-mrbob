@@ -1430,11 +1430,15 @@ exports.toefl = async (req, res) => {
 exports.video = async (req, res) => {
   try {
     const userId = req.session.user.id;
+    // Video tanpa program (program_id NULL) = bonus umum: tampil ke semua member
+    // Luxury. Video ber-program hanya tampil bila member aktif di program itu.
+    // Bonus umum ditaruh paling atas.
     const result = await query(`
       SELECT v.*, p.name as program_name
-      FROM videos v JOIN programs p ON v.program_id = p.id
-      WHERE v.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
-      ORDER BY v.program_id, v.order_number
+      FROM videos v LEFT JOIN programs p ON v.program_id = p.id
+      WHERE v.program_id IS NULL
+         OR v.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
+      ORDER BY (v.program_id IS NOT NULL), v.program_id, v.order_number
     `, [userId]);
     res.render('member/video', {
       title: 'Video Premium',

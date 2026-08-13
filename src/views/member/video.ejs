@@ -15,11 +15,14 @@
         <p>Belum ada video tersedia.</p>
       </div>
     <% } else { %>
-      <% let currentProgram = ''; %>
+      <% let currentProgram = null; %>
       <% videos.forEach(v => { %>
-        <% if (v.program_name !== currentProgram) { %>
-          <h3 class="module-program-title"><i class="fas fa-graduation-cap"></i> <%= v.program_name %></h3>
-          <% currentProgram = v.program_name; %>
+        <% const groupLabel = v.program_name || 'Bonus / Umum'; %>
+        <% if (groupLabel !== currentProgram) { %>
+          <h3 class="module-program-title">
+            <i class="fas fa-<%= v.program_name ? 'graduation-cap' : 'gift' %>"></i> <%= groupLabel %>
+          </h3>
+          <% currentProgram = groupLabel; %>
         <% } %>
         <div class="video-card">
           <div class="video-thumb" onclick="playVideo('<%= v.id %>', '<%= v.video_url %>')">
