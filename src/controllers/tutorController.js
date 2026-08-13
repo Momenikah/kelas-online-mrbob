@@ -7,6 +7,7 @@ const { toCsv } = require('../utils/csv');
 const { syncTutorAvailableTime, syncCertificate, syncQuestionnaire } = require('../utils/spreadsheetSync');
 const { sendScheduleNotificationEmails } = require('../utils/scheduleEmail');
 const { emptyReportDays, normalizeReportDays, ensureMemberReportsTable } = require('../utils/memberReports');
+const { ensureDiagnosticReportsTable } = require('../utils/diagnosticReports');
 const {
   ensureCertificateDetailsColumn,
   normalizeCertificateDetails,
@@ -1230,7 +1231,8 @@ exports.report = async (req, res) => {
     const tutorId = req.session.user.id;
     const programId = req.query.program_id || '';
     await ensureMemberReportsTable(query);
-    const [reports, programsRes, writtenReports] = await Promise.all([
+    await ensureDiagnosticReportsTable(query);
+    const [reports, programsRes, writtenReports, luxMembersRes, diagRes] = await Promise.all([
       fetchReportRows(tutorId, programId),
       query(`SELECT DISTINCT p.id, p.name FROM programs p
              JOIN schedules s ON s.program_id = p.id WHERE s.tutor_id = $1 ORDER BY p.name`, [tutorId]),
@@ -1242,6 +1244,26 @@ exports.report = async (req, res) => {
         WHERE mr.tutor_id = $1 ${programId ? 'AND mr.program_id = $2' : ''}
         ORDER BY mr.updated_at DESC
       `, programId ? [tutorId, Number(programId)] : [tutorId]),
+      // Member Luxury yang diajar tutor ini — target Diagnostic Test Report.
+      query(`
+        SELECT DISTINCT u.id, u.name
+        FROM schedule_members sm
+        JOIN schedules s ON s.id = sm.schedule_id
+        JOIN users u ON u.id = sm.member_id
+        WHERE s.tutor_id = $1 AND u.role = 'member' AND u.is_active = true AND u.is_luxury = true
+        ORDER BY u.name
+      `, [tutorId]),
+      // Diagnostic report untuk member yang diajar tutor ini.
+      query(`
+        SELECT dr.*, m.name AS member_name
+        FROM diagnostic_reports dr
+        JOIN users m ON m.id = dr.member_id
+        WHERE dr.member_id IN (
+          SELECT DISTINCT sm.member_id FROM schedule_members sm
+          JOIN schedules s ON s.id = sm.schedule_id WHERE s.tutor_id = $1
+        )
+        ORDER BY dr.created_at DESC
+      `, [tutorId]),
     ]);
 
     let attSum = 0; let attCount = 0; let scoreSum = 0; let scoreCount = 0;
@@ -1257,6 +1279,8 @@ exports.report = async (req, res) => {
       reports,
       writtenReports: writtenReports.rows,
       programs: programsRes.rows,
+      luxuryMembers: luxMembersRes.rows,
+      diagnosticReports: diagRes.rows,
       filters: { programId },
       stats: {
         members: reports.length,
@@ -1268,6 +1292,64 @@ exports.report = async (req, res) => {
     console.error(err);
     res.render('error', { title: 'Error', message: err.message, user: req.session.user });
   }
+};
+
+// Tutor unggah Diagnostic Test Report untuk member Luxury yang dia ajar.
+exports.uploadDiagnosticReport = async (req, res) => {
+  try {
+    await ensureDiagnosticReportsTable(query);
+    const tutorId = req.session.user.id;
+    const memberId = Number(req.body.member_id) || null;
+    const title = String(req.body.title || '').trim() || 'Diagnostic Test Report';
+    if (!memberId || !req.file) {
+      removeUploadedFile(req.file);
+      req.flash('error', 'Pilih member dan file laporan.');
+      return res.redirect('/tutor/report#diagnostic');
+    }
+    // Member harus Luxury DAN diajar tutor ini.
+    const ok = await query(`
+      SELECT 1 FROM users u
+      WHERE u.id = $1 AND u.is_luxury = true AND u.role = 'member'
+        AND EXISTS (SELECT 1 FROM schedule_members sm JOIN schedules s ON s.id = sm.schedule_id
+                    WHERE sm.member_id = u.id AND s.tutor_id = $2)
+      LIMIT 1`, [memberId, tutorId]);
+    if (!ok.rows.length) {
+      removeUploadedFile(req.file);
+      req.flash('error', 'Member Luxury tidak ditemukan di kelas kamu.');
+      return res.redirect('/tutor/report#diagnostic');
+    }
+    await query(
+      `INSERT INTO diagnostic_reports (member_id, uploaded_by, uploader_role, uploader_name, title, file_url)
+       VALUES ($1,$2,'tutor',$3,$4,$5)`,
+      [memberId, tutorId, req.session.user.name, title, `/uploads/${req.file.filename}`]
+    );
+    req.flash('success', 'Diagnostic Test Report berhasil diunggah.');
+  } catch (err) {
+    console.error(err);
+    removeUploadedFile(req.file);
+    req.flash('error', 'Gagal mengunggah Diagnostic Test Report.');
+  }
+  res.redirect('/tutor/report#diagnostic');
+};
+
+exports.deleteDiagnosticReport = async (req, res) => {
+  try {
+    const tutorId = req.session.user.id;
+    // Tutor hanya boleh hapus yang dia unggah.
+    const r = await query(
+      'SELECT file_url FROM diagnostic_reports WHERE id = $1 AND uploaded_by = $2',
+      [req.params.id, tutorId]
+    );
+    if (!r.rows.length) { req.flash('error', 'Laporan tidak ditemukan.'); return res.redirect('/tutor/report#diagnostic'); }
+    await query('DELETE FROM diagnostic_reports WHERE id = $1', [req.params.id]);
+    const fp = path.join(__dirname, '../../public', r.rows[0].file_url);
+    fs.unlink(fp, () => {});
+    req.flash('success', 'Diagnostic Test Report dihapus.');
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal menghapus laporan.');
+  }
+  res.redirect('/tutor/report#diagnostic');
 };
 
 exports.reportEdit = async (req, res) => {

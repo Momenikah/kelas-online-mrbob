@@ -3,6 +3,15 @@ const router = express.Router();
 const tutorController = require('../controllers/tutorController');
 const { requireRole } = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const uploadDoc = require('../middleware/uploadDoc');
+
+const diagnosticUpload = (req, res, next) => {
+  uploadDoc.single('report_file')(req, res, (err) => {
+    if (!err) return next();
+    req.flash('error', err.message || 'File laporan gagal diupload.');
+    return res.redirect('/tutor/report#diagnostic');
+  });
+};
 
 const isTutor = requireRole('tutor', 'admin');
 const isAdmin = requireRole('admin');
@@ -54,6 +63,8 @@ router.get('/questionnaire/:id', isTutor, tutorController.questionnaireDetail);
 router.post('/questionnaire/:id/delete', isTutor, tutorController.deleteQuestionnaire);
 router.get('/report', isTutor, tutorController.report);
 router.get('/report/edit', requireRole('tutor'), tutorController.reportEdit);
+router.post('/report/diagnostic', requireRole('tutor', 'admin'), diagnosticUpload, tutorController.uploadDiagnosticReport);
+router.post('/report/diagnostic/:id/delete', requireRole('tutor', 'admin'), tutorController.deleteDiagnosticReport);
 router.post('/report', requireRole('tutor'), tutorController.saveReport);
 router.get('/report/export.csv', isTutor, tutorController.exportReportCsv);
 router.get('/report/:id', isTutor, tutorController.reportDetail);

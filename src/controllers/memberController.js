@@ -11,6 +11,7 @@ const { ensureRenewalRequestsTable } = require('../utils/renewalRequests');
 const { getModuleMaterial } = require('../utils/moduleLinks');
 const { ensureMemberPresenceTable } = require('../utils/memberPresence');
 const { isSemiPrivateStart } = require('../utils/semiPrivate');
+const { ensureDiagnosticReportsTable } = require('../utils/diagnosticReports');
 const { packagesForProgram, PRICE_LIST } = require('../utils/priceList');
 const { syncRenewal, syncQuestionnaire } = require('../utils/spreadsheetSync');
 const { sendRenewalEmail, sendRenewalAdminEmail } = require('../utils/registrationEmail');
@@ -942,6 +943,8 @@ exports.report = async (req, res) => {
   try {
     const userId = req.session.user.id;
     await ensureMemberReportsTable(query);
+    await ensureDiagnosticReportsTable(query);
+    const isLuxury = req.session.user.is_luxury;
 
     const periodFilter = req.query.period || '';
     const reportParams = [userId];
@@ -986,6 +989,17 @@ exports.report = async (req, res) => {
         ORDER BY period_value DESC
       `, [userId]),
     ]);
+    // Diagnostic Test Report hanya untuk member Luxury.
+    let diagnosticReports = [];
+    if (isLuxury) {
+      const dr = await query(
+        `SELECT id, title, file_url, uploader_name, uploader_role, created_at
+         FROM diagnostic_reports WHERE member_id = $1 ORDER BY created_at DESC`,
+        [userId]
+      );
+      diagnosticReports = dr.rows;
+    }
+
     res.render('member/report', {
       title: 'Laporan Member',
       user: req.session.user,
@@ -995,6 +1009,8 @@ exports.report = async (req, res) => {
       reports: reportsRes.rows,
       periodOptions: periodOptionsRes.rows,
       filters: { period: periodFilter },
+      isLuxury,
+      diagnosticReports,
     });
   } catch (err) {
     console.error(err);

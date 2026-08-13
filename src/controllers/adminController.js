@@ -1,6 +1,12 @@
 const { query, pool } = require('../config/database');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+const { ensureDiagnosticReportsTable } = require('../utils/diagnosticReports');
+const removeUploadedFile = (file) => {
+  if (file) fs.unlink(path.join(__dirname, '../../public/uploads', file.filename), () => {});
+};
 const at = require('../utils/availableTime');
 const { parseCsv, rowsToObjects, toCsv } = require('../utils/csv');
 const { syncSchedule, syncCertificate, syncRenewal } = require('../utils/spreadsheetSync');
@@ -2185,6 +2191,7 @@ exports.deleteQuestionnaire = async (req, res) => {
 exports.report = async (req, res) => {
   try {
     await ensureMemberReportsTable(query);
+    await ensureDiagnosticReportsTable(query);
     const tutorId = req.query.tutor_id || '';
     const programId = req.query.program_id || '';
     const period = req.query.period || '';
@@ -2194,7 +2201,7 @@ exports.report = async (req, res) => {
     if (programId) { params.push(Number(programId)); where.push(`mr.program_id = $${params.length}`); }
     if (period) { params.push(period); where.push(`mr.period_start = $${params.length}`); }
 
-    const [reportsRes, tutorsRes, programsRes, periodsRes, statsRes] = await Promise.all([
+    const [reportsRes, tutorsRes, programsRes, periodsRes, statsRes, luxMembersRes, diagRes] = await Promise.all([
       query(`
         SELECT mr.*, m.name as member_name, t.name as tutor_name, p.name as program_name
         FROM member_reports mr
@@ -2208,6 +2215,9 @@ exports.report = async (req, res) => {
       query('SELECT id, name FROM programs WHERE is_active = true ORDER BY name'),
       query('SELECT DISTINCT period_start FROM member_reports WHERE period_start IS NOT NULL ORDER BY period_start DESC'),
       query(`SELECT COUNT(*) AS total, COUNT(DISTINCT member_id) AS members FROM member_reports`),
+      query("SELECT id, name FROM users WHERE role='member' AND is_active=true AND is_luxury=true ORDER BY name"),
+      query(`SELECT dr.*, m.name AS member_name FROM diagnostic_reports dr
+             JOIN users m ON m.id = dr.member_id ORDER BY dr.created_at DESC`),
     ]);
 
     const periods = periodsRes.rows.map((r) => {
@@ -2224,6 +2234,8 @@ exports.report = async (req, res) => {
       periods,
       filters: { tutorId, programId, period },
       stats: statsRes.rows[0],
+      luxuryMembers: luxMembersRes.rows,
+      diagnosticReports: diagRes.rows,
       error: req.flash('error'),
       success: req.flash('success'),
     });
@@ -2231,6 +2243,54 @@ exports.report = async (req, res) => {
     console.error(err);
     res.render('error', { title: 'Error', message: err.message, user: req.session.user });
   }
+};
+
+// Admin unggah Diagnostic Test Report untuk member Luxury mana pun.
+exports.uploadDiagnosticReport = async (req, res) => {
+  try {
+    await ensureDiagnosticReportsTable(query);
+    const memberId = Number(req.body.member_id) || null;
+    const title = String(req.body.title || '').trim() || 'Diagnostic Test Report';
+    if (!memberId || !req.file) {
+      removeUploadedFile(req.file);
+      req.flash('error', 'Pilih member dan file laporan.');
+      return res.redirect('/admin/report#diagnostic');
+    }
+    const ok = await query(
+      "SELECT 1 FROM users WHERE id = $1 AND role = 'member' AND is_luxury = true LIMIT 1",
+      [memberId]
+    );
+    if (!ok.rows.length) {
+      removeUploadedFile(req.file);
+      req.flash('error', 'Member Luxury tidak ditemukan.');
+      return res.redirect('/admin/report#diagnostic');
+    }
+    await query(
+      `INSERT INTO diagnostic_reports (member_id, uploaded_by, uploader_role, uploader_name, title, file_url)
+       VALUES ($1,$2,'admin',$3,$4,$5)`,
+      [memberId, req.session.user.id, req.session.user.name, title, `/uploads/${req.file.filename}`]
+    );
+    req.flash('success', 'Diagnostic Test Report berhasil diunggah.');
+  } catch (err) {
+    console.error(err);
+    removeUploadedFile(req.file);
+    req.flash('error', 'Gagal mengunggah Diagnostic Test Report.');
+  }
+  res.redirect('/admin/report#diagnostic');
+};
+
+exports.deleteDiagnosticReport = async (req, res) => {
+  try {
+    const r = await query('SELECT file_url FROM diagnostic_reports WHERE id = $1', [req.params.id]);
+    if (!r.rows.length) { req.flash('error', 'Laporan tidak ditemukan.'); return res.redirect('/admin/report#diagnostic'); }
+    await query('DELETE FROM diagnostic_reports WHERE id = $1', [req.params.id]);
+    fs.unlink(path.join(__dirname, '../../public', r.rows[0].file_url), () => {});
+    req.flash('success', 'Diagnostic Test Report dihapus.');
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal menghapus laporan.');
+  }
+  res.redirect('/admin/report#diagnostic');
 };
 
 exports.reportDetail = async (req, res) => {

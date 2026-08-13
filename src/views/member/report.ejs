@@ -10,6 +10,32 @@
   </div>
 
   <div class="container">
+    <% if (isLuxury) { %>
+    <div class="section-card module-premium">
+      <h3 class="section-title"><i class="fas fa-file-medical"></i> Diagnostic Test Report <span class="bonus-label">Luxury Class</span></h3>
+      <% if (!diagnosticReports || diagnosticReports.length === 0) { %>
+        <div class="empty-state compact"><i class="fas fa-file-circle-question"></i><p>Belum ada Diagnostic Test Report. Tutor/admin akan mengunggahnya untuk kamu.</p></div>
+      <% } else { %>
+        <div class="module-materials-grid">
+          <% diagnosticReports.forEach(dr => { %>
+            <div class="module-material-item">
+              <div class="module-material-info">
+                <span class="module-material-icon"><i class="fas fa-file-medical"></i></span>
+                <div>
+                  <strong><%= dr.title || 'Diagnostic Test Report' %></strong>
+                  <small>Diunggah <%= dr.uploader_name || (dr.uploader_role === 'admin' ? 'Admin' : 'Tutor') %> · <%= formatDate(dr.created_at) %></small>
+                </div>
+              </div>
+              <a href="<%= dr.file_url %>" class="btn btn-sm btn-primary" download target="_blank" rel="noopener">
+                <i class="fas fa-download"></i> Download
+              </a>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+    <% } %>
+
     <div class="section-card">
       <h3 class="section-title"><i class="fas fa-file-lines"></i> Member Report</h3>
       <% if (periodOptions && periodOptions.length > 0) { %>

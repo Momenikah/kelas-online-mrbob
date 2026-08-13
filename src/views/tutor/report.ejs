@@ -26,6 +26,49 @@
       </div>
     </div>
 
+    <!-- Diagnostic Test Report (khusus member Luxury) -->
+    <div class="section-card" id="diagnostic">
+      <h3 class="section-title"><i class="fas fa-file-medical"></i> Diagnostic Test Report <span class="bonus-label">Luxury</span></h3>
+      <p class="module-materials-note">Unggah laporan diagnostic test (PDF/gambar) untuk member Luxury yang kamu ajar. Member bisa mengunduhnya di halaman Report mereka.</p>
+      <% if ((luxuryMembers || []).length === 0) { %>
+        <div class="empty-state compact"><i class="fas fa-user-slash"></i><p>Belum ada member Luxury di kelasmu.</p></div>
+      <% } else { %>
+        <form action="/tutor/report/diagnostic" method="POST" enctype="multipart/form-data" class="filter-form" style="flex-wrap:wrap;gap:10px">
+          <select name="member_id" class="form-input" required>
+            <option value="">- Pilih Member Luxury -</option>
+            <% luxuryMembers.forEach(m => { %><option value="<%= m.id %>"><%= m.name %></option><% }) %>
+          </select>
+          <input type="text" name="title" class="form-input" maxlength="255" placeholder="Judul (opsional), mis. Diagnostic Test Report 1">
+          <input type="file" name="report_file" class="form-input" accept=".pdf,image/*" required>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-upload"></i> Unggah</button>
+        </form>
+      <% } %>
+
+      <% if ((diagnosticReports || []).length > 0) { %>
+        <div class="module-materials-grid" style="margin-top:14px">
+          <% diagnosticReports.forEach(dr => { %>
+            <div class="module-material-item">
+              <div class="module-material-info">
+                <span class="module-material-icon"><i class="fas fa-file-medical"></i></span>
+                <div>
+                  <strong><%= dr.title || 'Diagnostic Test Report' %></strong>
+                  <small><%= dr.member_name %> · <%= formatDate(dr.created_at) %></small>
+                </div>
+              </div>
+              <div class="row-actions">
+                <a href="<%= dr.file_url %>" class="btn btn-sm btn-outline" target="_blank" rel="noopener"><i class="fas fa-eye"></i> Lihat</a>
+                <% if (dr.uploaded_by == user.id) { %>
+                  <form action="/tutor/report/diagnostic/<%= dr.id %>/delete" method="POST" onsubmit="return confirm('Hapus laporan ini?')" style="display:inline">
+                    <button class="btn btn-sm btn-outline" title="Hapus"><i class="fas fa-trash"></i></button>
+                  </form>
+                <% } %>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+
     <div class="section-card">
       <form method="GET" action="/tutor/report" class="filter-form">
         <select name="program_id" class="form-input" onchange="this.form.submit()">

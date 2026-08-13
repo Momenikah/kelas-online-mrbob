@@ -3,8 +3,16 @@ const router = express.Router();
 const multer = require('multer');
 const adminController = require('../controllers/adminController');
 const { requireRole } = require('../middleware/auth');
+const uploadDoc = require('../middleware/uploadDoc');
 
 const isAdmin = requireRole('admin');
+const diagnosticUpload = (req, res, next) => {
+  uploadDoc.single('report_file')(req, res, (err) => {
+    if (!err) return next();
+    req.flash('error', err.message || 'File laporan gagal diupload.');
+    return res.redirect('/admin/report#diagnostic');
+  });
+};
 const csvUpload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
@@ -49,6 +57,8 @@ router.post('/questionnaire/:id/questions', isAdmin, adminController.addQuestion
 router.post('/questionnaire/:id/questions/:questionId/update', isAdmin, adminController.updateQuestion);
 router.post('/questionnaire/:id/questions/:questionId/delete', isAdmin, adminController.deleteQuestion);
 router.get('/report', isAdmin, adminController.report);
+router.post('/report/diagnostic', isAdmin, diagnosticUpload, adminController.uploadDiagnosticReport);
+router.post('/report/diagnostic/:id/delete', isAdmin, adminController.deleteDiagnosticReport);
 router.get('/report/:id', isAdmin, adminController.reportDetail);
 router.get('/certificate', isAdmin, adminController.certificate);
 router.post('/certificate', isAdmin, adminController.issueCertificate);

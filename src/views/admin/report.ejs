@@ -40,6 +40,51 @@
       </form>
     </div>
 
+    <!-- Diagnostic Test Report (khusus member Luxury) -->
+    <div class="section-card" id="diagnostic">
+      <h3 class="section-title"><i class="fas fa-file-medical"></i> Diagnostic Test Report <span class="bonus-label">Luxury</span></h3>
+      <p class="module-materials-note">Unggah laporan diagnostic test (PDF/gambar) untuk member Luxury. Member bisa mengunduhnya di halaman Report mereka.</p>
+      <% if ((luxuryMembers || []).length === 0) { %>
+        <div class="empty-state compact"><i class="fas fa-user-slash"></i><p>Belum ada member Luxury aktif.</p></div>
+      <% } else { %>
+        <form action="/admin/report/diagnostic" method="POST" enctype="multipart/form-data" class="filter-form" style="flex-wrap:wrap;gap:10px">
+          <select name="member_id" class="form-input" required>
+            <option value="">- Pilih Member Luxury -</option>
+            <% luxuryMembers.forEach(m => { %><option value="<%= m.id %>"><%= m.name %></option><% }) %>
+          </select>
+          <input type="text" name="title" class="form-input" maxlength="255" placeholder="Judul (opsional), mis. Diagnostic Test Report 1">
+          <input type="file" name="report_file" class="form-input" accept=".pdf,image/*" required>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-upload"></i> Unggah</button>
+        </form>
+      <% } %>
+
+      <% if ((diagnosticReports || []).length > 0) { %>
+        <div class="table-wrapper" style="margin-top:14px">
+          <table class="data-table">
+            <thead><tr><th>Member</th><th>Judul</th><th>Diunggah oleh</th><th>Tanggal</th><th>Aksi</th></tr></thead>
+            <tbody>
+              <% diagnosticReports.forEach(dr => { %>
+                <tr>
+                  <td><%= dr.member_name %></td>
+                  <td><%= dr.title || 'Diagnostic Test Report' %></td>
+                  <td><%= dr.uploader_name || '-' %> <small>(<%= dr.uploader_role %>)</small></td>
+                  <td><%= formatDate(dr.created_at) %></td>
+                  <td>
+                    <div class="row-actions">
+                      <a href="<%= dr.file_url %>" class="btn btn-sm btn-outline" target="_blank" rel="noopener"><i class="fas fa-eye"></i> Lihat</a>
+                      <form action="/admin/report/diagnostic/<%= dr.id %>/delete" method="POST" onsubmit="return confirm('Hapus laporan ini?')" style="display:inline">
+                        <button class="btn btn-sm btn-outline" title="Hapus"><i class="fas fa-trash"></i></button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
     <div class="section-card">
       <h3 class="section-title"><i class="fas fa-list"></i> Daftar Report</h3>
       <% if (reports.length === 0) { %>
