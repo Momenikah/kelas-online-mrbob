@@ -37,20 +37,20 @@
     <% if (isLuxury && (premiumEbooks || []).length > 0) { %>
     <div class="section-card module-materials module-premium">
       <h3 class="section-title"><i class="fas fa-crown"></i> Module Premium <span class="bonus-label">Luxury Class</span></h3>
-      <p class="module-materials-note">Koleksi e-book premium eksklusif untuk member Luxury Class.</p>
+      <p class="module-materials-note">Materi &amp; e-book premium eksklusif untuk member Luxury Class.</p>
       <div class="module-materials-grid">
         <% premiumEbooks.forEach(eb => { %>
           <div class="module-material-item">
             <div class="module-material-info">
-              <span class="module-material-icon"><i class="fas fa-book"></i></span>
+              <span class="module-material-icon"><i class="fas fa-<%= eb.program_name ? 'book-open' : 'book' %>"></i></span>
               <div>
                 <strong><%= eb.title %></strong>
-                <small><%= eb.description || 'E-book premium' %></small>
+                <small><%= eb.program_name ? ('Program: ' + eb.program_name) : (eb.description || 'E-book premium') %></small>
               </div>
             </div>
             <% if (eb.file_url) { %>
               <a href="<%= eb.file_url %>" class="btn btn-sm btn-primary" target="_blank" rel="noopener">
-                <i class="fas fa-up-right-from-square"></i> Buka E-book
+                <i class="fas fa-up-right-from-square"></i> Buka
               </a>
             <% } %>
           </div>

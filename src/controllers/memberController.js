@@ -335,26 +335,30 @@ exports.module = async (req, res) => {
     if (programId) { params.push(Number(programId)); progFilter = ` AND m.program_id = $${params.length}`; }
 
     const [result, programsRes, statsRes, ebooksRes] = await Promise.all([
+      // Daftar utama = modul biasa (non-premium). Modul premium ditampilkan hanya
+      // di section "Module Premium" (khusus Luxury), tidak di sini.
       query(`
         SELECT m.*, p.name as program_name
         FROM modules m JOIN programs p ON m.program_id = p.id
         WHERE m.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
-          AND m.is_active = true${progFilter}
+          AND m.is_active = true AND m.is_premium = false${progFilter}
         ORDER BY p.name, m.order_number
       `, params),
       query(`SELECT DISTINCT p.id, p.name FROM programs p
              JOIN enrollments e ON e.program_id = p.id
              WHERE e.member_id = $1 AND e.status = 'active' ORDER BY p.name`, [userId]),
-      query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE m.is_premium) AS premium
+      query(`SELECT COUNT(*) AS total
              FROM modules m
              WHERE m.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
-               AND m.is_active = true${progFilter}`, params),
-      // Module Premium = modul tanpa program (program_id NULL) yang premium: bonus
-      // umum khusus member Luxury (mis. koleksi e-book).
-      query(`SELECT id, title, description, file_url, order_number
-             FROM modules
-             WHERE program_id IS NULL AND is_premium = true AND is_active = true
-             ORDER BY order_number, title`),
+               AND m.is_active = true AND m.is_premium = false${progFilter}`, params),
+      // Module Premium (khusus Luxury): bonus umum (program_id NULL) + modul premium
+      // untuk program yang di-enroll member. Non-Luxury tidak menerima daftar ini.
+      query(`SELECT m.id, m.title, m.description, m.file_url, m.order_number, p.name AS program_name
+             FROM modules m LEFT JOIN programs p ON p.id = m.program_id
+             WHERE m.is_premium = true AND m.is_active = true
+               AND (m.program_id IS NULL
+                    OR m.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active'))
+             ORDER BY (m.program_id IS NULL) DESC, p.name, m.order_number, m.title`, [userId]),
     ]);
     const isLuxury = req.session.user.is_luxury;
     const premiumEbooks = isLuxury ? ebooksRes.rows : [];
@@ -367,9 +371,8 @@ exports.module = async (req, res) => {
       .filter((p) => !programId || String(programId) === String(p.id))
       .length;
     const stats = {
-      ...statsRes.rows[0],
       total: Number(statsRes.rows[0].total || 0) + visibleMaterialCount + premiumEbooks.length,
-      premium: Number(statsRes.rows[0].premium || 0) + premiumEbooks.length,
+      premium: premiumEbooks.length,
       manual: visibleMaterialCount,
     };
 
