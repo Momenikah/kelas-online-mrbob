@@ -4,8 +4,16 @@ const multer = require('multer');
 const adminController = require('../controllers/adminController');
 const { requireRole } = require('../middleware/auth');
 const uploadDoc = require('../middleware/uploadDoc');
+const uploadAudio = require('../middleware/uploadAudio');
 
 const isAdmin = requireRole('admin');
+const toeflAudioUpload = (req, res, next) => {
+  uploadAudio.single('audio')(req, res, (err) => {
+    if (!err) return next();
+    req.flash('error', err.message || 'Audio gagal diupload.');
+    return res.redirect(`/admin/toefl/${req.params.id}`);
+  });
+};
 const diagnosticUpload = (req, res, next) => {
   uploadDoc.single('report_file')(req, res, (err) => {
     if (!err) return next();
@@ -49,6 +57,16 @@ router.post('/enrollments/:id', isAdmin, adminController.updateEnrollment);
 router.post('/enrollments/:id/delete', isAdmin, adminController.deleteEnrollment);
 router.post('/enrollments/:id/extend', isAdmin, adminController.extendEnrollment);
 router.get('/member-presence', isAdmin, adminController.memberPresence);
+// Simulasi TOEFL
+router.get('/toefl', isAdmin, adminController.toeflList);
+router.post('/toefl', isAdmin, adminController.toeflCreate);
+router.get('/toefl/:id', isAdmin, adminController.toeflManage);
+router.post('/toefl/:id/update', isAdmin, adminController.toeflUpdate);
+router.post('/toefl/:id/delete', isAdmin, adminController.toeflDelete);
+router.post('/toefl/:id/passage', isAdmin, toeflAudioUpload, adminController.toeflPassageCreate);
+router.post('/toefl/:id/passage/:pid/delete', isAdmin, adminController.toeflPassageDelete);
+router.post('/toefl/:id/question', isAdmin, adminController.toeflQuestionCreate);
+router.post('/toefl/:id/question/:qid/delete', isAdmin, adminController.toeflQuestionDelete);
 router.get('/questionnaire', isAdmin, adminController.questionnaire);
 router.post('/questionnaire', isAdmin, adminController.createQuestionnaire);
 router.get('/questionnaire/:id', isAdmin, adminController.questionnaireDetail);

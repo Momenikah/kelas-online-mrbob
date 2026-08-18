@@ -12,6 +12,7 @@ const { getModuleMaterial } = require('../utils/moduleLinks');
 const { ensureMemberPresenceTable } = require('../utils/memberPresence');
 const { isSemiPrivateStart } = require('../utils/semiPrivate');
 const { ensureDiagnosticReportsTable } = require('../utils/diagnosticReports');
+const { ensureToeflTables, scoreAttempt } = require('../utils/toefl');
 const { packagesForProgram, PRICE_LIST } = require('../utils/priceList');
 const { syncRenewal, syncQuestionnaire } = require('../utils/spreadsheetSync');
 const { sendRenewalEmail, sendRenewalAdminEmail } = require('../utils/registrationEmail');
@@ -1437,8 +1438,10 @@ exports.submitRenewal = async (req, res) => {
 exports.toefl = async (req, res) => {
   try {
     const userId = req.session.user.id;
+    await ensureToeflTables(query);
     const [simResult, resultsResult] = await Promise.all([
-      query('SELECT * FROM toefl_simulations WHERE is_active = true'),
+      query(`SELECT ts.*, (SELECT COUNT(*) FROM toefl_questions q WHERE q.simulation_id = ts.id) AS question_count
+             FROM toefl_simulations ts WHERE ts.is_active = true ORDER BY ts.created_at DESC`),
       query(`SELECT tr.*, ts.title FROM toefl_results tr
              JOIN toefl_simulations ts ON tr.simulation_id = ts.id
              WHERE tr.member_id = $1 ORDER BY tr.taken_at DESC`, [userId]),
@@ -1449,6 +1452,85 @@ exports.toefl = async (req, res) => {
       simulations: simResult.rows,
       results: resultsResult.rows,
     });
+  } catch (err) {
+    console.error(err);
+    res.render('error', { title: 'Error', message: err.message, user: req.session.user });
+  }
+};
+
+// Halaman mengerjakan simulasi (semua section, timer per-section di klien).
+exports.toeflStart = async (req, res) => {
+  try {
+    await ensureToeflTables(query);
+    const sim = (await query('SELECT * FROM toefl_simulations WHERE id = $1 AND is_active = true', [req.params.id])).rows[0];
+    if (!sim) { req.flash('error', 'Simulasi tidak ditemukan.'); return res.redirect('/member/toefl'); }
+    const [passages, questions] = await Promise.all([
+      query('SELECT * FROM toefl_passages WHERE simulation_id = $1 ORDER BY section, order_number, id', [req.params.id]),
+      // Jangan kirim correct_option ke klien (cegah "ngintip" jawaban).
+      query(`SELECT id, passage_id, section, number, prompt, option_a, option_b, option_c, option_d, order_number
+             FROM toefl_questions WHERE simulation_id = $1 ORDER BY section, order_number, number, id`, [req.params.id]),
+    ]);
+    if (questions.rows.length === 0) { req.flash('error', 'Simulasi ini belum ada soalnya.'); return res.redirect('/member/toefl'); }
+    res.render('member/toefl-take', {
+      title: sim.title, user: req.session.user,
+      sim, passages: passages.rows, questions: questions.rows,
+    });
+  } catch (err) {
+    console.error(err);
+    res.render('error', { title: 'Error', message: err.message, user: req.session.user });
+  }
+};
+
+// Nilai + simpan hasil. Body: answers[<questionId>] = 'A'|'B'|'C'|'D'
+exports.toeflSubmit = async (req, res) => {
+  try {
+    await ensureToeflTables(query);
+    const userId = req.session.user.id;
+    const simId = req.params.id;
+    const sim = (await query('SELECT id FROM toefl_simulations WHERE id = $1', [simId])).rows[0];
+    if (!sim) { req.flash('error', 'Simulasi tidak ditemukan.'); return res.redirect('/member/toefl'); }
+    const questions = (await query('SELECT id, section, correct_option FROM toefl_questions WHERE simulation_id = $1', [simId])).rows;
+    const answers = {};
+    const posted = req.body.answers || {};
+    // Field name memakai prefix "q" (answers[q<id>]) supaya qs tidak mengubah id
+    // numerik jadi indeks array. Kupas prefix -> id asli.
+    Object.keys(posted).forEach((rawKey) => {
+      const v = String(posted[rawKey] || '').toUpperCase();
+      const qid = Number(String(rawKey).replace(/^q/, ''));
+      if (Number.isInteger(qid) && qid > 0 && ['A', 'B', 'C', 'D'].includes(v)) answers[qid] = v;
+    });
+    const s = scoreAttempt(questions, answers);
+    const ins = await query(
+      `INSERT INTO toefl_results
+         (simulation_id, member_id, listening_score, structure_score, reading_score, total_score,
+          listening_raw, structure_raw, reading_raw, answers)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
+      [simId, userId, s.scaled.listening, s.scaled.structure, s.scaled.reading, s.total,
+       s.raw.listening, s.raw.structure, s.raw.reading, JSON.stringify(answers)]
+    );
+    req.flash('success', `Simulasi selesai. Skor total kamu: ${s.total}.`);
+    res.redirect(`/member/toefl/result/${ins.rows[0].id}`);
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal mengirim jawaban.');
+    res.redirect('/member/toefl');
+  }
+};
+
+exports.toeflResult = async (req, res) => {
+  try {
+    await ensureToeflTables(query);
+    const userId = req.session.user.id;
+    const result = (await query(
+      `SELECT tr.*, ts.title FROM toefl_results tr JOIN toefl_simulations ts ON ts.id = tr.simulation_id
+       WHERE tr.id = $1 AND tr.member_id = $2`, [req.params.id, userId])).rows[0];
+    if (!result) { req.flash('error', 'Hasil tidak ditemukan.'); return res.redirect('/member/toefl'); }
+    // Jumlah soal per section (untuk tampil "benar/total").
+    const maxRes = await query(
+      `SELECT section, COUNT(*) c FROM toefl_questions WHERE simulation_id = $1 GROUP BY section`, [result.simulation_id]);
+    const maxBy = { listening: 0, structure: 0, reading: 0 };
+    maxRes.rows.forEach((r) => { maxBy[r.section] = Number(r.c); });
+    res.render('member/toefl-result', { title: 'Hasil Simulasi TOEFL', user: req.session.user, result, maxBy });
   } catch (err) {
     console.error(err);
     res.render('error', { title: 'Error', message: err.message, user: req.session.user });

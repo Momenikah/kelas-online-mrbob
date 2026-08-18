@@ -25,12 +25,14 @@
         <h4><%= s.title %></h4>
         <p><%= s.description %></p>
         <div class="sim-meta">
-          <span><i class="fas fa-clock"></i> <%= s.duration_minutes %> menit</span>
-          <span><i class="fas fa-tasks"></i> 3 Sections</span>
+          <span><i class="fas fa-clock"></i> <%= (s.listening_minutes||35)+(s.structure_minutes||25)+(s.reading_minutes||55) %> menit</span>
+          <span><i class="fas fa-tasks"></i> <%= s.question_count %> soal</span>
         </div>
-        <button class="btn btn-primary btn-full" onclick="alert('Fitur simulasi akan segera tersedia!')">
-          <i class="fas fa-play"></i> Mulai Simulasi
-        </button>
+        <% if (Number(s.question_count) > 0) { %>
+          <a href="/member/toefl/<%= s.id %>" class="btn btn-primary btn-full"><i class="fas fa-play"></i> Mulai Simulasi</a>
+        <% } else { %>
+          <button class="btn btn-outline btn-full" disabled><i class="fas fa-hourglass-half"></i> Soal belum tersedia</button>
+        <% } %>
       </div>
       <% }) %>
     </div>

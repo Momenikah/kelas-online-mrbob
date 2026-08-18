@@ -1,0 +1,51 @@
+<div class="toefl-qadmin">
+  <h4 style="margin-top:16px"><i class="fas fa-list-ol"></i> Soal <%= section.charAt(0).toUpperCase() + section.slice(1) %> (<%= (qBy[section] || []).length %>)</h4>
+
+  <form action="/admin/toefl/<%= sim.id %>/question" method="POST" class="modal-form" style="background:var(--gray-50,#f7f7fb);padding:14px;border-radius:10px;margin-bottom:12px">
+    <input type="hidden" name="section" value="<%= section %>">
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Nomor</label><input type="number" name="number" class="form-input" placeholder="mis. 1"></div>
+      <% if (section !== 'structure' && passages.length) { %>
+      <div class="form-group">
+        <label class="form-label"><%= section === 'listening' ? 'Part' : 'Passage' %></label>
+        <select name="passage_id" class="form-input">
+          <option value="">- Tanpa <%= section === 'listening' ? 'part' : 'passage' %> -</option>
+          <% passages.forEach(p => { %><option value="<%= p.id %>"><%= p.label || ('#'+p.id) %></option><% }) %>
+        </select>
+      </div>
+      <% } %>
+    </div>
+    <div class="form-group"><label class="form-label">Pertanyaan <% if (section==='listening'){ %><small>(kosongkan bila soal hanya audio)</small><% } %></label>
+      <textarea name="prompt" class="form-textarea" rows="2" placeholder="Teks soal / kalimat"></textarea></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">(A)</label><input type="text" name="option_a" class="form-input"></div>
+      <div class="form-group"><label class="form-label">(B)</label><input type="text" name="option_b" class="form-input"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">(C)</label><input type="text" name="option_c" class="form-input"></div>
+      <div class="form-group"><label class="form-label">(D)</label><input type="text" name="option_d" class="form-input"></div>
+    </div>
+    <div class="form-group" style="max-width:200px"><label class="form-label">Kunci <span class="req">*</span></label>
+      <select name="correct_option" class="form-input" required><option value="">-</option><option>A</option><option>B</option><option>C</option><option>D</option></select></div>
+    <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Tambah Soal</button>
+  </form>
+
+  <% if ((qBy[section] || []).length) { %>
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead><tr><th>#</th><% if (section!=='structure'){ %><th><%= section==='listening'?'Part':'Passage' %></th><% } %><th>Soal</th><th>Kunci</th><th></th></tr></thead>
+        <tbody>
+          <% qBy[section].forEach(q => { %>
+            <tr>
+              <td><%= q.number || '-' %></td>
+              <% if (section!=='structure'){ %><td><small><%= q.passage_id ? passageLabel(q.passage_id) : '-' %></small></td><% } %>
+              <td><small><%= (q.prompt || '(audio saja)').slice(0,70) %></small></td>
+              <td><span class="badge-pill badge-completed"><%= q.correct_option %></span></td>
+              <td><form action="/admin/toefl/<%= sim.id %>/question/<%= q.id %>/delete" method="POST" onsubmit="return confirm('Hapus soal?')"><button class="btn btn-sm btn-outline"><i class="fas fa-trash"></i></button></form></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>

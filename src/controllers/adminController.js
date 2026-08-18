@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { ensureDiagnosticReportsTable } = require('../utils/diagnosticReports');
+const { ensureToeflTables, SECTIONS: TOEFL_SECTIONS } = require('../utils/toefl');
 const removeUploadedFile = (file) => {
   if (file) fs.unlink(path.join(__dirname, '../../public/uploads', file.filename), () => {});
 };
@@ -2590,4 +2591,169 @@ exports.updateSupportFeedbackStatus = async (req, res) => {
     req.flash('error', 'Gagal memperbarui status feedback.');
   }
   res.redirect('/admin/support-feedback');
+};
+
+// ===================== Simulasi TOEFL (admin) =====================
+const removeToeflFile = (fileUrl) => {
+  if (fileUrl) fs.unlink(path.join(__dirname, '../../public', fileUrl), () => {});
+};
+
+exports.toeflList = async (req, res) => {
+  try {
+    await ensureToeflTables(query);
+    const sims = await query(`
+      SELECT ts.*,
+             (SELECT COUNT(*) FROM toefl_questions q WHERE q.simulation_id = ts.id) AS question_count,
+             (SELECT COUNT(*) FROM toefl_questions q WHERE q.simulation_id = ts.id AND q.section='listening') AS listening_count,
+             (SELECT COUNT(*) FROM toefl_questions q WHERE q.simulation_id = ts.id AND q.section='structure') AS structure_count,
+             (SELECT COUNT(*) FROM toefl_questions q WHERE q.simulation_id = ts.id AND q.section='reading') AS reading_count
+      FROM toefl_simulations ts ORDER BY ts.created_at DESC
+    `);
+    res.render('admin/toefl', {
+      title: 'Simulasi TOEFL', user: req.session.user, simulations: sims.rows,
+      error: req.flash('error'), success: req.flash('success'),
+    });
+  } catch (err) {
+    console.error(err);
+    res.render('error', { title: 'Error', message: err.message, user: req.session.user });
+  }
+};
+
+exports.toeflCreate = async (req, res) => {
+  try {
+    await ensureToeflTables(query);
+    const title = String(req.body.title || '').trim();
+    if (!title) { req.flash('error', 'Judul simulasi wajib diisi.'); return res.redirect('/admin/toefl'); }
+    const ins = await query(
+      `INSERT INTO toefl_simulations (title, description, listening_minutes, structure_minutes, reading_minutes, is_active)
+       VALUES ($1,$2,$3,$4,$5,true) RETURNING id`,
+      [title, String(req.body.description || '').trim() || null,
+       Number(req.body.listening_minutes) || 35, Number(req.body.structure_minutes) || 25, Number(req.body.reading_minutes) || 55]
+    );
+    req.flash('success', 'Simulasi dibuat. Tambahkan passage & soal.');
+    res.redirect(`/admin/toefl/${ins.rows[0].id}`);
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal membuat simulasi.');
+    res.redirect('/admin/toefl');
+  }
+};
+
+exports.toeflManage = async (req, res) => {
+  try {
+    await ensureToeflTables(query);
+    const id = req.params.id;
+    const simRes = await query('SELECT * FROM toefl_simulations WHERE id = $1', [id]);
+    const sim = simRes.rows[0];
+    if (!sim) { req.flash('error', 'Simulasi tidak ditemukan.'); return res.redirect('/admin/toefl'); }
+    const [passages, questions] = await Promise.all([
+      query('SELECT * FROM toefl_passages WHERE simulation_id = $1 ORDER BY section, order_number, id', [id]),
+      query('SELECT * FROM toefl_questions WHERE simulation_id = $1 ORDER BY section, order_number, number, id', [id]),
+    ]);
+    res.render('admin/toefl-detail', {
+      title: `Kelola: ${sim.title}`, user: req.session.user,
+      sim, passages: passages.rows, questions: questions.rows, sections: TOEFL_SECTIONS,
+      error: req.flash('error'), success: req.flash('success'),
+    });
+  } catch (err) {
+    console.error(err);
+    res.render('error', { title: 'Error', message: err.message, user: req.session.user });
+  }
+};
+
+exports.toeflUpdate = async (req, res) => {
+  try {
+    await query(
+      `UPDATE toefl_simulations SET title=$1, description=$2, listening_minutes=$3, structure_minutes=$4, reading_minutes=$5, is_active=$6 WHERE id=$7`,
+      [String(req.body.title || '').trim(), String(req.body.description || '').trim() || null,
+       Number(req.body.listening_minutes) || 35, Number(req.body.structure_minutes) || 25, Number(req.body.reading_minutes) || 55,
+       req.body.is_active === 'on', req.params.id]
+    );
+    req.flash('success', 'Simulasi diperbarui.');
+  } catch (err) { console.error(err); req.flash('error', 'Gagal memperbarui simulasi.'); }
+  res.redirect(`/admin/toefl/${req.params.id}`);
+};
+
+exports.toeflDelete = async (req, res) => {
+  try {
+    const ps = await query('SELECT audio_url FROM toefl_passages WHERE simulation_id = $1', [req.params.id]);
+    ps.rows.forEach((p) => removeToeflFile(p.audio_url));
+    await query('DELETE FROM toefl_simulations WHERE id = $1', [req.params.id]); // cascade
+    req.flash('success', 'Simulasi dihapus.');
+  } catch (err) { console.error(err); req.flash('error', 'Gagal menghapus simulasi.'); }
+  res.redirect('/admin/toefl');
+};
+
+exports.toeflPassageCreate = async (req, res) => {
+  const id = req.params.id;
+  try {
+    await ensureToeflTables(query);
+    const section = String(req.body.section || '').trim();
+    if (!['listening', 'reading'].includes(section)) {
+      if (req.file) removeToeflFile(`/uploads/toefl/${req.file.filename}`);
+      req.flash('error', 'Section passage harus listening atau reading.');
+      return res.redirect(`/admin/toefl/${id}#${section || 'listening'}`);
+    }
+    const audioUrl = req.file ? `/uploads/toefl/${req.file.filename}` : null;
+    await query(
+      `INSERT INTO toefl_passages (simulation_id, section, label, body, audio_url, order_number)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [id, section, String(req.body.label || '').trim() || null, String(req.body.body || '').trim() || null,
+       audioUrl, Number(req.body.order_number) || 0]
+    );
+    req.flash('success', `${section === 'listening' ? 'Part listening' : 'Passage'} ditambahkan.`);
+    res.redirect(`/admin/toefl/${id}#${section}`);
+  } catch (err) {
+    console.error(err);
+    if (req.file) removeToeflFile(`/uploads/toefl/${req.file.filename}`);
+    req.flash('error', 'Gagal menambah passage.');
+    res.redirect(`/admin/toefl/${id}`);
+  }
+};
+
+exports.toeflPassageDelete = async (req, res) => {
+  const { id, pid } = req.params;
+  try {
+    const p = await query('SELECT audio_url FROM toefl_passages WHERE id = $1 AND simulation_id = $2', [pid, id]);
+    if (p.rows.length) removeToeflFile(p.rows[0].audio_url);
+    await query('DELETE FROM toefl_passages WHERE id = $1 AND simulation_id = $2', [pid, id]);
+    req.flash('success', 'Passage/part dihapus.');
+  } catch (err) { console.error(err); req.flash('error', 'Gagal menghapus passage.'); }
+  res.redirect(`/admin/toefl/${id}`);
+};
+
+exports.toeflQuestionCreate = async (req, res) => {
+  const id = req.params.id;
+  try {
+    await ensureToeflTables(query);
+    const section = String(req.body.section || '').trim();
+    if (!TOEFL_SECTIONS.includes(section)) { req.flash('error', 'Section tidak valid.'); return res.redirect(`/admin/toefl/${id}`); }
+    const correct = String(req.body.correct_option || '').trim().toUpperCase();
+    if (!['A', 'B', 'C', 'D'].includes(correct)) { req.flash('error', 'Kunci jawaban (A/B/C/D) wajib.'); return res.redirect(`/admin/toefl/${id}#${section}`); }
+    await query(
+      `INSERT INTO toefl_questions
+        (simulation_id, passage_id, section, number, prompt, option_a, option_b, option_c, option_d, correct_option, order_number)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [id, Number(req.body.passage_id) || null, section, Number(req.body.number) || null,
+       String(req.body.prompt || '').trim() || null,
+       String(req.body.option_a || '').trim() || null, String(req.body.option_b || '').trim() || null,
+       String(req.body.option_c || '').trim() || null, String(req.body.option_d || '').trim() || null,
+       correct, Number(req.body.number) || 0]
+    );
+    req.flash('success', 'Soal ditambahkan.');
+    res.redirect(`/admin/toefl/${id}#${section}`);
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal menambah soal.');
+    res.redirect(`/admin/toefl/${id}`);
+  }
+};
+
+exports.toeflQuestionDelete = async (req, res) => {
+  const { id, qid } = req.params;
+  try {
+    await query('DELETE FROM toefl_questions WHERE id = $1 AND simulation_id = $2', [qid, id]);
+    req.flash('success', 'Soal dihapus.');
+  } catch (err) { console.error(err); req.flash('error', 'Gagal menghapus soal.'); }
+  res.redirect(`/admin/toefl/${id}`);
 };

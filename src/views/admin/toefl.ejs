@@ -1,0 +1,65 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'admin' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/admin" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <div class="sub-banner-titles">
+      <h1>Simulasi TOEFL</h1>
+      <p class="sub-banner-desc">Buat & kelola paket simulasi TOEFL (Listening, Structure, Reading).</p>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-plus"></i> Buat Simulasi Baru</h3>
+      <form action="/admin/toefl" method="POST" class="modal-form">
+        <div class="form-group">
+          <label class="form-label">Judul <span class="req">*</span></label>
+          <input type="text" name="title" class="form-input" required placeholder="mis. TOEFL Practice Test 2">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Deskripsi</label>
+          <input type="text" name="description" class="form-input" placeholder="Keterangan singkat (opsional)">
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Listening (menit)</label><input type="number" name="listening_minutes" class="form-input" value="35"></div>
+          <div class="form-group"><label class="form-label">Structure (menit)</label><input type="number" name="structure_minutes" class="form-input" value="25"></div>
+          <div class="form-group"><label class="form-label">Reading (menit)</label><input type="number" name="reading_minutes" class="form-input" value="55"></div>
+        </div>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Buat</button>
+      </form>
+    </div>
+
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-list"></i> Daftar Simulasi</h3>
+      <% if (simulations.length === 0) { %>
+        <div class="empty-state compact"><i class="fas fa-file-alt"></i><p>Belum ada simulasi.</p></div>
+      <% } else { %>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead><tr><th>Judul</th><th>Soal (L/S/R)</th><th>Status</th><th>Aksi</th></tr></thead>
+            <tbody>
+              <% simulations.forEach(s => { %>
+                <tr>
+                  <td><strong><%= s.title %></strong><br><small><%= s.description || '' %></small></td>
+                  <td><%= s.listening_count %> / <%= s.structure_count %> / <%= s.reading_count %> <small>(total <%= s.question_count %>)</small></td>
+                  <td><span class="badge-pill badge-<%= s.is_active ? 'completed' : 'cancelled' %>"><%= s.is_active ? 'Aktif' : 'Nonaktif' %></span></td>
+                  <td>
+                    <a href="/admin/toefl/<%= s.id %>" class="btn btn-sm btn-primary"><i class="fas fa-pen"></i> Kelola</a>
+                    <form action="/admin/toefl/<%= s.id %>/delete" method="POST" style="display:inline" onsubmit="return confirm('Hapus simulasi + semua soalnya?')">
+                      <button class="btn btn-sm btn-outline"><i class="fas fa-trash"></i></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

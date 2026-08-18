@@ -1,0 +1,40 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'member' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/member/toefl" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1><i class="fas fa-trophy"></i> Hasil: <%= result.title %></h1>
+  </div>
+
+  <div class="container">
+    <div class="section-card" style="text-align:center">
+      <p style="margin:0 0 6px;color:var(--gray-500)">Skor Total (skala TOEFL PBT)</p>
+      <div style="font-size:56px;font-weight:800;color:var(--brand-600);line-height:1"><%= result.total_score %></div>
+      <p style="margin-top:6px;color:var(--gray-500)">Diambil <%= formatDate(result.taken_at) %></p>
+    </div>
+
+    <div class="at-stats">
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:#2563EB"><i class="fas fa-headphones"></i></span>
+        <div><strong><%= result.listening_score %></strong><small>Listening · <%= result.listening_raw %>/<%= maxBy.listening %> benar</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:#7C3AED"><i class="fas fa-spell-check"></i></span>
+        <div><strong><%= result.structure_score %></strong><small>Structure · <%= result.structure_raw %>/<%= maxBy.structure %> benar</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:#059669"><i class="fas fa-book-open"></i></span>
+        <div><strong><%= result.reading_score %></strong><small>Reading · <%= result.reading_raw %>/<%= maxBy.reading %> benar</small></div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <p class="module-materials-note">Skor per section memakai skala TOEFL PBT (31–68) dan total 310–677 (estimasi konversi linear). Terus berlatih untuk meningkatkan skor! 💪</p>
+      <a href="/member/toefl" class="btn btn-primary"><i class="fas fa-redo"></i> Kembali ke Daftar Simulasi</a>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

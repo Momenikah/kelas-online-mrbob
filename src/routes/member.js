@@ -56,6 +56,9 @@ router.post('/profile', isMember, profilePhotoUpload, memberController.updatePro
 router.get('/renewal', isMember, memberController.renewal);
 router.post('/renewal', isMember, renewalProofUpload, memberController.submitRenewal);
 router.get('/toefl', isMember, requireLuxury, memberController.toefl);
+router.get('/toefl/result/:id', isMember, requireLuxury, memberController.toeflResult);
+router.get('/toefl/:id', isMember, requireLuxury, memberController.toeflStart);
+router.post('/toefl/:id/submit', isMember, requireLuxury, memberController.toeflSubmit);
 router.get('/video', isMember, requireLuxury, memberController.video);
 router.get('/placement-test', isMember, memberController.placementTestIndex);
 router.get('/placement-test/kids', isMember, memberController.placementTestKids);

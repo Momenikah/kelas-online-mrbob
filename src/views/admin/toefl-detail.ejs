@@ -1,0 +1,105 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'admin' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/admin/toefl" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <div class="sub-banner-titles">
+      <h1><%= sim.title %></h1>
+      <p class="sub-banner-desc">Kelola passage/audio &amp; soal per section.</p>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Meta -->
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-sliders-h"></i> Pengaturan Simulasi</h3>
+      <form action="/admin/toefl/<%= sim.id %>/update" method="POST" class="modal-form">
+        <div class="form-group"><label class="form-label">Judul</label><input type="text" name="title" class="form-input" value="<%= sim.title %>" required></div>
+        <div class="form-group"><label class="form-label">Deskripsi</label><input type="text" name="description" class="form-input" value="<%= sim.description || '' %>"></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Listening (menit)</label><input type="number" name="listening_minutes" class="form-input" value="<%= sim.listening_minutes %>"></div>
+          <div class="form-group"><label class="form-label">Structure (menit)</label><input type="number" name="structure_minutes" class="form-input" value="<%= sim.structure_minutes %>"></div>
+          <div class="form-group"><label class="form-label">Reading (menit)</label><input type="number" name="reading_minutes" class="form-input" value="<%= sim.reading_minutes %>"></div>
+        </div>
+        <label class="login-remember"><input type="checkbox" name="is_active" <%= sim.is_active ? 'checked' : '' %>> <span>Aktif (tampil untuk member)</span></label>
+        <div style="margin-top:12px"><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan</button></div>
+      </form>
+    </div>
+
+    <%
+      const passagesBy = { listening: [], reading: [] };
+      passages.forEach(p => { (passagesBy[p.section] || (passagesBy[p.section] = [])).push(p); });
+      const qBy = { listening: [], structure: [], reading: [] };
+      questions.forEach(q => { (qBy[q.section] || (qBy[q.section] = [])).push(q); });
+      const passageLabel = (pid) => { const p = passages.find(x => x.id == pid); return p ? (p.label || ('#'+p.id)) : ''; };
+    %>
+
+    <!-- LISTENING -->
+    <div class="section-card" id="listening">
+      <h3 class="section-title"><i class="fas fa-headphones"></i> Listening — Part &amp; Audio</h3>
+      <p class="module-materials-note">Tambah tiap Part (A/B/C) beserta audio-nya. Soal listening dikaitkan ke Part.</p>
+      <form action="/admin/toefl/<%= sim.id %>/passage" method="POST" enctype="multipart/form-data" class="filter-form" style="flex-wrap:wrap;gap:10px">
+        <input type="hidden" name="section" value="listening">
+        <input type="text" name="label" class="form-input" placeholder="Label, mis. Part A" required>
+        <input type="number" name="order_number" class="form-input" style="max-width:110px" placeholder="Urutan" value="0">
+        <input type="file" name="audio" class="form-input" accept="audio/*" required>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-upload"></i> Tambah Part</button>
+      </form>
+      <% if (passagesBy.listening.length) { %>
+        <div class="module-materials-grid" style="margin-top:12px">
+          <% passagesBy.listening.forEach(p => { %>
+            <div class="module-material-item">
+              <div class="module-material-info">
+                <span class="module-material-icon"><i class="fas fa-music"></i></span>
+                <div><strong><%= p.label || ('Part #'+p.id) %></strong><small><%= p.audio_url ? 'Audio terpasang' : 'Tanpa audio' %></small></div>
+              </div>
+              <div class="row-actions">
+                <% if (p.audio_url) { %><a href="<%= p.audio_url %>" target="_blank" class="btn btn-sm btn-outline"><i class="fas fa-play"></i></a><% } %>
+                <form action="/admin/toefl/<%= sim.id %>/passage/<%= p.id %>/delete" method="POST" onsubmit="return confirm('Hapus part ini?')"><button class="btn btn-sm btn-outline"><i class="fas fa-trash"></i></button></form>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+      <%- include('../partials/toefl-question-form', { sim, section: 'listening', passages: passagesBy.listening, qBy, passageLabel }) %>
+    </div>
+
+    <!-- STRUCTURE -->
+    <div class="section-card" id="structure">
+      <h3 class="section-title"><i class="fas fa-spell-check"></i> Structure &amp; Written Expression</h3>
+      <p class="module-materials-note">Soal tanpa passage. Isi kalimat/soal di kolom pertanyaan, lalu opsi A–D + kunci.</p>
+      <%- include('../partials/toefl-question-form', { sim, section: 'structure', passages: [], qBy, passageLabel }) %>
+    </div>
+
+    <!-- READING -->
+    <div class="section-card" id="reading">
+      <h3 class="section-title"><i class="fas fa-book-open"></i> Reading — Passage &amp; Soal</h3>
+      <p class="module-materials-note">Tambah tiap Passage (teks bacaan), lalu kaitkan soal ke Passage.</p>
+      <form action="/admin/toefl/<%= sim.id %>/passage" method="POST" enctype="multipart/form-data" class="modal-form">
+        <input type="hidden" name="section" value="reading">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Label</label><input type="text" name="label" class="form-input" placeholder="mis. Passage 1" required></div>
+          <div class="form-group"><label class="form-label">Urutan</label><input type="number" name="order_number" class="form-input" value="0"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Teks Bacaan</label><textarea name="body" class="form-textarea" rows="5" placeholder="Tempel teks passage di sini"></textarea></div>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Tambah Passage</button>
+      </form>
+      <% if (passagesBy.reading.length) { %>
+        <div class="module-materials-grid" style="margin-top:12px">
+          <% passagesBy.reading.forEach(p => { %>
+            <div class="module-material-item">
+              <div class="module-material-info"><span class="module-material-icon"><i class="fas fa-file-lines"></i></span>
+                <div><strong><%= p.label || ('Passage #'+p.id) %></strong><small><%= (p.body || '').slice(0,60) %>…</small></div></div>
+              <form action="/admin/toefl/<%= sim.id %>/passage/<%= p.id %>/delete" method="POST" onsubmit="return confirm('Hapus passage ini?')"><button class="btn btn-sm btn-outline"><i class="fas fa-trash"></i></button></form>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+      <%- include('../partials/toefl-question-form', { sim, section: 'reading', passages: passagesBy.reading, qBy, passageLabel }) %>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>
