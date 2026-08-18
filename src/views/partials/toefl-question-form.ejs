@@ -1,4 +1,19 @@
 <div class="toefl-qadmin">
+  <details class="toefl-import" style="margin-top:16px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:12px 14px">
+    <summary style="cursor:pointer;font-weight:700"><i class="fas fa-file-import"></i> Impor massal teks soal <%= section.charAt(0).toUpperCase() + section.slice(1) %></summary>
+    <p class="field-hint" style="margin-top:8px">
+      Satu baris per soal, dipisah tanda <b>|</b> (pipe):<br>
+      <code>nomor | pertanyaan | A | B | C | D<%= section !== 'structure' ? ' | ' + (section === 'listening' ? 'Part' : 'Passage') : '' %></code><br>
+      Kunci jawaban <b>tidak diubah</b> (sudah dari answer key) — impor hanya mengisi teks &amp; opsi.
+      Nomor harus cocok dengan soal yang sudah ada.
+    </p>
+    <form action="/admin/toefl/<%= sim.id %>/import" method="POST" class="modal-form">
+      <input type="hidden" name="section" value="<%= section %>">
+      <textarea name="data" class="form-textarea" rows="6" placeholder="1 | Pepsin ______ an enzyme used in digestion. | that | is | of | being&#10;2 | ... | ... | ... | ... | ..."></textarea>
+      <button type="submit" class="btn btn-primary btn-sm" style="margin-top:8px"><i class="fas fa-upload"></i> Impor</button>
+    </form>
+  </details>
+
   <h4 style="margin-top:16px"><i class="fas fa-list-ol"></i> Soal <%= section.charAt(0).toUpperCase() + section.slice(1) %> (<%= (qBy[section] || []).length %>)</h4>
 
   <form action="/admin/toefl/<%= sim.id %>/question" method="POST" class="modal-form" style="background:var(--gray-50,#f7f7fb);padding:14px;border-radius:10px;margin-bottom:12px">

@@ -2758,6 +2758,56 @@ exports.toeflQuestionDelete = async (req, res) => {
   res.redirect(`/admin/toefl/${id}`);
 };
 
+// Impor massal teks soal: tiap baris "nomor | pertanyaan | A | B | C | D | [passage]".
+// Mencocokkan ke soal yang SUDAH ada (by section+number) lalu mengisi teks & opsi.
+// Kunci jawaban TIDAK diubah (sudah dari answer key). Kolom passage opsional
+// (listening/reading) dicocokkan ke label part/passage.
+exports.toeflImport = async (req, res) => {
+  const id = req.params.id;
+  try {
+    await ensureToeflTables(query);
+    const section = String(req.body.section || '').trim();
+    if (!TOEFL_SECTIONS.includes(section)) { req.flash('error', 'Section tidak valid.'); return res.redirect(`/admin/toefl/${id}`); }
+
+    // Peta label passage/part -> id (untuk kolom passage opsional).
+    const passageMap = {};
+    if (section !== 'structure') {
+      const ps = await query('SELECT id, label FROM toefl_passages WHERE simulation_id = $1 AND section = $2', [id, section]);
+      ps.rows.forEach((p) => { if (p.label) passageMap[p.label.trim().toLowerCase()] = p.id; });
+    }
+
+    const lines = String(req.body.data || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    let updated = 0;
+    const unmatched = [];
+    for (const line of lines) {
+      const parts = line.split('|').map((s) => s.trim());
+      const num = Number(parts[0]);
+      if (!Number.isInteger(num)) continue;
+      const prompt = parts[1] || null;
+      const a = parts[2] || null, b = parts[3] || null, c = parts[4] || null, d = parts[5] || null;
+      const passageId = (parts[6] && passageMap[parts[6].toLowerCase()]) || null;
+      const sets = ['prompt=$1', 'option_a=$2', 'option_b=$3', 'option_c=$4', 'option_d=$5'];
+      const params = [prompt, a, b, c, d];
+      if (passageId) { params.push(passageId); sets.push(`passage_id=$${params.length}`); }
+      params.push(id, section, num);
+      const r = await query(
+        `UPDATE toefl_questions SET ${sets.join(', ')}
+         WHERE simulation_id=$${params.length - 2} AND section=$${params.length - 1} AND number=$${params.length}`,
+        params
+      );
+      if (r.rowCount > 0) updated += 1; else unmatched.push(num);
+    }
+    let msg = `${updated} soal ${section} terisi.`;
+    if (unmatched.length) msg += ` Nomor tak cocok (dilewati): ${unmatched.join(', ')}.`;
+    req.flash(updated ? 'success' : 'error', msg);
+    res.redirect(`/admin/toefl/${id}#${section}`);
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal impor soal.');
+    res.redirect(`/admin/toefl/${id}`);
+  }
+};
+
 exports.toeflQuestionEdit = async (req, res) => {
   const { id, qid } = req.params;
   try {
