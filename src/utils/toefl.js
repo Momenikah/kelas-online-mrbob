@@ -70,6 +70,11 @@ async function ensureToeflTables(query) {
   await query(`ALTER TABLE toefl_results ADD COLUMN IF NOT EXISTS structure_raw INTEGER DEFAULT 0`);
   await query(`ALTER TABLE toefl_results ADD COLUMN IF NOT EXISTS reading_raw INTEGER DEFAULT 0`);
   await query(`ALTER TABLE toefl_results ADD COLUMN IF NOT EXISTS answers JSONB`);
+  // Tabel lama (init.sql) memakai FK tanpa ON DELETE CASCADE -> menghapus simulasi
+  // yang sudah punya hasil akan gagal. Pasang ulang dengan CASCADE.
+  await query(`ALTER TABLE toefl_results DROP CONSTRAINT IF EXISTS toefl_results_simulation_id_fkey`);
+  await query(`ALTER TABLE toefl_results ADD CONSTRAINT toefl_results_simulation_id_fkey
+               FOREIGN KEY (simulation_id) REFERENCES toefl_simulations(id) ON DELETE CASCADE`);
 }
 
 // Raw benar (0..max) -> skala section TOEFL (31–68), linear & di-clamp.
