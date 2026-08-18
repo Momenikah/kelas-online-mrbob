@@ -41,7 +41,12 @@
               <% if (section!=='structure'){ %><td><small><%= q.passage_id ? passageLabel(q.passage_id) : '-' %></small></td><% } %>
               <td><small><%= (q.prompt || '(audio saja)').slice(0,70) %></small></td>
               <td><span class="badge-pill badge-completed"><%= q.correct_option %></span></td>
-              <td><form action="/admin/toefl/<%= sim.id %>/question/<%= q.id %>/delete" method="POST" onsubmit="return confirm('Hapus soal?')"><button class="btn btn-sm btn-outline"><i class="fas fa-trash"></i></button></form></td>
+              <td>
+                <div class="row-actions">
+                  <a href="/admin/toefl/<%= sim.id %>/question/<%= q.id %>/edit" class="btn btn-sm btn-outline"><i class="fas fa-pen"></i></a>
+                  <form action="/admin/toefl/<%= sim.id %>/question/<%= q.id %>/delete" method="POST" onsubmit="return confirm('Hapus soal?')"><button class="btn btn-sm btn-outline"><i class="fas fa-trash"></i></button></form>
+                </div>
+              </td>
             </tr>
           <% }) %>
         </tbody>

@@ -2757,3 +2757,46 @@ exports.toeflQuestionDelete = async (req, res) => {
   } catch (err) { console.error(err); req.flash('error', 'Gagal menghapus soal.'); }
   res.redirect(`/admin/toefl/${id}`);
 };
+
+exports.toeflQuestionEdit = async (req, res) => {
+  const { id, qid } = req.params;
+  try {
+    await ensureToeflTables(query);
+    const sim = (await query('SELECT * FROM toefl_simulations WHERE id = $1', [id])).rows[0];
+    const q = (await query('SELECT * FROM toefl_questions WHERE id = $1 AND simulation_id = $2', [qid, id])).rows[0];
+    if (!sim || !q) { req.flash('error', 'Soal tidak ditemukan.'); return res.redirect(`/admin/toefl/${id}`); }
+    const passages = (await query('SELECT id, section, label FROM toefl_passages WHERE simulation_id = $1 AND section = $2 ORDER BY order_number, id', [id, q.section])).rows;
+    res.render('admin/toefl-question-edit', {
+      title: 'Edit Soal', user: req.session.user, sim, q, passages,
+      error: req.flash('error'), success: req.flash('success'),
+    });
+  } catch (err) {
+    console.error(err);
+    res.render('error', { title: 'Error', message: err.message, user: req.session.user });
+  }
+};
+
+exports.toeflQuestionUpdate = async (req, res) => {
+  const { id, qid } = req.params;
+  try {
+    const correct = String(req.body.correct_option || '').trim().toUpperCase();
+    if (!['A', 'B', 'C', 'D'].includes(correct)) { req.flash('error', 'Kunci jawaban (A/B/C/D) wajib.'); return res.redirect(`/admin/toefl/${id}/question/${qid}/edit`); }
+    await query(
+      `UPDATE toefl_questions SET passage_id=$1, number=$2, prompt=$3,
+         option_a=$4, option_b=$5, option_c=$6, option_d=$7, correct_option=$8, order_number=$9
+       WHERE id=$10 AND simulation_id=$11`,
+      [Number(req.body.passage_id) || null, Number(req.body.number) || null,
+       String(req.body.prompt || '').trim() || null,
+       String(req.body.option_a || '').trim() || null, String(req.body.option_b || '').trim() || null,
+       String(req.body.option_c || '').trim() || null, String(req.body.option_d || '').trim() || null,
+       correct, Number(req.body.number) || 0, qid, id]
+    );
+    req.flash('success', 'Soal diperbarui.');
+    const sec = (await query('SELECT section FROM toefl_questions WHERE id = $1', [qid])).rows[0];
+    res.redirect(`/admin/toefl/${id}#${sec ? sec.section : ''}`);
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal memperbarui soal.');
+    res.redirect(`/admin/toefl/${id}/question/${qid}/edit`);
+  }
+};

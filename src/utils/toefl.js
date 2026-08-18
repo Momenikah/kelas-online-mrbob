@@ -77,12 +77,20 @@ async function ensureToeflTables(query) {
                FOREIGN KEY (simulation_id) REFERENCES toefl_simulations(id) ON DELETE CASCADE`);
 }
 
-// Raw benar (0..max) -> skala section TOEFL (31–68), linear & di-clamp.
-function toSectionScaled(raw, max) {
-  if (!max || max <= 0) return 31;
-  const r = Math.max(0, Math.min(raw, max));
-  const scaled = 31 + (r / max) * (68 - 31);
-  return Math.round(Math.max(31, Math.min(68, scaled)));
+// Tabel konversi resmi Practice Test 2 (raw benar -> skala section), indeks = jumlah
+// benar. Baris 24 tidak ada di sumber -> diinterpolasi dari 23 & 25.
+const CONVERSION = {
+  listening: [24, 25, 26, 27, 28, 29, 30, 31, 32, 32, 33, 35, 37, 38, 39, 41, 41, 42, 43, 44, 45, 45, 46, 47, 48, 48, 48, 49, 49, 50, 51, 52, 52, 53, 53, 54, 54, 55, 56, 57, 57, 58, 59, 60, 61, 62, 63, 65, 66, 67, 68],
+  structure: [19, 20, 21, 22, 23, 25, 26, 27, 29, 31, 33, 35, 36, 37, 38, 40, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 60, 61, 63, 65, 68, 68],
+  reading: [21, 22, 23, 23, 25, 26, 27, 28, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 44, 45, 46, 46, 47, 48, 48, 49, 50, 51, 52, 52, 53, 54, 54, 55, 56, 57, 58, 59, 60, 61, 63, 65, 66, 67],
+};
+
+// Jumlah benar section -> skala TOEFL PBT via tabel konversi (di-clamp ke rentang tabel).
+function toSectionScaled(raw, section) {
+  const table = CONVERSION[section];
+  if (!table) return 31;
+  const r = Math.max(0, Math.min(Math.round(raw), table.length - 1));
+  return table[r];
 }
 
 // Tiga skala section -> total TOEFL (310–677).
@@ -106,9 +114,9 @@ function scoreAttempt(questions, answers = {}) {
     }
   });
   const scaled = {
-    listening: toSectionScaled(raw.listening, max.listening),
-    structure: toSectionScaled(raw.structure, max.structure),
-    reading: toSectionScaled(raw.reading, max.reading),
+    listening: toSectionScaled(raw.listening, 'listening'),
+    structure: toSectionScaled(raw.structure, 'structure'),
+    reading: toSectionScaled(raw.reading, 'reading'),
   };
   const total = toTotalScore(scaled.listening, scaled.structure, scaled.reading);
   return { raw, max, scaled, total };

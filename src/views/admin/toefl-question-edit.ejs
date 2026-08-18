@@ -1,0 +1,52 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'admin' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/admin/toefl/<%= sim.id %>#<%= q.section %>" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <div class="sub-banner-titles">
+      <h1>Edit Soal — <%= q.section.charAt(0).toUpperCase() + q.section.slice(1) %> #<%= q.number || q.id %></h1>
+      <p class="sub-banner-desc"><%= sim.title %></p>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="section-card">
+      <form action="/admin/toefl/<%= sim.id %>/question/<%= q.id %>/update" method="POST" class="modal-form">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Nomor</label><input type="number" name="number" class="form-input" value="<%= q.number || '' %>"></div>
+          <% if (q.section !== 'structure') { %>
+          <div class="form-group">
+            <label class="form-label"><%= q.section === 'listening' ? 'Part' : 'Passage' %></label>
+            <select name="passage_id" class="form-input">
+              <option value="">- Tanpa <%= q.section === 'listening' ? 'part' : 'passage' %> -</option>
+              <% passages.forEach(p => { %><option value="<%= p.id %>" <%= String(q.passage_id) === String(p.id) ? 'selected' : '' %>><%= p.label || ('#'+p.id) %></option><% }) %>
+            </select>
+          </div>
+          <% } %>
+        </div>
+        <div class="form-group"><label class="form-label">Pertanyaan</label>
+          <textarea name="prompt" class="form-textarea" rows="3"><%= q.prompt || '' %></textarea></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">(A)</label><input type="text" name="option_a" class="form-input" value="<%= q.option_a || '' %>"></div>
+          <div class="form-group"><label class="form-label">(B)</label><input type="text" name="option_b" class="form-input" value="<%= q.option_b || '' %>"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">(C)</label><input type="text" name="option_c" class="form-input" value="<%= q.option_c || '' %>"></div>
+          <div class="form-group"><label class="form-label">(D)</label><input type="text" name="option_d" class="form-input" value="<%= q.option_d || '' %>"></div>
+        </div>
+        <div class="form-group" style="max-width:200px"><label class="form-label">Kunci <span class="req">*</span></label>
+          <select name="correct_option" class="form-input" required>
+            <% ['A','B','C','D'].forEach(k => { %><option <%= q.correct_option === k ? 'selected' : '' %>><%= k %></option><% }) %>
+          </select></div>
+        <div class="form-actions">
+          <a href="/admin/toefl/<%= sim.id %>#<%= q.section %>" class="btn btn-outline">Batal</a>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan Soal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

@@ -66,6 +66,8 @@ router.post('/toefl/:id/delete', isAdmin, adminController.toeflDelete);
 router.post('/toefl/:id/passage', isAdmin, toeflAudioUpload, adminController.toeflPassageCreate);
 router.post('/toefl/:id/passage/:pid/delete', isAdmin, adminController.toeflPassageDelete);
 router.post('/toefl/:id/question', isAdmin, adminController.toeflQuestionCreate);
+router.get('/toefl/:id/question/:qid/edit', isAdmin, adminController.toeflQuestionEdit);
+router.post('/toefl/:id/question/:qid/update', isAdmin, adminController.toeflQuestionUpdate);
 router.post('/toefl/:id/question/:qid/delete', isAdmin, adminController.toeflQuestionDelete);
 router.get('/questionnaire', isAdmin, adminController.questionnaire);
 router.post('/questionnaire', isAdmin, adminController.createQuestionnaire);
