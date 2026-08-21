@@ -19,9 +19,14 @@ async function ensureMemberPresenceTable(query) {
     )
   `);
   await query(`ALTER TABLE member_presences ADD COLUMN IF NOT EXISTS schedule_id INTEGER REFERENCES schedules(id) ON DELETE SET NULL`);
+  // Unik per (member, schedule, MEETING) — bukan per (member, schedule) — supaya
+  // tiap pertemuan BERTAMBAH (bukan menimpa). Satu jadwal (paket) berisi banyak
+  // pertemuan; re-submit pertemuan yang SAMA memperbarui buktinya, pertemuan baru
+  // menambah baris.
+  await query(`DROP INDEX IF EXISTS member_presences_member_schedule_idx`);
   await query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS member_presences_member_schedule_idx
-    ON member_presences (member_id, schedule_id)
+    CREATE UNIQUE INDEX IF NOT EXISTS member_presences_member_schedule_meeting_idx
+    ON member_presences (member_id, schedule_id, meeting_number)
   `);
 }
 

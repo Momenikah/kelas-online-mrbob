@@ -529,17 +529,17 @@ exports.submitPresence = async (req, res) => {
     }
 
     const screenshot = `/uploads/${req.file.filename}`;
+    // Hanya bukti pertemuan YANG SAMA yang diganti (dedup per member+schedule+meeting).
     const existingProof = scheduleId
-      ? await query('SELECT screenshot FROM member_presences WHERE member_id = $1 AND schedule_id = $2', [userId, scheduleId])
+      ? await query('SELECT screenshot FROM member_presences WHERE member_id = $1 AND schedule_id = $2 AND meeting_number = $3', [userId, scheduleId, meeting])
       : { rows: [] };
     await query(
       `INSERT INTO member_presences (member_id, tutor_id, schedule_id, period_start, program_id, meeting_number, screenshot)
        VALUES ($1,$2,$3,$4,$5,$6,$7)
-       ON CONFLICT (member_id, schedule_id)
+       ON CONFLICT (member_id, schedule_id, meeting_number)
        DO UPDATE SET tutor_id = EXCLUDED.tutor_id,
                      period_start = EXCLUDED.period_start,
                      program_id = EXCLUDED.program_id,
-                     meeting_number = EXCLUDED.meeting_number,
                      screenshot = EXCLUDED.screenshot,
                      created_at = NOW()`,
       [userId, tutorId, scheduleId, periodStart, programId, meeting, screenshot]
