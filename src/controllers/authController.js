@@ -98,7 +98,10 @@ exports.login = async (req, res) => {
   const password = String(req.body.password || '');
   try {
     await ensureUserAccessColumns(query);
-    const result = await query('SELECT * FROM users WHERE LOWER(TRIM(email)) = $1 AND is_active = true', [email]);
+    // Ambil user tanpa filter is_active dulu — supaya bisa membedakan "password salah"
+    // dari "akun nonaktif". Kalau password benar tapi akun nonaktif, beri pesan jelas
+    // (mis. admin sudah ganti password tapi lupa mengaktifkan akun -> login gagal).
+    const result = await query('SELECT * FROM users WHERE LOWER(TRIM(email)) = $1 ORDER BY is_active DESC LIMIT 1', [email]);
     const user = result.rows[0];
     if (!user) {
       req.flash('error', 'Email atau password salah.');
@@ -117,6 +120,10 @@ exports.login = async (req, res) => {
     }
     if (!valid) {
       req.flash('error', 'Email atau password salah.');
+      return res.redirect('/login');
+    }
+    if (!user.is_active) {
+      req.flash('error', 'Akun kamu belum aktif. Hubungi admin untuk mengaktifkan akun.');
       return res.redirect('/login');
     }
     req.session.user = {
