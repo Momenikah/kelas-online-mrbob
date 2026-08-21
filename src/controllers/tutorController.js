@@ -465,14 +465,12 @@ exports.saveAvailableTime = async (req, res) => {
     const entries = [];
     const seen = new Set();
     const daySlots = new Map();
-    let legacyCustomIndex = 0;
     for (let i = 0; i < jam.length; i += 1) {
       const slot = at.parseSlot(jam[i]);
       if (!slot) continue;
       const category = ['weekdays', 'weekend', 'custom'].includes(hari[i]) ? hari[i] : 'weekdays';
-      const rawCustom = category === 'custom'
-        ? (custom.length === jam.length ? custom[i] : custom[legacyCustomIndex++])
-        : '';
+      // Nama field kini ber-indeks (custom[i]) sehingga selalu sejajar dgn baris-nya.
+      const rawCustom = category === 'custom' ? (custom[i] != null ? custom[i] : '') : '';
       const customDays = category === 'custom' ? (rawCustom || '').trim() : null;
       const expandedDays = at.expandDays(category, customDays);
 

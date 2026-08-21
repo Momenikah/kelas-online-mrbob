@@ -269,7 +269,20 @@
   repeater.addEventListener('change', refresh);
   repeater.addEventListener('input', refresh);
   form.addEventListener('submit', function () {
-    repeater.querySelectorAll('[data-row]').forEach(syncCustom);
+    // Beri nama field per-baris dengan INDEKS eksplisit (jam_belajar[i], hari[i],
+    // custom[i]) supaya baris tak pernah salah-sejajar — mis. slot Custom di baris
+    // terakhir tetap terbaca. Nama array polos ("custom[]") bisa memadatkan entri
+    // kosong dan menggeser data.
+    var rows = repeater.querySelectorAll('[data-row]');
+    rows.forEach(function (row, i) {
+      syncCustom(row);
+      var jam = row.querySelector('[name^="jam_belajar"]');
+      var hari = row.querySelector('[data-hari]');
+      var cv = row.querySelector('[data-custom-value]');
+      if (jam) jam.name = 'jam_belajar[' + i + ']';
+      if (hari) hari.name = 'hari[' + i + ']';
+      if (cv) cv.name = 'custom[' + i + ']';
+    });
   });
 
   function setRowCount(n) {
