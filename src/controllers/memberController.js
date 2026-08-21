@@ -335,30 +335,37 @@ exports.module = async (req, res) => {
     let progFilter = '';
     if (programId) { params.push(Number(programId)); progFilter = ` AND m.program_id = $${params.length}`; }
 
+    // Program yang "dimiliki" member = enrollment aktif ATAU yang di-plot lewat sheet
+    // (schedule_members, jadwal tak dibatalkan). Banyak member terploting tanpa
+    // record enrollment, jadi kalau hanya andalkan enrollments, modulnya kosong.
+    const memberProgramSet = `(
+      SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active'
+      UNION
+      SELECT s.program_id FROM schedule_members sm JOIN schedules s ON s.id = sm.schedule_id
+      WHERE sm.member_id = $1 AND s.status <> 'cancelled'
+    )`;
     const [result, programsRes, statsRes, ebooksRes] = await Promise.all([
       // Daftar utama = modul biasa (non-premium). Modul premium ditampilkan hanya
       // di section "Module Premium" (khusus Luxury), tidak di sini.
       query(`
         SELECT m.*, p.name as program_name
         FROM modules m JOIN programs p ON m.program_id = p.id
-        WHERE m.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
+        WHERE m.program_id IN ${memberProgramSet}
           AND m.is_active = true AND m.is_premium = false${progFilter}
         ORDER BY p.name, m.order_number
       `, params),
       query(`SELECT DISTINCT p.id, p.name FROM programs p
-             JOIN enrollments e ON e.program_id = p.id
-             WHERE e.member_id = $1 AND e.status = 'active' ORDER BY p.name`, [userId]),
+             WHERE p.id IN ${memberProgramSet} ORDER BY p.name`, [userId]),
       query(`SELECT COUNT(*) AS total
              FROM modules m
-             WHERE m.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active')
+             WHERE m.program_id IN ${memberProgramSet}
                AND m.is_active = true AND m.is_premium = false${progFilter}`, params),
       // Module Premium (khusus Luxury): bonus umum (program_id NULL) + modul premium
-      // untuk program yang di-enroll member. Non-Luxury tidak menerima daftar ini.
+      // untuk program yang dimiliki member. Non-Luxury tidak menerima daftar ini.
       query(`SELECT m.id, m.title, m.description, m.file_url, m.order_number, p.name AS program_name
              FROM modules m LEFT JOIN programs p ON p.id = m.program_id
              WHERE m.is_premium = true AND m.is_active = true
-               AND (m.program_id IS NULL
-                    OR m.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active'))
+               AND (m.program_id IS NULL OR m.program_id IN ${memberProgramSet})
              ORDER BY (m.program_id IS NULL) DESC, p.name, m.order_number, m.title`, [userId]),
     ]);
     const isLuxury = req.session.user.is_luxury;
