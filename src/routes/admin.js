@@ -87,6 +87,12 @@ router.post('/certificate/:id/update', isAdmin, adminController.updateCertificat
 router.post('/certificate/:id/toggle', isAdmin, adminController.toggleCertificate);
 router.get('/certificate/:id/print', isAdmin, adminController.certificatePrint);
 router.post('/certificate/:id/sync', isAdmin, adminController.certificateSync);
+// Recording kelas (Luxury Class)
+router.get('/recording', isAdmin, adminController.recordings);
+router.post('/recording', isAdmin, adminController.createRecording);
+router.post('/recording/:id/update', isAdmin, adminController.updateRecording);
+router.post('/recording/:id/toggle', isAdmin, adminController.toggleRecording);
+router.post('/recording/:id/delete', isAdmin, adminController.deleteRecording);
 router.get('/periods', isAdmin, adminController.periods);
 router.post('/periods', isAdmin, adminController.createPeriod);
 router.post('/periods/:id/toggle', isAdmin, adminController.togglePeriod);

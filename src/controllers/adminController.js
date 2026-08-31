@@ -2850,3 +2850,152 @@ exports.toeflQuestionUpdate = async (req, res) => {
     res.redirect(`/admin/toefl/${id}/question/${qid}/edit`);
   }
 };
+
+// =====================================================
+// Recording Kelas (Luxury Class)
+// =====================================================
+const {
+  ensureRecordingsTable,
+  toEmbedUrl,
+  isSupportedUrl,
+} = require('../utils/recordings');
+
+const parseRecordingForm = (body) => {
+  const title = String(body.title || '').trim();
+  const rawUrl = String(body.video_url || '').trim();
+  const programId = body.program_id ? Number(body.program_id) : null;
+  return {
+    title,
+    rawUrl,
+    description: String(body.description || '').trim() || null,
+    videoUrl: toEmbedUrl(rawUrl),
+    recordedDate: String(body.recorded_date || '').trim() || null,
+    duration: String(body.duration || '').trim() || null,
+    programId: Number.isInteger(programId) && programId > 0 ? programId : null,
+    orderNumber: Number(body.order_number) || 0,
+    isActive: body.is_active === 'on' || body.is_active === 'true',
+  };
+};
+
+const validateRecordingForm = (form) => {
+  if (!form.title) return 'Judul recording wajib diisi.';
+  if (!form.rawUrl) return 'Link video wajib diisi.';
+  if (!isSupportedUrl(form.rawUrl)) return 'Link video harus berupa URL lengkap (diawali http:// atau https://).';
+  return null;
+};
+
+exports.recordings = async (req, res) => {
+  try {
+    await ensureRecordingsTable(query);
+    const [listRes, programRes, statsRes] = await Promise.all([
+      query(`
+        SELECT r.*, p.name AS program_name, u.name AS created_by_name
+        FROM recordings r
+        LEFT JOIN programs p ON r.program_id = p.id
+        LEFT JOIN users u ON r.created_by = u.id
+        ORDER BY (r.program_id IS NOT NULL), r.program_id,
+                 r.order_number, r.recorded_date DESC NULLS LAST, r.id DESC
+      `),
+      query('SELECT id, name FROM programs ORDER BY name'),
+      query(`SELECT COUNT(*) AS total,
+                    COUNT(*) FILTER (WHERE is_active) AS active,
+                    COUNT(*) FILTER (WHERE program_id IS NULL) AS general
+             FROM recordings`),
+    ]);
+    res.render('admin/recording', {
+      title: 'Kelola Recording',
+      user: req.session.user,
+      recordings: listRes.rows.map((r) => ({ ...r, recorded_date_iso: dateOnly(r.recorded_date) })),
+      programs: programRes.rows,
+      stats: statsRes.rows[0],
+      error: req.flash('error'),
+      success: req.flash('success'),
+    });
+  } catch (err) {
+    console.error(err);
+    res.render('error', { title: 'Error', message: err.message, user: req.session.user });
+  }
+};
+
+exports.createRecording = async (req, res) => {
+  try {
+    await ensureRecordingsTable(query);
+    const form = parseRecordingForm(req.body);
+    const invalid = validateRecordingForm(form);
+    if (invalid) {
+      req.flash('error', invalid);
+      return res.redirect('/admin/recording');
+    }
+    await query(`
+      INSERT INTO recordings
+        (title, description, video_url, recorded_date, duration, program_id, order_number, is_active, created_by)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+    `, [
+      form.title, form.description, form.videoUrl, form.recordedDate, form.duration,
+      form.programId, form.orderNumber, form.isActive, req.session.user.id,
+    ]);
+    req.flash('success', `Recording "${form.title}" berhasil ditambahkan.`);
+    res.redirect('/admin/recording');
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal menambahkan recording.');
+    res.redirect('/admin/recording');
+  }
+};
+
+exports.updateRecording = async (req, res) => {
+  try {
+    await ensureRecordingsTable(query);
+    const form = parseRecordingForm(req.body);
+    const invalid = validateRecordingForm(form);
+    if (invalid) {
+      req.flash('error', invalid);
+      return res.redirect('/admin/recording');
+    }
+    const result = await query(`
+      UPDATE recordings
+      SET title = $1, description = $2, video_url = $3, recorded_date = $4, duration = $5,
+          program_id = $6, order_number = $7, is_active = $8, updated_at = NOW()
+      WHERE id = $9
+    `, [
+      form.title, form.description, form.videoUrl, form.recordedDate, form.duration,
+      form.programId, form.orderNumber, form.isActive, req.params.id,
+    ]);
+    if (!result.rowCount) req.flash('error', 'Recording tidak ditemukan.');
+    else req.flash('success', `Recording "${form.title}" berhasil diperbarui.`);
+    res.redirect('/admin/recording');
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal memperbarui recording.');
+    res.redirect('/admin/recording');
+  }
+};
+
+exports.toggleRecording = async (req, res) => {
+  try {
+    await ensureRecordingsTable(query);
+    const result = await query(
+      'UPDATE recordings SET is_active = NOT is_active, updated_at = NOW() WHERE id = $1 RETURNING is_active',
+      [req.params.id]
+    );
+    if (!result.rowCount) req.flash('error', 'Recording tidak ditemukan.');
+    else req.flash('success', result.rows[0].is_active ? 'Recording ditampilkan ke member.' : 'Recording disembunyikan dari member.');
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal mengubah status recording.');
+  }
+  res.redirect('/admin/recording');
+};
+
+exports.deleteRecording = async (req, res) => {
+  try {
+    await ensureRecordingsTable(query);
+    const result = await query('DELETE FROM recordings WHERE id = $1', [req.params.id]);
+    if (!result.rowCount) req.flash('error', 'Recording tidak ditemukan.');
+    else req.flash('success', 'Recording berhasil dihapus.');
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Gagal menghapus recording.');
+  }
+  res.redirect('/admin/recording');
+};

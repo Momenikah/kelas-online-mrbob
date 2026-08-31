@@ -1,0 +1,39 @@
+<div class="form-group">
+  <label class="form-label">Judul Recording</label>
+  <input type="text" name="title" class="form-input" placeholder="Contoh: Speaking Class - Meeting 3" required>
+</div>
+<div class="form-group">
+  <label class="form-label">Link Video</label>
+  <input type="url" name="video_url" class="form-input" placeholder="https://youtu.be/... / link Google Drive / Vimeo" required>
+  <p class="field-hint">Tempel link biasa dari YouTube, Google Drive, atau Vimeo - otomatis diubah ke format embed. Pastikan akses file Drive disetel "siapa saja yang memiliki link".</p>
+</div>
+<div class="form-group">
+  <label class="form-label">Deskripsi (opsional)</label>
+  <textarea name="description" class="form-input" rows="2" placeholder="Materi yang dibahas di recording ini"></textarea>
+</div>
+<div class="form-group">
+  <label class="form-label">Program</label>
+  <select name="program_id" class="form-input">
+    <option value="">Umum - semua member Luxury Class</option>
+    <% programs.forEach(p => { %>
+      <option value="<%= p.id %>"><%= p.name %></option>
+    <% }) %>
+  </select>
+  <p class="field-hint">Kalau dipilih, hanya member dengan enrollment aktif di program itu yang bisa melihatnya.</p>
+</div>
+<div class="form-group">
+  <label class="form-label">Tanggal Kelas (opsional)</label>
+  <input type="date" name="recorded_date" class="form-input">
+</div>
+<div class="form-group">
+  <label class="form-label">Durasi (opsional)</label>
+  <input type="text" name="duration" class="form-input" placeholder="Contoh: 45 menit">
+</div>
+<div class="form-group">
+  <label class="form-label">Urutan Tampil</label>
+  <input type="number" name="order_number" class="form-input" value="0" min="0">
+  <p class="field-hint">Angka lebih kecil tampil lebih dulu.</p>
+</div>
+<div class="form-group">
+  <label class="check-inline"><input type="checkbox" name="is_active" checked> Tampilkan ke member</label>
+</div>

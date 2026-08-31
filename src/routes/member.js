@@ -60,6 +60,7 @@ router.get('/toefl/result/:id', isMember, requireLuxury, memberController.toeflR
 router.get('/toefl/:id', isMember, requireLuxury, memberController.toeflStart);
 router.post('/toefl/:id/submit', isMember, requireLuxury, memberController.toeflSubmit);
 router.get('/video', isMember, requireLuxury, memberController.video);
+router.get('/recording', isMember, requireLuxury, memberController.recording);
 router.get('/placement-test', isMember, memberController.placementTestIndex);
 router.get('/placement-test/kids', isMember, memberController.placementTestKids);
 router.post('/placement-test/kids', isMember, memberController.submitPlacementTestKids);

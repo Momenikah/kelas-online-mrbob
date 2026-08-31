@@ -261,11 +261,22 @@ async function migrate() {
       WHERE p.name = 'TOEFL Preparation' AND u.role = 'tutor'
     `);
 
-    // Seed TOEFL simulation
+    // Bersihkan duplikat simulasi hasil seed lama: ON CONFLICT DO NOTHING di bawah
+    // dulu ditulis tanpa unique constraint, sehingga tidak pernah menahan apa pun
+    // dan tiap 'npm run migrate' menambah satu baris baru berjudul sama. Hanya
+    // duplikat yang benar-benar kosong (tanpa soal & tanpa hasil) yang dihapus.
+    await client.query(`
+      DELETE FROM toefl_simulations ts
+      WHERE EXISTS (SELECT 1 FROM toefl_simulations t2 WHERE t2.title = ts.title AND t2.id < ts.id)
+        AND NOT EXISTS (SELECT 1 FROM toefl_questions q WHERE q.simulation_id = ts.id)
+        AND NOT EXISTS (SELECT 1 FROM toefl_results r WHERE r.simulation_id = ts.id)
+    `);
+    // Seed TOEFL simulation — idempoten lewat NOT EXISTS (tidak butuh constraint,
+    // jadi tetap aman kalau masih ada duplikat lama yang dipertahankan).
     await client.query(`
       INSERT INTO toefl_simulations (title, description, duration_minutes)
-      VALUES ('TOEFL Simulation Test 1', 'Simulasi ujian TOEFL lengkap dengan listening, structure, dan reading', 120)
-      ON CONFLICT DO NOTHING
+      SELECT 'TOEFL Simulation Test 1', 'Simulasi ujian TOEFL lengkap dengan listening, structure, dan reading', 120
+      WHERE NOT EXISTS (SELECT 1 FROM toefl_simulations WHERE title = 'TOEFL Simulation Test 1')
     `);
 
     // Seed available times for tutor (FluentForm-style: Periode + Jam Belajar + Hari)

@@ -18,6 +18,17 @@
     </div>
 
     <!-- Simulations -->
+    <% if (simulations.length === 0) { %>
+      <div class="empty-state">
+        <i class="fas fa-file-circle-question"></i>
+        <p>Belum ada simulasi TOEFL yang dibuka saat ini.<br>
+           Simulasi akan muncul di sini begitu dijadwalkan admin.</p>
+        <a href="/member/help-support" class="btn btn-sm btn-outline">
+          <i class="fas fa-headset"></i> Tanya Admin
+        </a>
+      </div>
+    <% } %>
+
     <div class="sim-grid">
       <% simulations.forEach(s => { %>
       <div class="sim-card">

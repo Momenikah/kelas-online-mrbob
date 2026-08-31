@@ -192,6 +192,14 @@
         <span class="menu-label">Video Premium</span>
       </div>
 
+      <div class="menu-card <%= !user.is_luxury ? 'menu-card-locked' : '' %>" onclick="window.location='/member/recording'">
+        <div class="menu-icon-wrap">
+          <span class="card-badge badge-bonus">Luxury Class</span>
+          <div class="menu-icon menu-icon-bonus"><i class="fas fa-video"></i></div>
+        </div>
+        <span class="menu-label">Recording</span>
+      </div>
+
       <div class="menu-card" onclick="window.location='/member/renewal'">
         <div class="menu-icon-wrap">
           <div class="menu-icon"><i class="fas fa-arrows-rotate"></i></div>

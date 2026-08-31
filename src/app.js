@@ -170,6 +170,10 @@ app.listen(PORT, () => {
   ensureUserAccessColumns(query)
     .then(() => console.log('Kolom akses user siap.'))
     .catch((err) => console.error('Gagal menyiapkan akses user:', err.message));
+  const { ensureRecordingsTable } = require('./utils/recordings');
+  ensureRecordingsTable(query)
+    .then(() => console.log('Tabel recordings siap.'))
+    .catch((err) => console.error('Gagal menyiapkan tabel recording:', err.message));
   const { ensureScheduleSyncSchema, startSchedulePoller } = require('./utils/scheduleSheetSync');
   ensureScheduleSyncSchema(query)
     .then(() => { console.log('Kolom sync jadwal siap.'); startSchedulePoller(); })

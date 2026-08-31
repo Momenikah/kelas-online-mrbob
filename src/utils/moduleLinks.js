@@ -28,8 +28,58 @@ const MODULE_LINKS = {
   'smart holiday smp/sma': 'https://drive.google.com/file/d/14Pk9CRZnElmBWUsNaRqYc7XyJbfv0k-H/view?usp=sharing',
 };
 
+// =============================================
+// Modul khusus paket Luxury Class. Member Luxury TIDAK menerima modul biasa —
+// hanya daftar di bawah ini. Kunci memakai nama program yang dinormalisasi,
+// dengan alias untuk varian nama di DB.
+// =============================================
+
+const LUXURY_MODULE_LINKS = {
+  'speak up 1': 'https://drive.google.com/file/d/1LDmzSHL84fFrFm2xanKocpHZ2iHLH4Um/view?usp=sharing',
+  'speak up 2': 'https://drive.google.com/file/d/1tkVBkYLnuc8oM_Z4RDUlq1trilBe4D_S/view?usp=sharing',
+  'grand speaking': 'https://drive.google.com/file/d/1rfymIePIuX0TTWw-aMLnwy3T_mkOENOe/view?usp=sharing',
+  'smart kids': 'https://drive.google.com/file/d/1HxmMSYU_Q2ZpaAw1-p16G5emrN82uJAs/view?usp=sharing',
+  'speak up 100': 'https://drive.google.com/file/d/1kCW7jNW-pIWDZprEoBqIi6XkIqojGW7_/view?usp=sharing',
+  'walky talky': 'https://drive.google.com/file/d/1pDrjEH1uxz3JM0N6OsfEsN012yTTykBl/view?usp=sharing',
+  'structure toefl': 'https://drive.google.com/file/d/1HKUNSRSeHeIQ2Ns7c9crif1IbykeKpJD/view?usp=sharing',
+  // 'Structure TOEFL' bukan nama program di DB; modul ini dipakai untuk program TOEFL.
+  'toefl': 'https://drive.google.com/file/d/1HKUNSRSeHeIQ2Ns7c9crif1IbykeKpJD/view?usp=sharing',
+  'toefl preparation': 'https://drive.google.com/file/d/1HKUNSRSeHeIQ2Ns7c9crif1IbykeKpJD/view?usp=sharing',
+  'genius teen': 'https://drive.google.com/file/d/1QAIRPFIDeWyDs1bVTwZxX1dPcSwS1ne-/view?usp=sharing',
+  'genius teens': 'https://drive.google.com/file/d/1QAIRPFIDeWyDs1bVTwZxX1dPcSwS1ne-/view?usp=sharing',
+};
+
+// Label tampilan per modul luxury (nama modul, bukan nama program).
+const LUXURY_MODULE_TITLES = {
+  'speak up 1': 'Speak Up 1',
+  'speak up 2': 'Speak Up 2',
+  'grand speaking': 'Grand Speaking',
+  'smart kids': 'Smart Kids',
+  'speak up 100': 'Speak Up 100',
+  'walky talky': 'Walky Talky',
+  'structure toefl': 'Structure TOEFL',
+  'toefl': 'Structure TOEFL',
+  'toefl preparation': 'Structure TOEFL',
+  'genius teen': 'Genius Teen',
+  'genius teens': 'Genius Teen',
+};
+
 const normalizeProgramName = (name) => String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 const getModuleMaterial = (programName) => MODULE_LINKS[normalizeProgramName(programName)] || null;
 
-module.exports = { MODULE_LINKS, getModuleMaterial, normalizeProgramName };
+// Modul luxury untuk sebuah program. null = program itu belum punya modul luxury.
+const getLuxuryModuleMaterial = (programName) => LUXURY_MODULE_LINKS[normalizeProgramName(programName)] || null;
+
+const getLuxuryModuleTitle = (programName) =>
+  LUXURY_MODULE_TITLES[normalizeProgramName(programName)] || String(programName || '').trim();
+
+module.exports = {
+  MODULE_LINKS,
+  LUXURY_MODULE_LINKS,
+  LUXURY_MODULE_TITLES,
+  getModuleMaterial,
+  getLuxuryModuleMaterial,
+  getLuxuryModuleTitle,
+  normalizeProgramName,
+};

@@ -1,0 +1,77 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'member' }) %>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/member" class="back-link"><i class="fas fa-arrow-left"></i></a>
+    <h1><i class="fas fa-video"></i> Recording <span class="bonus-label">Luxury Class</span></h1>
+  </div>
+
+  <div class="container">
+    <% if (recordings.length === 0) { %>
+      <div class="empty-state">
+        <i class="fas fa-video"></i>
+        <p>Belum ada recording kelas yang tersedia.</p>
+      </div>
+    <% } else { %>
+      <% let currentProgram = null; %>
+      <% recordings.forEach(r => { %>
+        <% const groupLabel = r.program_name || 'Umum'; %>
+        <% if (groupLabel !== currentProgram) { %>
+          <h3 class="module-program-title">
+            <i class="fas fa-<%= r.program_name ? 'graduation-cap' : 'video' %>"></i> <%= groupLabel %>
+          </h3>
+          <% currentProgram = groupLabel; %>
+        <% } %>
+        <div class="video-card">
+          <div class="video-thumb" onclick="playRecording('<%= encodeURI(r.video_url) %>')">
+            <div class="video-play-btn"><i class="fas fa-play-circle"></i></div>
+          </div>
+          <div class="video-info">
+            <h4><%= r.title %></h4>
+            <% if (r.description) { %><p><%= r.description %></p><% } %>
+            <div class="video-meta">
+              <% if (r.recorded_date) { %>
+                <span><i class="fas fa-calendar"></i> <%= formatDate(r.recorded_date) %></span>
+              <% } %>
+              <% if (r.duration) { %><span><i class="fas fa-clock"></i> <%= r.duration %></span><% } %>
+            </div>
+            <button class="btn btn-primary" onclick="playRecording('<%= encodeURI(r.video_url) %>')">
+              <i class="fas fa-play"></i> Tonton Recording
+            </button>
+          </div>
+        </div>
+      <% }) %>
+    <% } %>
+  </div>
+
+  <div class="modal" id="recordingModal" style="display:none">
+    <div class="modal-overlay" onclick="closeRecording()"></div>
+    <div class="modal-content video-modal">
+      <button class="modal-close" onclick="closeRecording()"><i class="fas fa-times"></i></button>
+      <div id="recordingContainer"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function playRecording(url) {
+  const frame = document.createElement('iframe');
+  frame.src = url;
+  frame.width = '100%';
+  frame.height = '400';
+  frame.frameBorder = '0';
+  frame.allowFullscreen = true;
+  const container = document.getElementById('recordingContainer');
+  container.innerHTML = '';
+  container.appendChild(frame);
+  document.getElementById('recordingModal').style.display = 'flex';
+}
+function closeRecording() {
+  document.getElementById('recordingModal').style.display = 'none';
+  document.getElementById('recordingContainer').innerHTML = '';
+}
+</script>
+
+<%- include('../partials/footer') %>

@@ -8,7 +8,22 @@ const { normalizeReportDays, ensureMemberReportsTable } = require('../utils/memb
 const { ensureCertificateDetailsColumn } = require('../utils/certificates');
 const { STUDY_TIME_SLOTS, PROGRAM_CATALOG } = require('../utils/catalog');
 const { ensureRenewalRequestsTable } = require('../utils/renewalRequests');
-const { getModuleMaterial } = require('../utils/moduleLinks');
+const {
+  getModuleMaterial,
+  getLuxuryModuleMaterial,
+  getLuxuryModuleTitle,
+} = require('../utils/moduleLinks');
+
+// Satu link modul luxury bisa dipetakan dari beberapa nama program (mis. TOEFL
+// dan TOEFL Preparation), jadi buang duplikatnya sebelum ditampilkan.
+const dedupeByUrl = (items) => {
+  const seen = new Set();
+  return items.filter((item) => {
+    if (seen.has(item.material_url)) return false;
+    seen.add(item.material_url);
+    return true;
+  });
+};
 const { ensureMemberPresenceTable } = require('../utils/memberPresence');
 const { isSemiPrivateStart } = require('../utils/semiPrivate');
 const { ensureDiagnosticReportsTable } = require('../utils/diagnosticReports');
@@ -370,26 +385,46 @@ exports.module = async (req, res) => {
     ]);
     const isLuxury = req.session.user.is_luxury;
     const premiumEbooks = isLuxury ? ebooksRes.rows : [];
+    const inProgramFilter = (item) => !programId || String(programId) === String(item.id);
+
+    // Member Luxury memakai kurikulum sendiri: hanya modul luxury dari program
+    // yang diikuti, dan sama sekali tidak menerima modul biasa. Kalau programnya
+    // belum punya modul luxury, daftarnya memang kosong (tanpa fallback).
+    const luxuryMaterialsAll = isLuxury
+      ? dedupeByUrl(programsRes.rows.map((p) => ({
+          id: p.id,
+          name: p.name,
+          title: getLuxuryModuleTitle(p.name),
+          material_url: getLuxuryModuleMaterial(p.name),
+        })).filter((p) => p.material_url))
+      : [];
+    const luxuryMaterials = luxuryMaterialsAll.filter(inProgramFilter);
+
     // Google Drive material link per enrolled program (member only sees links
     // for programs they are enrolled in — access is scoped to the chosen program).
-    const programMaterials = programsRes.rows
+    // Tidak berlaku untuk member Luxury.
+    const programMaterials = isLuxury ? [] : programsRes.rows
       .map((p) => ({ id: p.id, name: p.name, material_url: getModuleMaterial(p.name) }))
       .filter((p) => p.material_url);
-    const visibleMaterialCount = programMaterials
-      .filter((p) => !programId || String(programId) === String(p.id))
-      .length;
+    const visibleMaterialCount = programMaterials.filter(inProgramFilter).length;
+
+    // Modul biasa dari tabel modules juga disembunyikan dari member Luxury.
+    const visibleModules = isLuxury ? [] : result.rows;
     const stats = {
-      total: Number(statsRes.rows[0].total || 0) + visibleMaterialCount + premiumEbooks.length,
+      total: (isLuxury ? 0 : Number(statsRes.rows[0].total || 0))
+        + visibleMaterialCount + luxuryMaterials.length + premiumEbooks.length,
       premium: premiumEbooks.length,
       manual: visibleMaterialCount,
+      luxury: luxuryMaterials.length,
     };
 
     res.render('member/module', {
       title: 'Modul Belajar',
       user: req.session.user,
-      modules: result.rows,
+      modules: visibleModules,
       programs: programsRes.rows,
       programMaterials,
+      luxuryMaterials,
       premiumEbooks,
       filters: { programId },
       stats,
@@ -1726,5 +1761,34 @@ exports.submitHelpSupport = async (req, res) => {
     console.error(err);
     req.flash('error', 'Gagal mengirim feedback. Coba lagi beberapa saat.');
     return res.redirect('/member/help-support');
+  }
+};
+
+// =====================================================
+// Recording Kelas (Luxury Class)
+// =====================================================
+exports.recording = async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    // Aturan tampil sama seperti Video Premium: recording tanpa program
+    // (program_id NULL) = umum untuk semua member Luxury, recording ber-program
+    // hanya tampil bila member aktif di program itu. Yang umum ditaruh paling atas.
+    const result = await query(`
+      SELECT r.*, p.name AS program_name
+      FROM recordings r LEFT JOIN programs p ON r.program_id = p.id
+      WHERE r.is_active = true
+        AND (r.program_id IS NULL
+             OR r.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active'))
+      ORDER BY (r.program_id IS NOT NULL), r.program_id,
+               r.order_number, r.recorded_date DESC NULLS LAST, r.id DESC
+    `, [userId]);
+    res.render('member/recording', {
+      title: 'Recording',
+      user: req.session.user,
+      recordings: result.rows,
+    });
+  } catch (err) {
+    console.error(err);
+    res.render('error', { title: 'Error', message: err.message, user: req.session.user });
   }
 };
