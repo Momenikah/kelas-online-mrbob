@@ -22,16 +22,17 @@
         <div><strong><%= stats.active %></strong><small>Tampil ke member</small></div>
       </div>
       <div class="at-stat">
-        <span class="at-stat-icon" style="--c:var(--info)"><i class="fas fa-globe"></i></span>
-        <div><strong><%= stats.general %></strong><small>Umum (semua program)</small></div>
+        <span class="at-stat-icon" style="--c:var(--info)"><i class="fas fa-user-check"></i></span>
+        <div><strong><%= stats.personal %></strong><small>Khusus member tertentu</small></div>
       </div>
     </div>
 
     <div class="section-card">
       <p class="field-hint" style="margin-top:0">
         <i class="fas fa-circle-info"></i>
-        Recording hanya terlihat oleh member <strong>Luxury Class</strong>. Recording tanpa program tampil ke
-        semua member Luxury; recording dengan program hanya tampil ke member yang enrollment-nya aktif di program itu.
+        Recording hanya terlihat oleh member <strong>Luxury Class</strong>. Pilih tujuan saat menambah recording:
+        semua member Luxury, satu program (member dengan enrollment aktif di program itu), atau
+        <strong>member tertentu</strong> - recording itu hanya muncul di akun member yang dipilih.
       </p>
       <% if (recordings.length === 0) { %>
         <div class="empty-state"><i class="fas fa-video"></i><p>Belum ada recording.</p></div>
@@ -39,7 +40,7 @@
       <div class="table-wrapper">
         <table class="data-table">
           <thead>
-            <tr><th>Judul</th><th>Program</th><th>Tanggal</th><th>Durasi</th><th>Urutan</th><th>Status</th><th>Aksi</th></tr>
+            <tr><th>Judul</th><th>Dikirim ke</th><th>Tanggal</th><th>Durasi</th><th>Urutan</th><th>Status</th><th>Aksi</th></tr>
           </thead>
           <tbody>
             <% recordings.forEach(r => { %>
@@ -49,7 +50,16 @@
                 <% if (r.description) { %><br><small style="color:var(--gray-600)"><%= r.description %></small><% } %>
                 <br><a href="<%= r.video_url %>" target="_blank" rel="noopener" style="font-size:11.5px"><i class="fas fa-link"></i> Buka link</a>
               </td>
-              <td><%= r.program_name || 'Umum' %></td>
+              <td>
+                <% if (r.audience === 'members') { %>
+                  <span class="badge-pill badge-completed"><i class="fas fa-user-check"></i> <%= r.member_names.length %> member</span>
+                  <br><small style="color:var(--gray-600)"><%= r.member_names.join(', ') %></small>
+                <% } else if (r.audience === 'program') { %>
+                  <%= r.program_name %>
+                <% } else { %>
+                  Semua member Luxury
+                <% } %>
+              </td>
               <td><%= r.recorded_date ? formatDate(r.recorded_date) : '-' %></td>
               <td><%= r.duration || '-' %></td>
               <td><%= r.order_number %></td>
@@ -69,6 +79,8 @@
                           data-date="<%= r.recorded_date_iso %>"
                           data-duration="<%= r.duration || '' %>"
                           data-program="<%= r.program_id || '' %>"
+                          data-audience="<%= r.audience %>"
+                          data-members="<%= r.member_ids.join(',') %>"
                           data-order="<%= r.order_number %>"
                           data-active="<%= r.is_active ? '1' : '0' %>">
                     <i class="fas fa-pen"></i>
@@ -101,7 +113,7 @@
         <button class="modal-close" onclick="toggleModal('recordingModal')"><i class="fas fa-times"></i></button>
       </div>
       <form action="/admin/recording" method="POST" class="modal-form">
-        <%- include('../partials/recording-fields', { programs: programs }) %>
+        <%- include('../partials/recording-fields', { programs: programs, luxuryMembers: luxuryMembers }) %>
         <div class="form-actions">
           <button type="button" class="btn btn-outline" onclick="toggleModal('recordingModal')">Batal</button>
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan</button>
@@ -118,7 +130,7 @@
         <button class="modal-close" onclick="toggleModal('editRecordingModal')"><i class="fas fa-times"></i></button>
       </div>
       <form id="editRecordingForm" action="" method="POST" class="modal-form">
-        <%- include('../partials/recording-fields', { programs: programs }) %>
+        <%- include('../partials/recording-fields', { programs: programs, luxuryMembers: luxuryMembers }) %>
         <div class="form-actions">
           <button type="button" class="btn btn-outline" onclick="toggleModal('editRecordingModal')">Batal</button>
           <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Simpan Perubahan</button>
@@ -130,6 +142,51 @@
 
 <script>
 (function () {
+  // Setiap form (tambah & edit) punya salinan partial yang sama, jadi semua
+  // logika pemilih audiens dipasang per-form.
+  function setupAudience(form) {
+    var panels = form.querySelectorAll('[data-audience-panel]');
+    var radios = form.querySelectorAll('[name="audience"]');
+    var boxes = form.querySelectorAll('input[name="member_ids[]"]');
+    var counter = form.querySelector('[data-member-count]');
+
+    function refreshCount() {
+      if (!counter) return;
+      counter.textContent = form.querySelectorAll('input[name="member_ids[]"]:checked').length;
+    }
+    function apply() {
+      var picked = form.querySelector('[name="audience"]:checked');
+      var value = picked ? picked.value : 'all';
+      panels.forEach(function (panel) {
+        panel.hidden = panel.dataset.audiencePanel !== value;
+      });
+      // Field yang tersembunyi jangan ikut terkirim - biar sasarannya tegas.
+      var program = form.querySelector('[name="program_id"]');
+      if (program) program.disabled = value !== 'program';
+      boxes.forEach(function (b) { b.disabled = value !== 'members'; });
+    }
+
+    radios.forEach(function (r) { r.addEventListener('change', apply); });
+    boxes.forEach(function (b) { b.addEventListener('change', refreshCount); });
+
+    var filter = form.querySelector('[data-member-filter]');
+    if (filter) {
+      filter.addEventListener('input', function () {
+        var q = filter.value.trim().toLowerCase();
+        form.querySelectorAll('.member-pick-item').forEach(function (el) {
+          el.style.display = el.dataset.name.indexOf(q) !== -1 ? '' : 'none';
+        });
+      });
+    }
+
+    form.audienceApply = apply;
+    form.audienceRefreshCount = refreshCount;
+    apply();
+    refreshCount();
+  }
+
+  document.querySelectorAll('.modal-form').forEach(setupAudience);
+
   var form = document.getElementById('editRecordingForm');
   document.querySelectorAll('[data-edit-recording]').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -143,6 +200,16 @@
       form.querySelector('[name="program_id"]').value = d.program || '';
       form.querySelector('[name="order_number"]').value = d.order || '0';
       form.querySelector('[name="is_active"]').checked = d.active === '1';
+
+      var audience = d.audience || 'all';
+      var radio = form.querySelector('[name="audience"][value="' + audience + '"]');
+      if (radio) radio.checked = true;
+      var selected = (d.members || '').split(',').filter(Boolean);
+      form.querySelectorAll('input[name="member_ids[]"]').forEach(function (b) {
+        b.checked = selected.indexOf(b.value) !== -1;
+      });
+      form.audienceApply();
+      form.audienceRefreshCount();
       toggleModal('editRecordingModal');
     });
   });

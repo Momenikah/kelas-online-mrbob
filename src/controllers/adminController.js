@@ -2856,6 +2856,8 @@ exports.toeflQuestionUpdate = async (req, res) => {
 // =====================================================
 const {
   ensureRecordingsTable,
+  filterLuxuryMemberIds,
+  syncRecordingMembers,
   toEmbedUrl,
   isSupportedUrl,
 } = require('../utils/recordings');
@@ -2864,14 +2866,23 @@ const parseRecordingForm = (body) => {
   const title = String(body.title || '').trim();
   const rawUrl = String(body.video_url || '').trim();
   const programId = body.program_id ? Number(body.program_id) : null;
+  // Tiga sasaran: 'all' (semua member Luxury), 'program' (satu program),
+  // 'members' (member yang dipilih admin satu per satu).
+  const audience = ['all', 'program', 'members'].includes(body.audience) ? body.audience : 'all';
+  const rawIds = Array.isArray(body.member_ids) ? body.member_ids : (body.member_ids ? [body.member_ids] : []);
+  const memberIds = audience === 'members'
+    ? [...new Set(rawIds.map(Number).filter((n) => Number.isInteger(n) && n > 0))]
+    : [];
   return {
     title,
     rawUrl,
+    audience,
+    memberIds,
     description: String(body.description || '').trim() || null,
     videoUrl: toEmbedUrl(rawUrl),
     recordedDate: String(body.recorded_date || '').trim() || null,
     duration: String(body.duration || '').trim() || null,
-    programId: Number.isInteger(programId) && programId > 0 ? programId : null,
+    programId: audience === 'program' && Number.isInteger(programId) && programId > 0 ? programId : null,
     orderNumber: Number(body.order_number) || 0,
     isActive: body.is_active === 'on' || body.is_active === 'true',
   };
@@ -2881,32 +2892,60 @@ const validateRecordingForm = (form) => {
   if (!form.title) return 'Judul recording wajib diisi.';
   if (!form.rawUrl) return 'Link video wajib diisi.';
   if (!isSupportedUrl(form.rawUrl)) return 'Link video harus berupa URL lengkap (diawali http:// atau https://).';
+  if (form.audience === 'program' && !form.programId) return 'Pilih program tujuan recording.';
+  if (form.audience === 'members' && !form.memberIds.length) return 'Pilih minimal satu member Luxury penerima recording.';
   return null;
+};
+
+// Beri tahu member yang baru dikirimi recording supaya mereka tahu ada yang baru.
+const notifyRecordingMembers = async (memberIds, title) => {
+  for (const memberId of memberIds) {
+    await query(
+      `INSERT INTO notifications (user_id, title, message, type)
+       VALUES ($1, 'Recording Baru', $2, 'info')`,
+      [memberId, `Recording "${title}" sudah tersedia di menu Recording.`]
+    );
+  }
 };
 
 exports.recordings = async (req, res) => {
   try {
     await ensureRecordingsTable(query);
-    const [listRes, programRes, statsRes] = await Promise.all([
+    const [listRes, programRes, memberRes, statsRes] = await Promise.all([
       query(`
-        SELECT r.*, p.name AS program_name, u.name AS created_by_name
+        SELECT r.*, p.name AS program_name, u.name AS created_by_name,
+               COALESCE(rm.member_ids, '{}') AS member_ids,
+               COALESCE(rm.member_names, '{}') AS member_names
         FROM recordings r
         LEFT JOIN programs p ON r.program_id = p.id
         LEFT JOIN users u ON r.created_by = u.id
+        LEFT JOIN (
+          SELECT rm.recording_id,
+                 ARRAY_AGG(rm.member_id ORDER BY m.name) AS member_ids,
+                 ARRAY_AGG(m.name ORDER BY m.name) AS member_names
+          FROM recording_members rm JOIN users m ON m.id = rm.member_id
+          GROUP BY rm.recording_id
+        ) rm ON rm.recording_id = r.id
         ORDER BY (r.program_id IS NOT NULL), r.program_id,
                  r.order_number, r.recorded_date DESC NULLS LAST, r.id DESC
       `),
       query('SELECT id, name FROM programs ORDER BY name'),
+      query("SELECT id, name, email FROM users WHERE role = 'member' AND is_active = true AND is_luxury = true ORDER BY name"),
       query(`SELECT COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE is_active) AS active,
-                    COUNT(*) FILTER (WHERE program_id IS NULL) AS general
+                    COUNT(*) FILTER (WHERE id IN (SELECT recording_id FROM recording_members)) AS personal
              FROM recordings`),
     ]);
     res.render('admin/recording', {
       title: 'Kelola Recording',
       user: req.session.user,
-      recordings: listRes.rows.map((r) => ({ ...r, recorded_date_iso: dateOnly(r.recorded_date) })),
+      recordings: listRes.rows.map((r) => ({
+        ...r,
+        recorded_date_iso: dateOnly(r.recorded_date),
+        audience: r.member_ids.length ? 'members' : (r.program_id ? 'program' : 'all'),
+      })),
       programs: programRes.rows,
+      luxuryMembers: memberRes.rows,
       stats: statsRes.rows[0],
       error: req.flash('error'),
       success: req.flash('success'),
@@ -2926,15 +2965,27 @@ exports.createRecording = async (req, res) => {
       req.flash('error', invalid);
       return res.redirect('/admin/recording');
     }
-    await query(`
+    // Saring dulu: kalau sasarannya member tertentu tapi tak ada yang valid,
+    // recording batal disimpan daripada terlanjur tampil ke semua member.
+    const memberIds = await filterLuxuryMemberIds(query, form.memberIds);
+    if (form.audience === 'members' && !memberIds.length) {
+      req.flash('error', 'Member yang dipilih bukan member Luxury aktif. Recording tidak disimpan.');
+      return res.redirect('/admin/recording');
+    }
+    const created = await query(`
       INSERT INTO recordings
         (title, description, video_url, recorded_date, duration, program_id, order_number, is_active, created_by)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      RETURNING id
     `, [
       form.title, form.description, form.videoUrl, form.recordedDate, form.duration,
       form.programId, form.orderNumber, form.isActive, req.session.user.id,
     ]);
-    req.flash('success', `Recording "${form.title}" berhasil ditambahkan.`);
+    const saved = await syncRecordingMembers(query, created.rows[0].id, memberIds);
+    if (saved.length && form.isActive) await notifyRecordingMembers(saved, form.title);
+    req.flash('success', saved.length
+      ? `Recording "${form.title}" dikirim ke ${saved.length} member Luxury.`
+      : `Recording "${form.title}" berhasil ditambahkan.`);
     res.redirect('/admin/recording');
   } catch (err) {
     console.error(err);
@@ -2952,6 +3003,11 @@ exports.updateRecording = async (req, res) => {
       req.flash('error', invalid);
       return res.redirect('/admin/recording');
     }
+    const memberIds = await filterLuxuryMemberIds(query, form.memberIds);
+    if (form.audience === 'members' && !memberIds.length) {
+      req.flash('error', 'Member yang dipilih bukan member Luxury aktif. Perubahan tidak disimpan.');
+      return res.redirect('/admin/recording');
+    }
     const result = await query(`
       UPDATE recordings
       SET title = $1, description = $2, video_url = $3, recorded_date = $4, duration = $5,
@@ -2961,8 +3017,20 @@ exports.updateRecording = async (req, res) => {
       form.title, form.description, form.videoUrl, form.recordedDate, form.duration,
       form.programId, form.orderNumber, form.isActive, req.params.id,
     ]);
-    if (!result.rowCount) req.flash('error', 'Recording tidak ditemukan.');
-    else req.flash('success', `Recording "${form.title}" berhasil diperbarui.`);
+    if (!result.rowCount) {
+      req.flash('error', 'Recording tidak ditemukan.');
+      return res.redirect('/admin/recording');
+    }
+    // Notifikasi hanya untuk member yang baru ditambahkan, bukan yang sudah ada.
+    const recordingId = Number(req.params.id);
+    const before = await query('SELECT member_id FROM recording_members WHERE recording_id = $1', [recordingId]);
+    const existing = new Set(before.rows.map((r) => r.member_id));
+    const saved = await syncRecordingMembers(query, recordingId, memberIds);
+    const added = saved.filter((id) => !existing.has(id));
+    if (added.length && form.isActive) await notifyRecordingMembers(added, form.title);
+    req.flash('success', saved.length
+      ? `Recording "${form.title}" diperbarui untuk ${saved.length} member Luxury.`
+      : `Recording "${form.title}" berhasil diperbarui.`);
     res.redirect('/admin/recording');
   } catch (err) {
     console.error(err);

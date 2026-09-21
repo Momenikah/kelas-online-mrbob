@@ -12,14 +12,40 @@
   <textarea name="description" class="form-input" rows="2" placeholder="Materi yang dibahas di recording ini"></textarea>
 </div>
 <div class="form-group">
+  <label class="form-label">Dikirim ke</label>
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <label class="check-inline"><input type="radio" name="audience" value="all" checked> Semua member Luxury Class</label>
+    <label class="check-inline"><input type="radio" name="audience" value="program"> Member di satu program</label>
+    <label class="check-inline"><input type="radio" name="audience" value="members"> Member tertentu (pilih sendiri)</label>
+  </div>
+</div>
+<div class="form-group" data-audience-panel="program" hidden>
   <label class="form-label">Program</label>
   <select name="program_id" class="form-input">
-    <option value="">Umum - semua member Luxury Class</option>
+    <option value="">- Pilih program -</option>
     <% programs.forEach(p => { %>
       <option value="<%= p.id %>"><%= p.name %></option>
     <% }) %>
   </select>
-  <p class="field-hint">Kalau dipilih, hanya member dengan enrollment aktif di program itu yang bisa melihatnya.</p>
+  <p class="field-hint">Hanya member dengan enrollment aktif di program itu yang bisa melihatnya.</p>
+</div>
+<div class="form-group" data-audience-panel="members" hidden>
+  <label class="form-label">Member Luxury Penerima</label>
+  <p class="field-hint">Recording ini hanya tampil di menu Recording milik member yang dicentang.</p>
+  <% if (luxuryMembers.length === 0) { %>
+    <p class="field-hint">Belum ada member Luxury aktif.</p>
+  <% } else { %>
+    <input type="text" class="form-input" data-member-filter placeholder="Cari member..." style="margin-bottom:10px">
+    <div class="member-pick">
+      <% luxuryMembers.forEach(m => { %>
+      <label class="member-pick-item" data-name="<%= m.name.toLowerCase() %> <%= (m.email || '').toLowerCase() %>">
+        <input type="checkbox" name="member_ids[]" value="<%= m.id %>">
+        <span><strong><%= m.name %></strong><small><%= m.email %></small></span>
+      </label>
+      <% }) %>
+    </div>
+    <p class="field-hint"><strong data-member-count>0</strong> member dipilih.</p>
+  <% } %>
 </div>
 <div class="form-group">
   <label class="form-label">Tanggal Kelas (opsional)</label>

@@ -17,10 +17,10 @@
     <% } else { %>
       <% let currentProgram = null; %>
       <% recordings.forEach(r => { %>
-        <% const groupLabel = r.program_name || 'Umum'; %>
+        <% const groupLabel = r.is_personal ? 'Khusus untuk Kamu' : (r.program_name || 'Umum'); %>
         <% if (groupLabel !== currentProgram) { %>
           <h3 class="module-program-title">
-            <i class="fas fa-<%= r.program_name ? 'graduation-cap' : 'video' %>"></i> <%= groupLabel %>
+            <i class="fas fa-<%= r.is_personal ? 'user-check' : (r.program_name ? 'graduation-cap' : 'video') %>"></i> <%= groupLabel %>
           </h3>
           <% currentProgram = groupLabel; %>
         <% } %>

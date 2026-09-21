@@ -1770,16 +1770,27 @@ exports.submitHelpSupport = async (req, res) => {
 exports.recording = async (req, res) => {
   try {
     const userId = req.session.user.id;
-    // Aturan tampil sama seperti Video Premium: recording tanpa program
-    // (program_id NULL) = umum untuk semua member Luxury, recording ber-program
-    // hanya tampil bila member aktif di program itu. Yang umum ditaruh paling atas.
+    // Tiga sasaran, dicek berurutan:
+    // 1. Recording yang punya penerima khusus (recording_members) hanya tampil
+    //    untuk member yang dipilih admin - ini yang paling menang.
+    // 2. Recording ber-program tampil bila enrollment member aktif di program itu.
+    // 3. Sisanya (tanpa program, tanpa penerima) umum untuk semua member Luxury.
+    // Yang khusus ditaruh paling atas supaya langsung kelihatan.
     const result = await query(`
-      SELECT r.*, p.name AS program_name
+      SELECT r.*, p.name AS program_name,
+             EXISTS (SELECT 1 FROM recording_members rm WHERE rm.recording_id = r.id) AS is_personal
       FROM recordings r LEFT JOIN programs p ON r.program_id = p.id
       WHERE r.is_active = true
-        AND (r.program_id IS NULL
-             OR r.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active'))
-      ORDER BY (r.program_id IS NOT NULL), r.program_id,
+        AND (
+          r.id IN (SELECT recording_id FROM recording_members WHERE member_id = $1)
+          OR (
+            NOT EXISTS (SELECT 1 FROM recording_members rm WHERE rm.recording_id = r.id)
+            AND (r.program_id IS NULL
+                 OR r.program_id IN (SELECT program_id FROM enrollments WHERE member_id = $1 AND status = 'active'))
+          )
+        )
+      ORDER BY NOT EXISTS (SELECT 1 FROM recording_members rm WHERE rm.recording_id = r.id),
+               (r.program_id IS NOT NULL), r.program_id,
                r.order_number, r.recorded_date DESC NULLS LAST, r.id DESC
     `, [userId]);
     res.render('member/recording', {

@@ -18,6 +18,44 @@ const ensureRecordingsTable = async (query) => {
       updated_at TIMESTAMP DEFAULT NOW()
     )
   `);
+
+  // Penerima khusus: kalau sebuah recording punya baris di sini, hanya member
+  // yang terdaftar yang bisa melihatnya (mengalahkan aturan program).
+  await query(`
+    CREATE TABLE IF NOT EXISTS recording_members (
+      id SERIAL PRIMARY KEY,
+      recording_id INTEGER REFERENCES recordings(id) ON DELETE CASCADE,
+      member_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(recording_id, member_id)
+    )
+  `);
+};
+
+// Saring id yang benar-benar member Luxury aktif. Dipanggil sebelum menyimpan,
+// supaya recording bersasaran member tidak pernah terlanjur tersimpan tanpa
+// penerima - tanpa penerima artinya tampil ke semua member Luxury.
+const filterLuxuryMemberIds = async (query, memberIds) => {
+  if (!memberIds.length) return [];
+  const result = await query(`
+    SELECT id FROM users
+    WHERE id = ANY($1::int[]) AND role = 'member' AND is_active = true AND is_luxury = true
+  `, [memberIds]);
+  return result.rows.map((r) => r.id);
+};
+
+// Simpan daftar penerima sebuah recording. Daftar kosong = kembali ke aturan
+// umum/program. Dipakai baik saat tambah maupun edit, jadi hapus-lalu-isi.
+const syncRecordingMembers = async (query, recordingId, memberIds) => {
+  await query('DELETE FROM recording_members WHERE recording_id = $1', [recordingId]);
+  if (!memberIds.length) return [];
+  const inserted = await query(`
+    INSERT INTO recording_members (recording_id, member_id)
+    SELECT $1::int, unnest($2::int[])
+    ON CONFLICT (recording_id, member_id) DO NOTHING
+    RETURNING member_id
+  `, [recordingId, memberIds]);
+  return inserted.rows.map((r) => r.member_id);
 };
 
 // Admin biasanya menempel link YouTube/Drive/Vimeo apa adanya dari address bar.
@@ -91,4 +129,10 @@ const isSupportedUrl = (rawUrl) => {
   }
 };
 
-module.exports = { ensureRecordingsTable, toEmbedUrl, isSupportedUrl };
+module.exports = {
+  ensureRecordingsTable,
+  filterLuxuryMemberIds,
+  syncRecordingMembers,
+  toEmbedUrl,
+  isSupportedUrl,
+};
