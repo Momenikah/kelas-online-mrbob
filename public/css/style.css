@@ -9021,3 +9021,17 @@ select.form-input,
   .login-options { margin-bottom: 10px; }
   .auth-footer { margin-top: 10px; }
 }
+
+/* Kolom aksi admin loyalty menempel di kanan. Tabelnya lebih lebar dari kartu,
+   jadi tombol Setujui dan Tolak dulu tersembunyi sampai tabel digeser. */
+.loyalty-table th:last-child,
+.loyalty-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  background: var(--white);
+  box-shadow: -10px 0 14px -10px rgba(17, 24, 39, 0.25);
+}
+.loyalty-table thead th:last-child { background: var(--gray-50); z-index: 3; }
+.loyalty-table tbody tr:hover td:last-child { background: var(--brand-50); }
+.loyalty-table tbody tr.is-off td:last-child { background: var(--gray-50); }
