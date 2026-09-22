@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const { redirectIfLoggedIn } = require('../middleware/auth');
+const { loginLimiter } = require('../middleware/security');
 const upload = require('../middleware/upload');
 
 const transferProofUpload = (req, res, next) => {
@@ -13,7 +14,7 @@ const transferProofUpload = (req, res, next) => {
 };
 
 router.get('/login', redirectIfLoggedIn, authController.showLogin);
-router.post('/login', redirectIfLoggedIn, authController.login);
+router.post('/login', redirectIfLoggedIn, loginLimiter, authController.login);
 router.get('/register', redirectIfLoggedIn, authController.showRegister);
 router.post('/register', redirectIfLoggedIn, authController.register);
 router.get('/pendaftaran/:code', redirectIfLoggedIn, authController.showRegistrationThanks);

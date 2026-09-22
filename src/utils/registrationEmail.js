@@ -4,6 +4,29 @@ const fs = require('fs');
 
 const QRIS_PATH = path.join(__dirname, '../../public/img/qriskelasonline.jpeg');
 const QRIS_CID = 'qriskelasonline';
+const PROOF_PATH = path.join(__dirname, '../../public/img/contoh-bukti-pembayaran.jpeg');
+const PROOF_CID = 'contohbuktipembayaran';
+const BRI_PATH = path.join(__dirname, '../../public/img/logo-bri.png');
+const BRI_CID = 'logobri';
+
+// Kartu rekening digambar dengan HTML, bukan file gambar. Gambar lama diambil
+// dari situs WordPress lama dan sekarang 404, jadi kotaknya selalu kosong.
+// Bentuk HTML ini tampil di semua aplikasi email walau gambar diblokir.
+const bankCard = () => `
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-radius:12px;background-color:#00529c;">
+    <tr><td style="padding:18px 20px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td><img src="cid:${BRI_CID}" alt="BRI" width="86" style="width:86px;max-width:86px;height:auto;display:block;" /></td>
+          <td align="right" style="font-size:12px;color:#cfe2f5;font-family:Arial,Helvetica,sans-serif;">KELAS ONLINE</td>
+        </tr>
+      </table>
+      <div style="margin-top:14px;font-size:21px;font-weight:800;color:#ffffff;letter-spacing:2px;font-family:Arial,Helvetica,sans-serif;">0555 0100 1605 561</div>
+      <div style="margin-top:6px;font-size:13px;color:#dbeafe;font-family:Arial,Helvetica,sans-serif;">a.n. LKBI MR BOB QQ ONLINE</div>
+    </td></tr>
+  </table>
+  <div style="margin-top:10px;font-size:13px;color:#6b7280;text-align:center;">Nomor rekening tanpa spasi: <strong style="color:#111827;">055501001605561</strong></div>
+`;
 
 const appBaseUrl = () => (process.env.APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
 
@@ -121,6 +144,17 @@ function keyValueTable(rows) {
     </table>`;
 }
 
+// Saat mendaftar, total masih harga normal. Diskon referral baru dipotong
+// setelah admin memverifikasi pemberi rekomendasi, jadi katakan apa adanya.
+const referralDiscountNote = (registration) => {
+  const discount = Number(registration.referral_discount) || 0;
+  if (discount > 0) {
+    return `Sudah termasuk diskon referral <strong>${escapeHtml(formatCurrency(discount))}</strong> yang sudah diverifikasi admin.<br>`;
+  }
+  if (!registration.referral_code) return '';
+  return `Total ini belum termasuk diskon referral. Kode <strong>${escapeHtml(registration.referral_code)}</strong> sedang kami verifikasi, dan kalau valid diskon <strong>${escapeHtml(formatCurrency(100000))}</strong> dipotong untuk paket VIP ke atas. Kami kirim email berisi total terbaru sebelum kamu perlu transfer.<br>`;
+};
+
 const emailTotalBox = (label, amount, sub = '') => `
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0;border-radius:12px;background-color:#f5f3ff;border:1px solid #ddd6fe;">
     <tr><td style="padding:18px 22px;">
@@ -176,22 +210,16 @@ function buildRegistrationEmailHtml(registration) {
   const body = `
     ${emailParagraph(`Terimakasih sudah mendaftar <strong>Kelas Online di Mr.BOB Kampung Inggris</strong>. Jadwal belajar pilihanmu: <strong>Hari Senin, ${startDate}, jam ${studyTime}</strong>.`)}
     ${emailParagraph(`Program <strong>${program}</strong> (${learnerType} — ${duration}). Silakan selesaikan pembayaran sesuai rincian berikut:`)}
-    ${emailTotalBox('Total Transfer', paymentTotal, `Kode unik kamu: <strong>${uniqueCode}</strong>. Transfer tepat sampai 3 digit terakhir (jangan dibulatkan) supaya pembayaran mudah kami verifikasi.`)}
+    ${emailTotalBox('Total Transfer', paymentTotal, `${referralDiscountNote(registration)}Kode unik kamu: <strong>${uniqueCode}</strong>. Transfer tepat sampai 3 digit terakhir (jangan dibulatkan) supaya pembayaran mudah kami verifikasi.`)}
     ${emailHeading('Rincian Program')}
     ${paymentSummary}
     ${emailHeading('Metode Pembayaran')}
     ${emailParagraph('Transfer ke rekening BRI berikut:')}
-    ${emailInfoBox(`
-      <div style="text-align:center;">
-        <img src="https://app.kelasonlinemrbob.com/wp-content/uploads/2024/12/BRI-Kelas-online-mrbob-1024x683.png" alt="BRI Kelas Online Mr.BOB" width="420" style="width:100%;max-width:420px;height:auto;border-radius:10px;" />
-        <div style="margin-top:12px;font-size:17px;font-weight:800;color:#111827;letter-spacing:0.5px;">BRI &nbsp;055501001605561</div>
-        <div style="font-size:13px;color:#6b7280;margin-top:3px;">a.n. LKBI MR BOB QQ ONLINE</div>
-      </div>
-    `)}
+    ${emailInfoBox(bankCard())}
     ${emailParagraph('<strong>Atau</strong> scan QRIS berikut (menerima semua e-wallet &amp; m-banking):')}
     <p style="text-align:center;margin:0 0 16px;"><img src="cid:${QRIS_CID}" alt="QRIS Kelas Online Mr.BOB" width="300" style="width:100%;max-width:300px;height:auto;border-radius:10px;border:1px solid #eeeeee;" /></p>
-    ${emailHeading('Contoh Transfer')}
-    <p style="text-align:center;margin:0 0 8px;"><img src="https://app.kelasonlinemrbob.com/wp-content/uploads/2024/12/Screenshot_20241207_155306_BRImo-473x1024.jpg" alt="Contoh bukti transfer" width="220" style="width:100%;max-width:220px;height:auto;border-radius:10px;border:1px solid #eeeeee;" /></p>
+    ${emailHeading('Contoh Bukti Pembayaran')}
+    <p style="text-align:center;margin:0 0 8px;"><img src="cid:${PROOF_CID}" alt="Contoh bukti pembayaran Kelas Online Mr.BOB" width="260" style="width:100%;max-width:260px;height:auto;border-radius:10px;border:1px solid #eeeeee;" /></p>
     ${emailHeading('Konfirmasi Pembayaran')}
     ${emailParagraph('Setelah transfer, mohon segera unggah foto bukti transfer melalui tombol di bawah ini:')}
     ${emailButton(confirmationUrl, 'Konfirmasi Bukti Transfer')}
@@ -257,6 +285,8 @@ function registrationDetailRows(registration) {
     ['Mulai Belajar', registration.start_date],
     ['Tutor Pilihan', registration.preferred_tutor],
     ['Harga Paket', formatCurrency(registration.package_price)],
+    ['Diskon Referral', Number(registration.referral_discount) > 0
+      ? `${formatCurrency(registration.referral_discount)} (sudah dipotong)` : null],
     ['Kode Unik', getUniqueCode(registration)],
     ['Total Transfer', formatCurrency(getPaymentTotal(registration))],
     ['Kupon', registration.coupon_code],
@@ -390,12 +420,66 @@ async function sendRegistrationEmail(registration) {
   if (fs.existsSync(QRIS_PATH)) {
     attachments.push({ filename: 'qris-kelasonline.jpeg', path: QRIS_PATH, cid: QRIS_CID });
   }
+  if (fs.existsSync(PROOF_PATH)) {
+    attachments.push({ filename: 'contoh-bukti-pembayaran.jpeg', path: PROOF_PATH, cid: PROOF_CID });
+  }
+  if (fs.existsSync(BRI_PATH)) {
+    attachments.push({ filename: 'logo-bri.png', path: BRI_PATH, cid: BRI_CID });
+  }
   await transporter.sendMail({
     from: process.env.MAIL_FROM || process.env.SMTP_USER,
     to: registration.email,
     subject: 'Pendaftaran Kelas Online Mr.BOB Kampung Inggris',
     html: buildRegistrationEmailHtml(registration),
     attachments,
+  });
+  return { sent: true };
+}
+
+// Email ke member baru begitu admin selesai memverifikasi kode referralnya.
+// Isinya link ke halaman pendaftarannya, supaya mereka melihat total terbaru.
+function buildReferralApprovedEmailHtml(registration, { discount = 0, newPrice = 0, alreadyPaid = false } = {}) {
+  const { firstName } = splitName(registration.name);
+  const link = `${appBaseUrl()}/pendaftaran/${encodeURIComponent(registration.registration_code || '')}`;
+  const program = escapeHtml(registration.selected_class || registration.package_name || 'Kelas Online');
+
+  let body = emailParagraph(`Halo <strong>${escapeHtml(firstName || registration.name || 'Sahabat Mr.BOB')}</strong>, kode referral yang kamu isi saat mendaftar <strong>${program}</strong> sudah kami verifikasi dan dinyatakan valid.`);
+
+  if (discount > 0) {
+    body += emailTotalBox('Total Pembayaran Terbaru', escapeHtml(formatCurrency(newPrice)),
+      `Diskon referral <strong>${escapeHtml(formatCurrency(discount))}</strong> sudah dipotong dari total kamu. Jumlah di halaman pendaftaran adalah jumlah yang perlu ditransfer.`);
+    body += emailParagraph('Silakan buka halaman pendaftaran kamu untuk melihat rincian dan cara pembayarannya:');
+  } else if (alreadyPaid) {
+    body += emailParagraph('Pembayaran kamu sudah kami terima sebelum verifikasi selesai, jadi diskon referral tidak bisa dipotong lagi dari tagihan ini. Hubungi admin kalau kamu ingin menanyakan hal ini.');
+  } else {
+    body += emailParagraph(`Diskon referral hanya berlaku untuk paket VIP dan paket lain yang harganya setara atau lebih besar, jadi total pembayaran kamu tetap sama. Silakan lanjutkan pembayaran seperti biasa:`);
+  }
+
+  body += emailButton(link, 'Buka Halaman Pendaftaran');
+  body += emailParagraph(`Kalau tombol di atas tidak bisa diklik, salin link ini: <a href="${link}" style="color:${EMAIL_BRAND};">${escapeHtml(link)}</a>`);
+
+  return emailShell({
+    heading: 'Referral Terverifikasi',
+    subheading: registration.registration_code ? `ID Pendaftaran: ${escapeHtml(registration.registration_code)}` : '',
+    bodyHtml: body,
+  });
+}
+
+async function sendReferralApprovedEmail(registration, options = {}) {
+  const transportConfig = getTransportConfig();
+  if (!transportConfig) {
+    console.warn('SMTP belum dikonfigurasi. Email verifikasi referral dilewati.');
+    return { skipped: true };
+  }
+  if (!registration.email) return { skipped: true };
+  const transporter = nodemailer.createTransport(transportConfig);
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || process.env.SMTP_USER,
+    to: registration.email,
+    subject: options.discount > 0
+      ? 'Referral terverifikasi, diskon sudah dipotong'
+      : 'Referral kamu sudah diverifikasi',
+    html: buildReferralApprovedEmailHtml(registration, options),
   });
   return { sent: true };
 }
@@ -566,6 +650,8 @@ async function sendRenewalAdminEmail(renewal) {
 
 module.exports = {
   buildRegistrationEmailHtml,
+  buildReferralApprovedEmailHtml,
+  sendReferralApprovedEmail,
   buildAdminSubject,
   buildAdminEmailHtml,
   buildPaymentConfirmedEmailHtml,

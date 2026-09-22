@@ -1,0 +1,179 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar') %>
+
+<%
+  // Diurutkan dari paket termurah supaya mudah dibaca, lalu dibagi dua kolom sama panjang.
+  const sortedPoints = [...pointTable].sort((a, b) => a.price - b.price);
+  const splitAt = Math.ceil(sortedPoints.length / 2);
+  const pointColumns = [sortedPoints.slice(0, splitAt), sortedPoints.slice(splitAt)];
+%>
+
+<main class="lp">
+  <section class="lp-hero">
+    <div class="lp-hero-inner">
+      <div class="lp-hero-copy">
+        <span class="lp-eyebrow lp-rise">Khusus alumni Kelas Online Mr.BOB</span>
+        <h1 class="lp-rise">Alumni Loyalty Program</h1>
+        <p class="lp-lead lp-rise">Rekomendasikan teman untuk belajar di Kelas Online Mr.BOB, kumpulkan poin dari setiap pendaftaran yang berhasil, lalu tukar poinnya dengan hadiah pilihan kamu.</p>
+        <div class="lp-actions lp-rise">
+          <a href="/member/loyalty" class="lp-btn lp-btn-primary"><i class="fas fa-star"></i> Lihat Poin Saya</a>
+          <a href="/register" class="lp-btn lp-btn-ghost"><i class="fas fa-user-plus"></i> Daftar dengan Referral</a>
+        </div>
+      </div>
+
+      <div class="lp-hero-card lp-rise" aria-hidden="true">
+        <div class="lp-card-top">
+          <span>Contoh saldo poin</span>
+          <b><i class="fas fa-gem"></i> Alumni</b>
+        </div>
+        <div class="lp-card-points"><strong>20</strong><span>poin</span></div>
+        <div class="lp-card-track"><i></i></div>
+        <ul class="lp-card-list">
+          <li><span>2 teman daftar paket VIP</span><b>+20</b></li>
+          <li><span>Tukar: e-money senilai</span><b><%= formatCurrency(200000) %></b></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-section">
+    <div class="lp-container">
+      <header class="lp-section-head">
+        <span class="lp-kicker">Cara kerja</span>
+        <h2>Empat langkah sampai hadiah di tangan</h2>
+      </header>
+      <ol class="lp-steps">
+        <li>
+          <span class="lp-step-no">1</span>
+          <h3>Bagikan kode kamu</h3>
+          <p>Masuk ke Member Area, buka menu Loyalty Program, lalu bagikan kode referral atau link pendaftaran kamu.</p>
+        </li>
+        <li>
+          <span class="lp-step-no">2</span>
+          <h3>Teman mendaftar</h3>
+          <p>Teman mendaftar di <a href="/register">app.kelasonlinemrbob.com</a> dan mengisi kode kamu atau nama lengkap kamu di kolom <b>Kode Referral / Nama Pemberi Rekomendasi</b>.</p>
+        </li>
+        <li>
+          <span class="lp-step-no">3</span>
+          <h3>Admin memverifikasi</h3>
+          <p>Admin mengecek nama pemberi rekomendasi. Kalau valid, diskon teman kamu dipotong dan mereka dikirimi email berisi total terbaru. Poin masuk ke akun kamu setelah pembayaran mereka selesai.</p>
+        </li>
+        <li>
+          <span class="lp-step-no">4</span>
+          <h3>Tukar dengan hadiah</h3>
+          <p>Pilih hadiah dari katalog, isi data diri dan alamat lengkap, lalu hadiah kami proses.</p>
+        </li>
+      </ol>
+
+      <div class="lp-callout">
+        <i class="fas fa-tags"></i>
+        <div>
+          <strong>Teman kamu juga untung</strong>
+          <p>Member baru yang mendaftar dengan referral alumni mendapat diskon <b><%= formatCurrency(referralDiscount) %></b> untuk paket VIP dan paket lain seharga <%= formatCurrency(discountMinPrice) %> ke atas. Diskon dipotong setelah admin memverifikasi referralnya, dan totalnya dikirim lewat email.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-section lp-section-tint" id="katalog">
+    <div class="lp-container">
+      <header class="lp-section-head">
+        <span class="lp-kicker">Katalog hadiah</span>
+        <h2>Tukar poin dengan hadiah pilihan</h2>
+        <p>Pilih satu hadiah dari tingkat poin yang sudah kamu capai.</p>
+      </header>
+      <div class="lp-tiers">
+        <% rewardTiers.forEach(tier => { %>
+          <article class="lp-tier">
+            <div class="lp-tier-head">
+              <strong><%= tier.points %></strong>
+              <span>poin</span>
+            </div>
+            <p class="lp-tier-value">Senilai <%= formatCurrency(tier.value) %></p>
+            <ul>
+              <% tier.items.forEach(item => { %><li><i class="fas fa-check"></i> <%= item %></li><% }) %>
+            </ul>
+          </article>
+        <% }) %>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-section" id="poin">
+    <div class="lp-container">
+      <header class="lp-section-head">
+        <span class="lp-kicker">Daftar harga dan poin</span>
+        <h2>Poin dari setiap paket</h2>
+        <p>Nilai poin mengikuti paket yang diambil teman yang kamu rekomendasikan.</p>
+      </header>
+      <div class="lp-points">
+        <% pointColumns.forEach(column => { %>
+          <table class="lp-points-table">
+            <thead><tr><th>Paket</th><th>Harga</th><th>Poin</th></tr></thead>
+            <tbody>
+              <% column.forEach(row => { %>
+                <tr><td><%= row.name %></td><td><%= formatCurrency(row.price) %></td><td><b><%= row.points %></b></td></tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% }) %>
+      </div>
+      <p class="lp-footnote">Di formulir pendaftaran, paket TOEFL tampil dengan nama paket VIP yang dipilih, dan IELTS Luxury tampil sebagai LUXURY CLASS.</p>
+    </div>
+  </section>
+
+  <section class="lp-section lp-section-tint" id="ketentuan">
+    <div class="lp-container lp-narrow">
+      <header class="lp-section-head">
+        <span class="lp-kicker">Ketentuan</span>
+        <h2>Syarat dan ketentuan program</h2>
+      </header>
+
+      <details class="lp-faq" open>
+        <summary>Mekanisme program</summary>
+        <ol>
+          <li>Program ini adalah program loyalitas dengan sistem poin. Poin adalah alat tukar yang punya nilai dan fungsi tertentu dalam program.</li>
+          <li>Alumni mendapat poin dari setiap rekomendasi yang berhasil, yaitu ketika rekan atau kolega yang direkomendasikan berhasil mendaftar di Kelas Online Mr.BOB.</li>
+          <li>Nilai poin berbeda-beda sesuai nilai transaksi program.</li>
+          <li>Poin dapat ditukar dengan hadiah atau diskon yang tersedia di katalog program.</li>
+          <li>Poin berlaku sampai <b><%= formatDate('2026-12-31') %></b>. Poin direset per 1 Januari 2027 dan selanjutnya diperbarui setiap 180 hari berdasarkan akumulasi poin.</li>
+        </ol>
+      </details>
+
+      <details class="lp-faq">
+        <summary>Ketentuan rekomendasi</summary>
+        <ol>
+          <li>Pemberi rekomendasi adalah alumni yang merekomendasikan orang lain untuk kursus di Kelas Online Mr.BOB. Pemberi rekomendasi harus sudah menjadi member dan terdata di sistem Kelas Online Mr.BOB.</li>
+          <li>Member baru adalah orang yang direkomendasikan oleh pemberi rekomendasi untuk kursus di Kelas Online Mr.BOB.</li>
+          <li>Rekomendasi dilakukan dengan cara member baru mendaftar di aplikasi Kelas Online (<a href="/register">app.kelasonlinemrbob.com</a>) dan mengisi kode referral atau nama lengkap pemberi rekomendasi pada kolom referral.</li>
+          <li>Admin melakukan verifikasi internal. Jika data valid, pemberi rekomendasi mendapat poin sesuai nominal transaksi setelah member baru menyelesaikan pembayaran.</li>
+          <li>Member baru mendapat diskon kursus <%= formatCurrency(referralDiscount) %> bila mendaftar dengan referral yang valid, khusus paket VIP dan paket lain yang harganya setara atau lebih besar dari paket VIP. Diskon dipotong setelah verifikasi admin, bukan saat mengisi formulir.</li>
+        </ol>
+      </details>
+
+      <details class="lp-faq">
+        <summary>Ketentuan hadiah</summary>
+        <ol>
+          <li>Hadiah adalah benda fisik maupun digital yang berhak didapat alumni dengan menukarkan poin.</li>
+          <li>Alumni dapat memilih jenis hadiah sesuai yang tersedia di katalog hadiah.</li>
+          <li>Untuk mengklaim hadiah, alumni wajib melengkapi data diri dan menuliskan alamat lengkap.</li>
+          <li>Hadiah tidak dapat dipindahtangankan maupun diuangkan.</li>
+          <li>Untuk hadiah berupa barang fisik, biaya pengiriman ke alamat alumni ditanggung oleh alumni.</li>
+          <li>Kelas Online Mr.BOB tidak bertanggung jawab atas kendala pengiriman yang disebabkan alamat yang salah atau tidak lengkap.</li>
+        </ol>
+      </details>
+    </div>
+  </section>
+
+  <section class="lp-cta">
+    <div class="lp-container">
+      <h2>Sudah jadi alumni? Mulai kumpulkan poin hari ini.</h2>
+      <div class="lp-actions">
+        <a href="/member/loyalty" class="lp-btn lp-btn-light"><i class="fas fa-right-to-bracket"></i> Masuk ke Member Area</a>
+        <a href="/register" class="lp-btn lp-btn-ghost"><i class="fas fa-user-plus"></i> Daftar Kelas Baru</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<%- include('../partials/footer') %>

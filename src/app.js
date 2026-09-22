@@ -16,8 +16,12 @@ process.on('uncaughtException', (err) => {
   console.error('[uncaughtException]', err && err.stack ? err.stack : err);
 });
 
+const security = require('./middleware/security');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
+app.disable('x-powered-by');
+app.use(security.securityHeaders);
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '../public/uploads');
@@ -38,12 +42,24 @@ app.use(express.json());
 app.use(methodOverride('_method'));
 
 // Session
+// sameSite 'lax' menahan form dari situs lain, secure dipakai saat aplikasi
+// benar-benar berjalan di https (APP_URL) supaya localhost tetap bisa login.
+const isHttps = String(process.env.APP_URL || '').startsWith('https://');
+if (isHttps) app.set('trust proxy', 1);
 app.use(session({
   secret: process.env.SESSION_SECRET || 'superseru_secret_2024',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 }, // 24 hours
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: isHttps,
+  },
 }));
+
+// Tolak POST yang datang dari situs lain (CSRF) setelah sesi siap.
+app.use(security.sameOrigin);
 
 // Flash messages
 app.use(flash());
@@ -92,6 +108,7 @@ app.get('/', (req, res) => {
 });
 
 app.use('/', require('./routes/auth'));
+app.use('/', require('./routes/loyalty'));
 app.use('/member', require('./routes/member'));
 app.use('/tutor', require('./routes/tutor'));
 app.use('/admin', require('./routes/admin'));
@@ -174,6 +191,10 @@ app.listen(PORT, () => {
   ensureRecordingsTable(query)
     .then(() => console.log('Tabel recordings siap.'))
     .catch((err) => console.error('Gagal menyiapkan tabel recording:', err.message));
+  const { ensureLoyaltyTables } = require('./utils/loyalty');
+  ensureLoyaltyTables(query)
+    .then(() => console.log('Tabel loyalty program siap.'))
+    .catch((err) => console.error('Gagal menyiapkan tabel loyalty program:', err.message));
   const { ensureScheduleSyncSchema, startSchedulePoller } = require('./utils/scheduleSheetSync');
   ensureScheduleSyncSchema(query)
     .then(() => { console.log('Kolom sync jadwal siap.'); startSchedulePoller(); })

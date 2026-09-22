@@ -273,11 +273,17 @@
               </div>
             </div>
             <div class="signup-field">
-              <label>Kode Referral</label>
+              <label for="referralInput">Kode Referral / Nama Pemberi Rekomendasi</label>
               <div class="signup-action-field">
-                <input type="text" name="referral_code">
-                <button type="button">Terapkan</button>
+                <input type="text" name="referral_code" id="referralInput" maxlength="100"
+                  value="<%= typeof referralPrefill !== 'undefined' ? referralPrefill : '' %>"
+                  placeholder="Kode atau nama lengkap alumni" autocomplete="off">
+                <button type="button" id="referralApplyBtn">Terapkan</button>
               </div>
+              <small class="field-hint" id="referralHint" aria-live="polite">
+                Direkomendasikan alumni? Isi kodenya atau nama lengkapnya.
+                <a href="/loyalty-program" target="_blank" rel="noopener">Tentang Loyalty Program</a>
+              </small>
             </div>
           </div>
 
@@ -359,6 +365,18 @@ const packageName = document.getElementById('packageName');
 const packageGroupValue = document.getElementById('packageGroupValue');
 const packagePrice = document.getElementById('packagePrice');
 const packageNote = document.getElementById('packageNote');
+
+// Alumni Loyalty Program: kolom referral dicek ke server (kode, email, atau nama lengkap alumni).
+const REFERRAL_DISCOUNT = <%- JSON.stringify(typeof referralDiscount !== 'undefined' ? referralDiscount : 0) %>;
+const REFERRAL_MIN_PRICE = <%- JSON.stringify(typeof referralMinPrice !== 'undefined' ? referralMinPrice : 0) %>;
+const referralInput = document.getElementById('referralInput');
+const referralApplyBtn = document.getElementById('referralApplyBtn');
+const referralHint = document.getElementById('referralHint');
+const referralHintDefault = referralHint.innerHTML;
+const emailInput = document.querySelector('input[name="email"]');
+let referralState = { valid: false, checkedValue: '' };
+let referralTimer = null;
+let referralRequest = 0;
 
 // Sumber tunggal dari server (utils/catalog.js) — sama dengan available time & plot jadwal.
 const defaultStudyTimes = <%- JSON.stringify(studyTimeSlots) %>;
@@ -632,6 +650,9 @@ function updatePayment() {
     .filter((i) => i.value.trim() !== '').length;
   const headcount = gBounds ? Math.min(gBounds.max, Math.max(gBounds.min, 1 + filledFriends)) : 1;
   const subtotal = selectedPackage.price * headcount;
+  // Diskon referral tidak dipotong saat mendaftar. Admin memverifikasi dulu,
+  // baru totalnya turun dan member baru dikirimi email berisi total terbaru.
+  const discountEligible = referralState.valid && selectedPackage.price >= REFERRAL_MIN_PRICE;
   const totalTransfer = subtotal + (uniqueCode ? Number(uniqueCode) : 0);
 
   paymentSummary.innerHTML = `
@@ -652,6 +673,11 @@ function updatePayment() {
       <span>Harga Paket${gBounds ? ` (${rupiah(selectedPackage.price)} × ${headcount} orang)` : ''}</span>
       <strong>${rupiah(subtotal)}</strong>
     </div>
+    ${discountEligible ? `<div class="summary-row summary-discount">
+      <span>Diskon Referral (setelah verifikasi)</span>
+      <strong>- ${rupiah(REFERRAL_DISCOUNT)}</strong>
+    </div>` : ''}
+    ${referralState.valid && !discountEligible ? `<div class="summary-note">Diskon referral ${rupiah(REFERRAL_DISCOUNT)} berlaku untuk paket VIP dan paket seharga ${rupiah(REFERRAL_MIN_PRICE)} ke atas.</div>` : ''}
     <div class="summary-row">
       <span>Kode Unik</span>
       <strong>${uniqueCode ? '+ ' + uniqueCode : 'Isi 3 Digit HP'}</strong>
@@ -660,6 +686,7 @@ function updatePayment() {
       <span>Total Transfer</span>
       <strong>${rupiah(totalTransfer)}</strong>
     </div>
+    ${discountEligible ? `<div class="summary-note">Diskon belum dipotong dari total ini. Admin memverifikasi nama pemberi rekomendasi dulu, lalu kami kirim email berisi total terbaru sebelum kamu transfer.</div>` : ''}
     <div class="summary-note">Transfer tepat sampai 3 digit terakhir (jangan dibulatkan) agar pembayaran mudah kami verifikasi.</div>
   `;
 }
@@ -678,6 +705,63 @@ packageGroup.addEventListener('change', renderDurationOptions);
 duration.addEventListener('change', renderPackageOptions);
 packageType.addEventListener('change', updatePayment);
 if (phoneLastThree) phoneLastThree.addEventListener('input', updatePayment);
+
+function setReferralHint(state, html) {
+  referralHint.classList.toggle('is-ok', state === 'ok');
+  referralHint.classList.toggle('is-error', state === 'error');
+  referralHint.innerHTML = html;
+}
+
+async function checkReferral() {
+  const value = referralInput.value.trim();
+  clearTimeout(referralTimer);
+  if (!value) {
+    referralState = { valid: false, checkedValue: '' };
+    setReferralHint('', referralHintDefault);
+    updatePayment();
+    return;
+  }
+  if (value === referralState.checkedValue) return;
+  const requestId = ++referralRequest;
+  setReferralHint('', 'Memeriksa referral...');
+  try {
+    const params = new URLSearchParams({ q: value, email: emailInput ? emailInput.value.trim() : '' });
+    const response = await fetch(`/referral/check?${params}`, { headers: { Accept: 'application/json' } });
+    const data = await response.json();
+    if (requestId !== referralRequest) return; // ada pengecekan yang lebih baru
+    referralState = { valid: !!data.valid, checkedValue: value };
+    if (data.valid) {
+      setReferralHint('ok', `<i class="fas fa-check-circle"></i> Referral atas nama ${escapeHtml(data.name)} ditemukan. Diskon ${rupiah(REFERRAL_DISCOUNT)} untuk paket VIP ke atas dipotong setelah admin memverifikasi.`);
+    } else if (data.ambiguous) {
+      setReferralHint('error', '<i class="fas fa-circle-exclamation"></i> Nama itu dipakai lebih dari satu alumni. Minta kode referral-nya supaya diskon bisa dipakai.');
+    } else {
+      setReferralHint('error', '<i class="fas fa-circle-exclamation"></i> Alumni tidak ditemukan. Cek lagi kode atau nama lengkapnya. Admin tetap akan memverifikasi.');
+    }
+  } catch (err) {
+    if (requestId !== referralRequest) return;
+    referralState = { valid: false, checkedValue: '' };
+    setReferralHint('error', 'Referral belum bisa dicek. Coba tekan Terapkan lagi.');
+  }
+  updatePayment();
+}
+
+referralApplyBtn.addEventListener('click', checkReferral);
+referralInput.addEventListener('input', () => {
+  // Isian berubah: diskon lama tidak berlaku sampai dicek ulang.
+  if (referralState.valid) {
+    referralState = { valid: false, checkedValue: '' };
+    updatePayment();
+  }
+  clearTimeout(referralTimer);
+  referralTimer = setTimeout(checkReferral, 600);
+});
+referralInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    checkReferral();
+  }
+});
+if (referralInput.value.trim()) checkReferral();
 
 function openTutorModal(button) {
   const name = button.dataset.name || 'Detail Tutor';

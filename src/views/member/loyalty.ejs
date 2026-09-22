@@ -1,0 +1,279 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'member' }) %>
+
+<%
+  const referralBadge = { pending: 'badge-suspended', approved: 'badge-completed', rejected: 'badge-cancelled' };
+  const claimBadge = { pending: 'badge-suspended', processing: 'badge-upcoming', shipped: 'badge-upcoming', completed: 'badge-completed', rejected: 'badge-cancelled' };
+  const progress = nextTier ? Math.min(1, summary.balance / nextTier.points) : 1;
+  const affordable = rewardTiers.filter(t => t.points <= summary.balance);
+  const shareText = `Yuk belajar bahasa Inggris di Kelas Online Mr.BOB! Daftar lewat link ini dan pakai kode referral ${code} untuk diskon ${formatCurrency(referralDiscount)} (paket VIP ke atas): ${shareLink}`;
+%>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/member" class="back-link" aria-label="Kembali ke Member Area"><i class="fas fa-arrow-left"></i></a>
+    <h1><i class="fas fa-gift"></i> Alumni Loyalty Program</h1>
+    <a href="/loyalty-program#ketentuan" class="btn btn-light" target="_blank" rel="noopener"><i class="fas fa-circle-info"></i> Ketentuan</a>
+  </div>
+
+  <div class="container">
+    <section class="loyalty-hero">
+      <div class="loyalty-balance">
+        <span class="loyalty-eyebrow">Saldo poin</span>
+        <div class="loyalty-balance-value"><strong><%= summary.balance %></strong><span>poin</span></div>
+        <p class="loyalty-balance-meta">Berlaku sampai <b><%= formatDate(period.end) %></b></p>
+        <% if (summary.pending > 0) { %>
+          <p class="loyalty-pending"><i class="fas fa-hourglass-half"></i> +<%= summary.pending %> poin menunggu verifikasi admin</p>
+        <% } %>
+        <div class="loyalty-progress">
+          <div class="loyalty-progress-track" role="progressbar"
+            aria-label="<%= nextTier ? 'Poin menuju hadiah ' + nextTier.points + ' poin' : 'Semua hadiah sudah terbuka' %>"
+            aria-valuemin="0" aria-valuemax="<%= nextTier ? nextTier.points : summary.balance %>" aria-valuenow="<%= summary.balance %>"
+            aria-valuetext="<%= summary.balance %> poin<%= nextTier ? ' dari ' + nextTier.points + ' poin' : '' %>">
+            <i style="--p: <%= progress.toFixed(3) %>"></i>
+          </div>
+          <small>
+            <% if (nextTier) { %>
+              <%= nextTier.points - summary.balance %> poin lagi untuk hadiah <%= formatCurrency(nextTier.value) %>
+            <% } else { %>
+              Semua hadiah di katalog bisa kamu tukar.
+            <% } %>
+          </small>
+        </div>
+      </div>
+
+      <div class="loyalty-share">
+        <span class="loyalty-eyebrow">Kode referral kamu</span>
+        <div class="loyalty-code-row">
+          <code class="loyalty-code"><%= code %></code>
+          <button type="button" class="loyalty-copy-btn" data-copy="<%= code %>"><i class="fas fa-copy"></i> <span>Salin kode</span></button>
+        </div>
+        <label class="loyalty-link-label" for="loyaltyShareLink">Link pendaftaran untuk teman</label>
+        <div class="loyalty-link-row">
+          <input type="text" id="loyaltyShareLink" class="form-input" value="<%= shareLink %>" readonly>
+          <button type="button" class="loyalty-copy-btn" data-copy="<%= shareLink %>"><i class="fas fa-link"></i> <span>Salin link</span></button>
+        </div>
+        <a class="btn btn-whatsapp loyalty-wa" href="https://wa.me/?text=<%= encodeURIComponent(shareText) %>" target="_blank" rel="noopener">
+          <i class="fab fa-whatsapp"></i> Bagikan lewat WhatsApp
+        </a>
+        <p class="loyalty-share-note">Teman juga bisa menulis nama lengkap kamu di kolom referral saat mendaftar.</p>
+      </div>
+    </section>
+
+    <div class="at-stats loyalty-stats">
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--success)"><i class="fas fa-user-check"></i></span>
+        <div><strong><%= summary.approvedCount %></strong><small>Rekomendasi disetujui</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--brand-600)"><i class="fas fa-star"></i></span>
+        <div><strong><%= summary.earned %></strong><small>Poin didapat periode ini</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--info)"><i class="fas fa-gift"></i></span>
+        <div><strong><%= summary.spent %></strong><small>Poin ditukar</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--warning)"><i class="fas fa-hourglass-half"></i></span>
+        <div><strong><%= summary.pending %></strong><small>Menunggu verifikasi</small></div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-gift"></i> Tukar Poin</h3>
+      <div class="loyalty-tiers">
+        <% rewardTiers.forEach(tier => { const canClaim = summary.balance >= tier.points; %>
+          <article class="loyalty-tier <%= canClaim ? 'is-open' : '' %>">
+            <header>
+              <strong><%= tier.points %> <small>poin</small></strong>
+              <span>Senilai <%= formatCurrency(tier.value) %></span>
+            </header>
+            <ul>
+              <% tier.items.forEach(item => { %><li><%= item %></li><% }) %>
+            </ul>
+            <% if (canClaim) { %>
+              <button type="button" class="btn btn-primary btn-sm btn-full loyalty-press" data-claim-tier="<%= tier.points %>">
+                <i class="fas fa-hand-holding-heart"></i> Tukar
+              </button>
+            <% } else { %>
+              <span class="loyalty-tier-lock"><i class="fas fa-lock"></i> Butuh <%= tier.points - summary.balance %> poin lagi</span>
+            <% } %>
+          </article>
+        <% }) %>
+      </div>
+    </div>
+
+    <div class="section-card" id="riwayat-referral">
+      <h3 class="section-title"><i class="fas fa-users"></i> Riwayat Rekomendasi</h3>
+      <% if (referrals.length === 0) { %>
+        <div class="empty-state compact">
+          <i class="fas fa-user-plus"></i>
+          <p>Belum ada teman yang mendaftar dengan referral kamu.</p>
+          <small>Bagikan kode atau link di atas. Poin masuk setelah admin memverifikasi pendaftaran teman.</small>
+        </div>
+      <% } else { %>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead><tr><th>Tanggal</th><th>Teman</th><th>Program</th><th>Paket</th><th>Poin</th><th>Status</th></tr></thead>
+            <tbody>
+              <% referrals.forEach(r => { %>
+                <tr>
+                  <td><%= formatDate(r.created_at) %></td>
+                  <td><strong><%= r.referred_name || '-' %></strong></td>
+                  <td><%= r.selected_class || '-' %></td>
+                  <td><%= r.package_name || '-' %></td>
+                  <td><%= r.status === 'rejected' ? '-' : r.points %></td>
+                  <td><span class="badge-pill <%= referralBadge[r.status] %>"><%= referralStatusLabels[r.status] %></span></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="section-card" id="riwayat-klaim">
+      <h3 class="section-title"><i class="fas fa-box-open"></i> Riwayat Penukaran</h3>
+      <% if (claims.length === 0) { %>
+        <div class="empty-state compact">
+          <i class="fas fa-box-open"></i>
+          <p>Belum ada penukaran hadiah.</p>
+        </div>
+      <% } else { %>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead><tr><th>Tanggal</th><th>Hadiah</th><th>Poin</th><th>Dikirim ke</th><th>Status</th></tr></thead>
+            <tbody>
+              <% claims.forEach(c => { %>
+                <tr>
+                  <td><%= formatDate(c.created_at) %></td>
+                  <td><strong><%= c.reward_item %></strong></td>
+                  <td><%= c.points %></td>
+                  <td><%= c.recipient_name %><br><small class="table-subtext"><%= c.address %></small></td>
+                  <td>
+                    <span class="badge-pill <%= claimBadge[c.status] %>"><%= claimStatusLabels[c.status] %></span>
+                    <% if (c.admin_note) { %><br><small class="table-subtext"><%= c.admin_note %></small><% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (affordable.length > 0) { %>
+  <div class="modal" id="claimModal" style="display:none">
+    <div class="modal-overlay" onclick="toggleModal('claimModal')"></div>
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="claimModalTitle">
+      <div class="modal-header">
+        <h3 id="claimModalTitle">Klaim Hadiah</h3>
+        <button type="button" class="modal-close" onclick="toggleModal('claimModal')" aria-label="Tutup"><i class="fas fa-times"></i></button>
+      </div>
+      <form action="/member/loyalty/claim" method="POST" class="modal-form">
+        <div class="form-group">
+          <label class="form-label" for="claimReward">Hadiah</label>
+          <select name="reward" id="claimReward" class="form-input" required>
+            <% affordable.forEach(tier => { %>
+              <optgroup label="<%= tier.points %> poin (senilai <%= formatCurrency(tier.value) %>)">
+                <% tier.items.forEach(item => { %>
+                  <option value="<%= tier.points %>|<%= item %>" data-tier="<%= tier.points %>" data-points="<%= tier.points %>"><%= item %> — <%= tier.points %> poin</option>
+                <% }) %>
+              </optgroup>
+            <% }) %>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="claimName">Nama penerima</label>
+            <input type="text" name="recipient_name" id="claimName" class="form-input" value="<%= profile.name || '' %>" maxlength="255" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="claimPhone">No. WhatsApp</label>
+            <input type="tel" name="phone" id="claimPhone" class="form-input" value="<%= profile.phone || '' %>" maxlength="30" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="claimAddress">Alamat lengkap</label>
+          <textarea name="address" id="claimAddress" class="form-textarea" rows="3" minlength="10" maxlength="1000"
+            placeholder="Jalan, nomor rumah, RT/RW, kelurahan, kecamatan, kota, kode pos" required></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="claimNote">Catatan (opsional)</label>
+          <input type="text" name="note" id="claimNote" class="form-input" maxlength="1000" placeholder="Warna, ukuran, atau nomor e-money">
+        </div>
+        <p class="loyalty-claim-cost" id="claimCost" aria-live="polite"></p>
+        <p class="field-hint">Ongkos kirim hadiah fisik ditanggung penerima. Pastikan alamat lengkap supaya pengiriman lancar.</p>
+        <button type="submit" class="btn btn-primary btn-full loyalty-press"><i class="fas fa-paper-plane"></i> Kirim Klaim</button>
+      </form>
+    </div>
+  </div>
+  <% } %>
+</div>
+
+<script>
+document.querySelectorAll('[data-copy]').forEach((button) => {
+  button.addEventListener('click', async () => {
+    const label = button.querySelector('span');
+    const original = label.textContent;
+    try {
+      await navigator.clipboard.writeText(button.dataset.copy);
+      label.textContent = 'Tersalin';
+    } catch (err) {
+      label.textContent = 'Gagal menyalin';
+    }
+    button.classList.add('is-done');
+    setTimeout(() => { label.textContent = original; button.classList.remove('is-done'); }, 1600);
+  });
+});
+
+// Modal klaim: biaya poin selalu terlihat, halaman di belakang tidak ikut
+// bergulir, dan fokus kembali ke tombol Tukar yang tadi ditekan.
+const claimModal = document.getElementById('claimModal');
+const claimSelect = document.getElementById('claimReward');
+const claimCost = document.getElementById('claimCost');
+const claimBalance = <%- JSON.stringify(summary.balance) %>;
+let claimOpener = null;
+
+function showClaimCost() {
+  if (!claimSelect || !claimCost) return;
+  const option = claimSelect.selectedOptions[0];
+  const cost = option ? Number(option.dataset.points) : 0;
+  claimCost.textContent = cost
+    ? `Hadiah ini menukar ${cost} poin. Saldo kamu ${claimBalance} poin, sisa setelah ditukar ${claimBalance - cost} poin.`
+    : '';
+}
+
+function closeClaimModal() {
+  if (!claimModal || claimModal.style.display === 'none') return;
+  toggleModal('claimModal');
+  document.body.style.overflow = '';
+  if (claimOpener) claimOpener.focus();
+}
+
+if (claimSelect) claimSelect.addEventListener('change', showClaimCost);
+if (claimModal) {
+  claimModal.querySelectorAll('.modal-overlay, .modal-close').forEach((el) => {
+    el.addEventListener('click', () => { document.body.style.overflow = ''; if (claimOpener) claimOpener.focus(); });
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') { document.body.style.overflow = ''; if (claimOpener) claimOpener.focus(); }
+  });
+}
+
+document.querySelectorAll('[data-claim-tier]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const first = claimSelect.querySelector(`option[data-tier="${button.dataset.claimTier}"]`);
+    if (first) claimSelect.value = first.value;
+    claimOpener = button;
+    toggleModal('claimModal');
+    document.body.style.overflow = 'hidden';
+    showClaimCost();
+    claimSelect.focus();
+  });
+});
+</script>
+
+<%- include('../partials/footer') %>

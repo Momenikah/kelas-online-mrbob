@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const memberController = require('../controllers/memberController');
+const loyaltyController = require('../controllers/loyaltyController');
 const { requireRole, requireLuxury } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 
@@ -55,6 +56,8 @@ router.get('/profile', isMember, memberController.profile);
 router.post('/profile', isMember, profilePhotoUpload, memberController.updateProfile);
 router.get('/renewal', isMember, memberController.renewal);
 router.post('/renewal', isMember, renewalProofUpload, memberController.submitRenewal);
+router.get('/loyalty', isMember, loyaltyController.memberDashboard);
+router.post('/loyalty/claim', isMember, loyaltyController.memberClaim);
 router.get('/toefl', isMember, requireLuxury, memberController.toefl);
 router.get('/toefl/result/:id', isMember, requireLuxury, memberController.toeflResult);
 router.get('/toefl/:id', isMember, requireLuxury, memberController.toeflStart);

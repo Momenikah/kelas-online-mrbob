@@ -15,6 +15,8 @@ const metaPixel = require('../utils/metaPixel');
 const at = require('../utils/availableTime');
 const { PRICE_LIST, packagesForProgram, groupSizeBounds } = require('../utils/priceList');
 const { ensureUserAccessColumns, isLuxuryPackage, getAccessFromRegistration } = require('../utils/userAccess');
+const loyalty = require('../utils/loyalty');
+const { clearLoginAttempts } = require('../middleware/security');
 
 const ensureRegistrationTable = async () => {
   await query(`
@@ -82,6 +84,22 @@ const findRegistrationByCode = async (code) => {
   return result.rows[0];
 };
 
+// Ganti id sesi lalu pasang datanya. Dipakai setiap kali hak akses berubah.
+const regenerateSession = (req, sessionUser, done) => {
+  req.session.regenerate((err) => {
+    if (err) {
+      console.error('Gagal memperbarui sesi:', err.message);
+      req.session.user = sessionUser;
+      return done();
+    }
+    req.session.user = sessionUser;
+    req.session.save((saveErr) => {
+      if (saveErr) console.error('Gagal menyimpan sesi:', saveErr.message);
+      done();
+    });
+  });
+};
+
 const removeUploadedFile = (file) => {
   if (!file) return;
   fs.unlink(path.join(__dirname, '../../public/uploads', file.filename), () => {});
@@ -126,7 +144,7 @@ exports.login = async (req, res) => {
       req.flash('error', 'Akun kamu belum aktif. Hubungi admin untuk mengaktifkan akun.');
       return res.redirect('/login');
     }
-    req.session.user = {
+    const sessionUser = {
       id: user.id,
       name: user.name,
       email: user.email,
@@ -135,9 +153,14 @@ exports.login = async (req, res) => {
       is_vip: user.is_vip,
       is_luxury: user.is_luxury,
     };
-    if (user.role === 'admin') return res.redirect('/admin');
-    if (user.role === 'tutor') return res.redirect('/tutor');
-    return res.redirect('/member');
+    clearLoginAttempts(req);
+    // Sesi lama dibuang dan id baru dibuat supaya id yang sempat bocor sebelum
+    // login tidak bisa dipakai lagi setelah akun masuk.
+    return regenerateSession(req, sessionUser, () => {
+      if (user.role === 'admin') return res.redirect('/admin');
+      if (user.role === 'tutor') return res.redirect('/tutor');
+      return res.redirect('/member');
+    });
   } catch (err) {
     console.error(err);
     req.flash('error', 'Terjadi kesalahan. Coba lagi.');
@@ -146,6 +169,8 @@ exports.login = async (req, res) => {
 };
 
 exports.showRegister = async (req, res) => {
+  // Link bagikan alumni: /register?ref=KODE mengisi kolom referral otomatis.
+  const referralPrefill = String(req.query.ref || '').trim().slice(0, 100);
   try {
     await ensureUserAccessColumns(query);
     const tutors = await getGradeATutors();
@@ -157,6 +182,9 @@ exports.showRegister = async (req, res) => {
       priceList: PRICE_LIST,
       gradeATutors: tutors.rows,
       startDateOptions: at.upcomingMondays(),
+      referralPrefill,
+      referralDiscount: loyalty.REFERRAL_DISCOUNT,
+      referralMinPrice: loyalty.DISCOUNT_MIN_PRICE,
     });
   } catch (err) {
     console.error(err);
@@ -168,6 +196,9 @@ exports.showRegister = async (req, res) => {
       priceList: PRICE_LIST,
       gradeATutors: [],
       startDateOptions: at.upcomingMondays(),
+      referralPrefill,
+      referralDiscount: loyalty.REFERRAL_DISCOUNT,
+      referralMinPrice: loyalty.DISCOUNT_MIN_PRICE,
     });
   }
 };
@@ -195,10 +226,18 @@ exports.register = async (req, res) => {
     ? Math.min(groupBounds.max, Math.max(groupBounds.min, 1 + friendList.length))
     : 1;
   const finalPackagePrice = perPersonPrice * headcount;
+  const referralInput = String(referral_code || '').trim().slice(0, 100);
 
   try {
+    // Paket harus ada di katalog harga. Kalau tidak, harga datang dari kiriman
+    // form dan tagihannya bisa dikarang, jadi pendaftaran ditolak sejak awal.
+    if (!catalogPkg) {
+      req.flash('error', 'Paket yang dipilih tidak dikenali. Pilih ulang program dan paketnya.');
+      return res.redirect('/register');
+    }
     await ensureRegistrationTable();
     await ensureUserAccessColumns(query);
+    await loyalty.ensureLoyaltyTables(query);
     const pendingRegistration = {
       package_group,
       package_name,
@@ -242,6 +281,14 @@ exports.register = async (req, res) => {
       return res.redirect(`/pendaftaran/${pending.rows[0].registration_code}`);
     }
 
+    // Alumni Loyalty Program: referral valid (cocok dengan alumni) memberi diskon
+    // untuk paket seharga VIP ke atas. package_price menyimpan nominal yang dibayar.
+    // Tidak ada diskon saat mendaftar. Diskon baru dipotong setelah admin
+    // memverifikasi pemberi rekomendasi (lihat loyaltyController.approveReferral).
+    const referrers = await loyalty.findReferrers(query, referralInput, email);
+    const referralDiscount = 0;
+    const payablePrice = finalPackagePrice;
+
     const tempPassword = await bcrypt.hash(createRegistrationCode(), 10);
     const userResult = await query(
       'INSERT INTO users (name, email, password, phone, role, is_active) VALUES ($1, $2, $3, $4, $5, false) RETURNING id',
@@ -249,20 +296,20 @@ exports.register = async (req, res) => {
     );
 
     const registrationCode = createRegistrationCode();
-    await query(
+    const registrationResult = await query(
       `INSERT INTO member_registrations (
         registration_code, user_id, name, email, phone, city, education_background,
         education_level, occupation, age, instagram, phone_last_three, program_type,
         selected_class, package_group, package_name, package_price, package_note,
         duration, meeting_count, study_time, start_date, preferred_tutor_id,
-        preferred_tutor, friend_name, coupon_code, referral_code
+        preferred_tutor, friend_name, coupon_code, referral_code, referral_discount
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7,
         $8, $9, $10, $11, $12, $13,
         $14, $15, $16, $17, $18,
         $19, $20, $21, $22, $23, $24,
-        $25, $26, $27
-      )`,
+        $25, $26, $27, $28
+      ) RETURNING id`,
       [
         registrationCode,
         userResult.rows[0].id,
@@ -280,7 +327,7 @@ exports.register = async (req, res) => {
         selected_class || null,
         package_group || null,
         package_name || null,
-        finalPackagePrice > 0 ? finalPackagePrice : null,
+        payablePrice > 0 ? payablePrice : null,
         package_note || null,
         duration || null,
         meeting_count || null,
@@ -290,9 +337,29 @@ exports.register = async (req, res) => {
         preferredTutorName,
         friendNames || null,
         coupon_code || null,
-        referral_code || null,
+        referralInput || null,
+        referralDiscount,
       ]
     );
+
+    // Setiap isian referral masuk antrean verifikasi admin, termasuk yang belum
+    // cocok (admin bisa menetapkan alumninya). Nama kembar = alumni belum ditetapkan.
+    if (referralInput) {
+      await query(
+        `INSERT INTO loyalty_referrals
+           (registration_id, referrer_id, referred_user_id, referral_input, package_name, package_price, points)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          registrationResult.rows[0].id,
+          referrers.length === 1 ? referrers[0].id : null,
+          userResult.rows[0].id,
+          referralInput,
+          package_name || null,
+          payablePrice > 0 ? payablePrice : null,
+          loyalty.pointsForPackage(package_name),
+        ]
+      );
+    }
 
     try {
       const registration = await findRegistrationByCode(registrationCode);
@@ -313,7 +380,7 @@ exports.register = async (req, res) => {
 
     // Meta Pixel: CompleteRegistration (browser + CAPI, event_id sama utk dedup).
     const regEventId = metaPixel.newEventId();
-    const regValue = finalPackagePrice > 0 ? finalPackagePrice : 0;
+    const regValue = payablePrice > 0 ? payablePrice : 0;
     metaPixel.queueBrowserEvent(req, {
       eventName: 'CompleteRegistration',
       eventId: regEventId,
@@ -345,9 +412,22 @@ exports.showRegistrationThanks = async (req, res) => {
         user: req.session.user,
       });
     }
+    // Status verifikasi referral ditampilkan di halaman ini, sebelum member transfer.
+    let referral = null;
+    try {
+      await loyalty.ensureLoyaltyTables(query);
+      const found = await query(
+        'SELECT status, admin_note, points FROM loyalty_referrals WHERE registration_id = $1',
+        [registration.id]
+      );
+      referral = found.rows[0] || null;
+    } catch (loyaltyErr) {
+      console.error('Gagal membaca status referral:', loyaltyErr.message);
+    }
     res.render('auth/register-thanks', {
       title: 'Detail Pendaftaran',
       registration,
+      referral,
       success: res.locals.flashSuccess,
       error: res.locals.flashError,
     });
@@ -463,7 +543,7 @@ exports.confirmTransfer = async (req, res) => {
       [proofPath, code]
     );
 
-    req.session.user = {
+    const sessionUser = {
       id: registration.user_id,
       name: registration.name,
       email: registration.email,
@@ -494,11 +574,6 @@ exports.confirmTransfer = async (req, res) => {
     // Meta Pixel: Purchase saat bukti transfer dikirim (browser + CAPI, dedup).
     const buyEventId = metaPixel.newEventId();
     const buyValue = Number(registration.package_price) || 0;
-    metaPixel.queueBrowserEvent(req, {
-      eventName: 'Purchase',
-      eventId: buyEventId,
-      params: { value: buyValue, currency: 'IDR', content_name: registration.package_name || '' },
-    });
     metaPixel.sendServerEvent({
       eventName: 'Purchase',
       eventId: buyEventId,
@@ -507,8 +582,17 @@ exports.confirmTransfer = async (req, res) => {
       customData: { value: buyValue, currency: 'IDR', content_name: registration.package_name || '' },
     }).catch((e) => console.error('Meta CAPI Purchase gagal:', e.message));
 
-    req.flash('success', 'Bukti transfer berhasil dikirim. Selamat datang di Member Area!');
-    res.redirect('/member');
+    // Akun baru saja aktif, jadi id sesi diganti dulu. Pixel dan flash dititipkan
+    // di sesi, jadi keduanya diisi setelah sesi baru siap.
+    return regenerateSession(req, sessionUser, () => {
+      metaPixel.queueBrowserEvent(req, {
+        eventName: 'Purchase',
+        eventId: buyEventId,
+        params: { value: buyValue, currency: 'IDR', content_name: registration.package_name || '' },
+      });
+      req.flash('success', 'Bukti transfer berhasil dikirim. Selamat datang di Member Area!');
+      res.redirect('/member');
+    });
   } catch (err) {
     console.error(err);
     req.flash('error', 'Terjadi kesalahan. Coba lagi.');

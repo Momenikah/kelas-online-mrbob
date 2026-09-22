@@ -1,0 +1,16 @@
+<nav class="loyalty-pager" aria-label="Navigasi halaman">
+  <span>Menampilkan <%= firstShown %> sampai <%= lastShown %> dari <%= total %> <%= label %></span>
+  <% if (totalPages > 1) { %>
+    <div class="loyalty-pager-actions">
+      <a class="btn btn-sm btn-outline <%= page <= 1 ? 'is-disabled' : '' %>"
+         href="<%= pageUrl(Math.max(1, page - 1)) %>" <%- page <= 1 ? 'aria-disabled="true" tabindex="-1"' : '' %>>
+        <i class="fas fa-chevron-left"></i> Sebelumnya
+      </a>
+      <span class="loyalty-pager-page">Halaman <%= page %> dari <%= totalPages %></span>
+      <a class="btn btn-sm btn-outline <%= page >= totalPages ? 'is-disabled' : '' %>"
+         href="<%= pageUrl(Math.min(totalPages, page + 1)) %>" <%- page >= totalPages ? 'aria-disabled="true" tabindex="-1"' : '' %>>
+        Berikutnya <i class="fas fa-chevron-right"></i>
+      </a>
+    </div>
+  <% } %>
+</nav>

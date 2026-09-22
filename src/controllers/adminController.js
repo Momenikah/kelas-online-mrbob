@@ -26,6 +26,7 @@ const {
 const { ensureSupportFeedbackTable } = require('../utils/supportFeedback');
 const { ensureRenewalRequestsTable, renewalStatuses } = require('../utils/renewalRequests');
 const { ensureUserAccessColumns } = require('../utils/userAccess');
+const { ensureLoyaltyTables } = require('../utils/loyalty');
 const {
   isTeachingQuestionnaire,
   isTeachingMode,
@@ -243,6 +244,7 @@ async function validateScheduleRows(records) {
 exports.dashboard = async (req, res) => {
   try {
     await ensureSupportFeedbackTable(query);
+    await ensureLoyaltyTables(query);
     const [statsRes, recentUsers, pendingRegs, upcoming] = await Promise.all([
       query(`SELECT
                 (SELECT COUNT(*) FROM users) AS total_users,
@@ -253,6 +255,8 @@ exports.dashboard = async (req, res) => {
                 (SELECT COUNT(*) FROM programs WHERE is_active = true) AS programs,
                 (SELECT COUNT(*) FROM member_registrations WHERE status = 'pending_payment') AS pending_payments,
                 (SELECT COUNT(*) FROM support_feedback WHERE status IN ('new','in_progress')) AS pending_feedback,
+                (SELECT COUNT(*) FROM loyalty_referrals WHERE status = 'pending')
+                  + (SELECT COUNT(*) FROM loyalty_claims WHERE status = 'pending') AS pending_loyalty,
                 (SELECT COUNT(*) FROM schedules WHERE date >= CURRENT_DATE AND status <> 'cancelled') AS upcoming_schedules`),
       query('SELECT * FROM users ORDER BY created_at DESC LIMIT 8'),
       query(`SELECT user_id, registration_code, name, email, selected_class, package_name, package_price, created_at
@@ -282,6 +286,7 @@ exports.dashboard = async (req, res) => {
         totalPrograms: s.programs,
         pendingPayments: Number(s.pending_payments),
         pendingFeedback: Number(s.pending_feedback),
+        pendingLoyalty: Number(s.pending_loyalty),
         upcomingSchedules: s.upcoming_schedules,
       },
       recentUsers: recentUsers.rows,

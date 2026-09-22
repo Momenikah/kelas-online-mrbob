@@ -1,0 +1,254 @@
+<%- include('../partials/head') %>
+<%- include('../partials/navbar', { activeNav: 'admin' }) %>
+
+<%
+  const referralBadge = { pending: 'badge-suspended', approved: 'badge-completed', rejected: 'badge-cancelled' };
+  const claimBadge = { pending: 'badge-suspended', processing: 'badge-upcoming', shipped: 'badge-upcoming', completed: 'badge-completed', rejected: 'badge-cancelled' };
+  const pageUrl = (p) => `/admin/loyalty?tab=${tab}&status=${encodeURIComponent(tab === 'referrals' ? referralStatus : claimStatus)}&page=${p}`;
+  const firstShown = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const lastShown = Math.min(page * pageSize, total);
+  const tabs = [
+    { key: 'referrals', label: 'Verifikasi Referral', icon: 'fa-user-check', count: stats.pending_referrals },
+    { key: 'claims', label: 'Klaim Hadiah', icon: 'fa-gift', count: stats.open_claims },
+    { key: 'points', label: 'Poin Alumni', icon: 'fa-ranking-star', count: stats.active_alumni },
+  ];
+%>
+
+<div class="page-wrapper">
+  <%- include('../partials/flash') %>
+  <div class="sub-banner">
+    <a href="/admin" class="back-link" aria-label="Kembali ke Admin Panel"><i class="fas fa-arrow-left"></i></a>
+    <h1>Alumni Loyalty Program</h1>
+    <a href="/loyalty-program" class="btn btn-light" target="_blank" rel="noopener"><i class="fas fa-up-right-from-square"></i> Halaman Publik</a>
+  </div>
+
+  <div class="container">
+    <div class="at-stats loyalty-stats">
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--warning)"><i class="fas fa-hourglass-half"></i></span>
+        <div><strong><%= stats.pending_referrals %></strong><small>Referral menunggu verifikasi</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--brand-600)"><i class="fas fa-star"></i></span>
+        <div><strong><%= stats.period_points %></strong><small>Poin terverifikasi periode ini</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--info)"><i class="fas fa-gift"></i></span>
+        <div><strong><%= stats.open_claims %></strong><small>Klaim hadiah belum selesai</small></div>
+      </div>
+      <div class="at-stat">
+        <span class="at-stat-icon" style="--c:var(--success)"><i class="fas fa-users"></i></span>
+        <div><strong><%= stats.active_alumni %></strong><small>Alumni dapat poin periode ini</small></div>
+      </div>
+    </div>
+
+    <p class="field-hint loyalty-period-note">
+      <i class="fas fa-calendar"></i> Periode poin berjalan sampai <b><%= formatDate(period.end) %></b>.
+      Poin direset 1 Januari 2027, lalu setiap 180 hari.
+    </p>
+
+    <div class="user-tabs">
+      <% tabs.forEach(t => { %>
+        <a href="/admin/loyalty?tab=<%= t.key %>" class="user-tab <%= tab === t.key ? 'active' : '' %>">
+          <i class="fas <%= t.icon %>"></i><span><%= t.label %></span><b><%= t.count %></b>
+        </a>
+      <% }) %>
+    </div>
+
+    <% if (tab === 'referrals') { %>
+    <div class="section-card">
+      <form method="GET" action="/admin/loyalty" class="filter-form loyalty-filter">
+        <input type="hidden" name="tab" value="referrals">
+        <select name="status" class="form-input" onchange="this.form.submit()" aria-label="Filter status referral">
+          <% ['pending', 'approved', 'rejected', 'all'].forEach(s => { %>
+            <option value="<%= s %>" <%= referralStatus === s ? 'selected' : '' %>><%= s === 'all' ? 'Semua status' : referralStatusLabels[s] %></option>
+          <% }) %>
+        </select>
+      </form>
+      <p class="field-hint">
+        <i class="fas fa-circle-info"></i>
+        Verifikasi secepatnya, jangan tunggu pembayaran: begitu disetujui, diskon <%= formatCurrency(100000) %> dipotong dari tagihan member baru
+        (paket VIP ke atas, selama belum dibayar) dan mereka dikirimi email berisi total terbaru. Poin baru masuk ke alumni setelah pembayaran mereka terkonfirmasi.
+        Poin terisi dari daftar poin paket dan bisa diubah sebelum disetujui. Kalau isian referral belum cocok atau namanya kembar, isi kode, email, atau nama lengkap alumni yang benar.
+      </p>
+
+      <% if (referrals.length === 0) { %>
+        <div class="empty-state compact"><i class="fas fa-user-check"></i><p>Tidak ada referral di filter ini.</p></div>
+      <% } else { %>
+      <div class="table-wrapper">
+        <table class="data-table loyalty-table">
+          <thead>
+            <tr><th>Tanggal</th><th>Member baru</th><th>Isian referral</th><th>Alumni</th><th>Paket</th><th>Status</th><th>Verifikasi</th></tr>
+          </thead>
+          <tbody>
+            <% referrals.forEach(r => { const paid = r.registration_status === 'confirmed'; %>
+            <tr>
+              <td class="loyalty-date"><%= formatDate(r.created_at) %></td>
+              <td>
+                <% if (r.referred_user_id) { %><a href="/admin/users/<%= r.referred_user_id %>"><strong><%= r.referred_name %></strong></a><% } else { %>-<% } %>
+                <div class="table-subtext"><%= r.referred_email || '' %></div>
+                <span class="badge-pill <%= paid ? 'badge-completed' : 'badge-suspended' %>"><%= paid ? 'Sudah bayar' : 'Belum bayar' %></span>
+              </td>
+              <td><code class="loyalty-input-code"><%= r.referral_input %></code></td>
+              <td>
+                <% if (r.referrer_id) { %>
+                  <a href="/admin/users/<%= r.referrer_id %>"><strong><%= r.referrer_name %></strong></a>
+                  <div class="table-subtext"><%= r.referrer_email %><%= r.referrer_code ? ' · ' + r.referrer_code : '' %></div>
+                <% } else { %>
+                  <span class="badge-pill badge-cancelled">Belum cocok</span>
+                <% } %>
+              </td>
+              <td><%= r.selected_class || '-' %><div class="table-subtext"><%= r.package_name || '-' %> · <%= formatCurrency(r.package_price) %></div></td>
+              <td>
+                <span class="badge-pill <%= referralBadge[r.status] %>"><%= referralStatusLabels[r.status] %></span>
+                <% if (r.status !== 'pending') { %>
+                  <div class="table-subtext"><%= r.status === 'approved' ? r.points + ' poin · ' : '' %><%= r.verified_by_name || '' %>, <%= formatDate(r.verified_at) %></div>
+                  <% if (r.status === 'approved' && !paid) { %>
+                    <div class="table-subtext"><i class="fas fa-hourglass-half"></i> Poin menunggu pembayaran member baru</div>
+                  <% } %>
+                  <% if (r.admin_note) { %><div class="table-subtext"><%= r.admin_note %></div><% } %>
+                <% } %>
+              </td>
+              <td>
+                <% if (r.status === 'pending') { %>
+                  <form action="/admin/loyalty/referrals/<%= r.id %>/approve" method="POST" class="loyalty-verify-form">
+                    <label class="loyalty-points-field">
+                      <input type="number" name="points" class="form-input" min="1" max="1000" value="<%= r.points || '' %>" required aria-label="Poin">
+                      <span>poin</span>
+                    </label>
+                    <% if (!r.referrer_id) { %>
+                      <input type="text" name="referrer" class="form-input" placeholder="Kode / email / nama alumni" required aria-label="Alumni pemberi rekomendasi">
+                    <% } %>
+                    <button type="submit" class="btn btn-sm btn-primary"
+                      title="<%= paid ? 'Setujui, poin langsung masuk ke alumni' : 'Setujui, diskon dipotong dan email dikirim ke member baru. Poin masuk setelah mereka membayar' %>">
+                      <i class="fas fa-check"></i> Setujui
+                    </button>
+                  </form>
+                  <form action="/admin/loyalty/referrals/<%= r.id %>/reject" method="POST" class="loyalty-reject-form" data-reject-form>
+                    <input type="hidden" name="admin_note">
+                    <button type="submit" class="btn btn-sm btn-outline"><i class="fas fa-times"></i> Tolak</button>
+                  </form>
+                <% } else { %>
+                  <span class="table-subtext">Sudah diverifikasi</span>
+                <% } %>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <%- include('../partials/loyalty-pager', { page, totalPages, total, firstShown, lastShown, pageUrl, label: 'referral' }) %>
+      <% } %>
+    </div>
+    <% } %>
+
+    <% if (tab === 'claims') { %>
+    <div class="section-card">
+      <form method="GET" action="/admin/loyalty" class="filter-form loyalty-filter">
+        <input type="hidden" name="tab" value="claims">
+        <select name="status" class="form-input" onchange="this.form.submit()" aria-label="Filter status klaim">
+          <option value="open" <%= claimStatus === 'open' ? 'selected' : '' %>>Belum selesai</option>
+          <% claimStatuses.forEach(s => { %>
+            <option value="<%= s %>" <%= claimStatus === s ? 'selected' : '' %>><%= claimStatusLabels[s] %></option>
+          <% }) %>
+          <option value="all" <%= claimStatus === 'all' ? 'selected' : '' %>>Semua status</option>
+        </select>
+      </form>
+      <p class="field-hint"><i class="fas fa-circle-info"></i> Klaim yang ditolak mengembalikan poin ke saldo alumni. Status Selesai dan Ditolak tidak bisa diubah lagi.</p>
+
+      <% if (claims.length === 0) { %>
+        <div class="empty-state compact"><i class="fas fa-gift"></i><p>Tidak ada klaim di filter ini.</p></div>
+      <% } else { %>
+      <div class="table-wrapper">
+        <table class="data-table loyalty-table">
+          <thead>
+            <tr><th>Tanggal</th><th>Alumni</th><th>Hadiah</th><th>Penerima</th><th>Status</th><th>Aksi</th></tr>
+          </thead>
+          <tbody>
+            <% claims.forEach(c => { const isFinal = c.status === 'completed' || c.status === 'rejected'; %>
+            <tr>
+              <td class="loyalty-date"><%= formatDate(c.created_at) %></td>
+              <td>
+                <a href="/admin/users/<%= c.member_id %>"><strong><%= c.member_name %></strong></a>
+                <div class="table-subtext"><%= c.member_email %></div>
+              </td>
+              <td><strong><%= c.reward_item %></strong><div class="table-subtext"><%= c.points %> poin · <%= formatCurrency(c.reward_value) %></div></td>
+              <td>
+                <%= c.recipient_name %> · <%= c.phone %>
+                <div class="table-subtext"><%= c.address %></div>
+                <% if (c.note) { %><div class="table-subtext"><i class="fas fa-note-sticky"></i> <%= c.note %></div><% } %>
+              </td>
+              <td>
+                <span class="badge-pill <%= claimBadge[c.status] %>"><%= claimStatusLabels[c.status] %></span>
+                <% if (c.admin_note) { %><div class="table-subtext"><%= c.admin_note %></div><% } %>
+              </td>
+              <td>
+                <% if (!isFinal) { %>
+                  <form action="/admin/loyalty/claims/<%= c.id %>" method="POST" class="loyalty-verify-form loyalty-claim-form">
+                    <select name="status" class="form-input" aria-label="Status klaim">
+                      <% claimStatuses.filter(s => s !== 'pending').forEach(s => { %>
+                        <option value="<%= s %>" <%= c.status === s ? 'selected' : '' %>><%= claimStatusLabels[s] %></option>
+                      <% }) %>
+                    </select>
+                    <textarea name="admin_note" class="form-textarea" rows="2" maxlength="1000"
+                      placeholder="Catatan / no. resi" aria-label="Catatan admin"><%= c.admin_note || '' %></textarea>
+                    <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-floppy-disk"></i> Simpan</button>
+                  </form>
+                <% } else { %>
+                  <span class="table-subtext">Final</span>
+                <% } %>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <%- include('../partials/loyalty-pager', { page, totalPages, total, firstShown, lastShown, pageUrl, label: 'klaim' }) %>
+      <% } %>
+    </div>
+    <% } %>
+
+    <% if (tab === 'points') { %>
+    <div class="section-card">
+      <h3 class="section-title"><i class="fas fa-ranking-star"></i> Poin Alumni Periode Ini</h3>
+      <% if (alumni.length === 0) { %>
+        <div class="empty-state compact"><i class="fas fa-ranking-star"></i><p>Belum ada alumni dengan poin di periode ini.</p></div>
+      <% } else { %>
+      <div class="table-wrapper">
+        <table class="data-table loyalty-table">
+          <thead>
+            <tr><th>#</th><th>Alumni</th><th>Kode</th><th>Referral disetujui</th><th>Poin didapat</th><th>Ditukar</th><th>Saldo</th><th>Menunggu</th></tr>
+          </thead>
+          <tbody>
+            <% alumni.forEach((a, i) => { %>
+            <tr>
+              <td><%= i + 1 %></td>
+              <td><a href="/admin/users/<%= a.id %>"><strong><%= a.name %></strong></a><div class="table-subtext"><%= a.email %></div></td>
+              <td><%= a.loyalty_code || '-' %></td>
+              <td><%= a.referrals %></td>
+              <td><%= a.earned %></td>
+              <td><%= a.spent %></td>
+              <td><strong><%= a.balance %></strong></td>
+              <td><%= a.pending %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </div>
+    <% } %>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('[data-reject-form]').forEach((form) => {
+  form.addEventListener('submit', (event) => {
+    const note = prompt('Alasan menolak referral ini (opsional):', '');
+    if (note === null) { event.preventDefault(); return; }
+    form.elements.admin_note.value = note;
+  });
+});
+</script>
+
+<%- include('../partials/footer') %>

@@ -64,10 +64,49 @@
         </div>
       </div>
 
+      <% if (typeof referral !== 'undefined' && referral) { %>
+        <div class="referral-status referral-status-<%= referral.status %>">
+          <span class="referral-status-icon" aria-hidden="true">
+            <% if (referral.status === 'pending') { %><i class="fas fa-circle-notch"></i>
+            <% } else if (referral.status === 'approved') { %><i class="fas fa-circle-check"></i>
+            <% } else { %><i class="fas fa-circle-xmark"></i><% } %>
+          </span>
+          <div>
+            <% if (referral.status === 'pending') { %>
+              <strong>Waiting for the Verification</strong>
+              <p>
+                Admin sedang mengecek nama pemberi rekomendasi kamu. Total di bawah ini <b>belum termasuk diskon</b>.
+                Kalau referral kamu valid, diskon <%= formatCurrency(100000) %> dipotong untuk paket VIP ke atas dan kami
+                kirim email berisi total terbaru ke <%= registration.email %>. Tunggu email itu dulu sebelum transfer
+                supaya kamu membayar jumlah yang benar.
+              </p>
+            <% } else if (referral.status === 'approved') { %>
+              <strong>Referral terverifikasi</strong>
+              <p>
+                <% if (Number(registration.referral_discount) > 0) { %>
+                  Diskon <%= formatCurrency(registration.referral_discount) %> sudah dipotong. Total di bawah ini adalah jumlah yang perlu kamu transfer.
+                <% } else { %>
+                  Pemberi rekomendasi kamu sudah dikonfirmasi admin. Diskon referral hanya untuk paket VIP ke atas, jadi total kamu tetap sama.
+                <% } %>
+              </p>
+            <% } else { %>
+              <strong>Referral tidak valid</strong>
+              <p>
+                <%= referral.admin_note || 'Admin tidak menemukan alumni dengan data itu.' %>
+                Tidak ada diskon referral untuk pendaftaran ini, jadi total di bawah adalah harga normal.
+              </p>
+            <% } %>
+          </div>
+        </div>
+      <% } %>
+
       <div class="payment-box">
         <div>
           <span>Total Pembayaran</span>
           <strong><%= formatCurrency(registration.package_price) %></strong>
+          <% if (Number(registration.referral_discount) > 0) { %>
+            <small class="payment-discount"><i class="fas fa-gift"></i> Sudah termasuk diskon referral <%= formatCurrency(registration.referral_discount) %></small>
+          <% } %>
         </div>
         <p>Status: <b><%= registration.status === 'confirmed' ? 'Bukti transfer sudah dikirim' : 'Menunggu bukti transfer' %></b></p>
       </div>

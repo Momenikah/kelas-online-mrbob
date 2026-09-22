@@ -28,6 +28,9 @@
         <div>
           <span>Total yang perlu dibayar</span>
           <strong><%= formatCurrency(registration.package_price) %></strong>
+          <% if (Number(registration.referral_discount) > 0) { %>
+            <small>Sudah termasuk diskon referral <%= formatCurrency(registration.referral_discount) %></small>
+          <% } %>
         </div>
         <button type="button" class="copy-code-btn" id="copyCodeBtn" data-code="<%= registration.registration_code %>">
           <i class="fas fa-copy"></i> Salin ID
