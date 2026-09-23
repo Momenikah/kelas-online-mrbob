@@ -152,7 +152,7 @@ const referralDiscountNote = (registration) => {
     return `Sudah termasuk diskon referral <strong>${escapeHtml(formatCurrency(discount))}</strong> yang sudah diverifikasi admin.<br>`;
   }
   if (!registration.referral_code) return '';
-  return `Total ini belum termasuk diskon referral. Kode <strong>${escapeHtml(registration.referral_code)}</strong> sedang kami verifikasi, dan kalau valid diskon <strong>${escapeHtml(formatCurrency(100000))}</strong> dipotong untuk paket VIP ke atas. Kami kirim email berisi total terbaru sebelum kamu perlu transfer.<br>`;
+  return `Total ini belum termasuk diskon referral. Kode <strong>${escapeHtml(registration.referral_code)}</strong> sedang kami verifikasi, dan kalau valid diskon <strong>${escapeHtml(formatCurrency(100000))}</strong> dipotong untuk paket seharga Rp900.000 ke atas. Kami kirim email berisi total terbaru sebelum kamu perlu transfer.<br>`;
 };
 
 const emailTotalBox = (label, amount, sub = '') => `
@@ -452,7 +452,7 @@ function buildReferralApprovedEmailHtml(registration, { discount = 0, newPrice =
   } else if (alreadyPaid) {
     body += emailParagraph('Pembayaran kamu sudah kami terima sebelum verifikasi selesai, jadi diskon referral tidak bisa dipotong lagi dari tagihan ini. Hubungi admin kalau kamu ingin menanyakan hal ini.');
   } else {
-    body += emailParagraph(`Diskon referral hanya berlaku untuk paket VIP dan paket lain yang harganya setara atau lebih besar, jadi total pembayaran kamu tetap sama. Silakan lanjutkan pembayaran seperti biasa:`);
+    body += emailParagraph(`Diskon referral hanya berlaku untuk paket seharga Rp900.000 ke atas, jadi total pembayaran kamu tetap sama. Pemberi rekomendasi kamu tetap menerima poin. Silakan lanjutkan pembayaran seperti biasa:`);
   }
 
   body += emailButton(link, 'Buka Halaman Pendaftaran');

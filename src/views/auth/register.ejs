@@ -677,7 +677,7 @@ function updatePayment() {
       <span>Diskon Referral (setelah verifikasi)</span>
       <strong>- ${rupiah(REFERRAL_DISCOUNT)}</strong>
     </div>` : ''}
-    ${referralState.valid && !discountEligible ? `<div class="summary-note">Diskon referral ${rupiah(REFERRAL_DISCOUNT)} berlaku untuk paket VIP dan paket seharga ${rupiah(REFERRAL_MIN_PRICE)} ke atas.</div>` : ''}
+    ${referralState.valid && !discountEligible ? `<div class="summary-note">Paket ini tidak mendapat potongan harga. Diskon ${rupiah(REFERRAL_DISCOUNT)} hanya untuk paket seharga ${rupiah(REFERRAL_MIN_PRICE)} ke atas, tetapi pemberi rekomendasi kamu tetap menerima poin.</div>` : ''}
     <div class="summary-row">
       <span>Kode Unik</span>
       <strong>${uniqueCode ? '+ ' + uniqueCode : 'Isi 3 Digit HP'}</strong>
@@ -731,7 +731,7 @@ async function checkReferral() {
     if (requestId !== referralRequest) return; // ada pengecekan yang lebih baru
     referralState = { valid: !!data.valid, checkedValue: value };
     if (data.valid) {
-      setReferralHint('ok', `<i class="fas fa-check-circle"></i> Referral atas nama ${escapeHtml(data.name)} ditemukan. Diskon ${rupiah(REFERRAL_DISCOUNT)} untuk paket VIP ke atas dipotong setelah admin memverifikasi.`);
+      setReferralHint('ok', `<i class="fas fa-check-circle"></i> Referral atas nama ${escapeHtml(data.name)} ditemukan. Diskon ${rupiah(REFERRAL_DISCOUNT)} untuk paket seharga ${rupiah(REFERRAL_MIN_PRICE)} ke atas dipotong setelah admin memverifikasi.`);
     } else if (data.ambiguous) {
       setReferralHint('error', '<i class="fas fa-circle-exclamation"></i> Nama itu dipakai lebih dari satu alumni. Minta kode referral-nya supaya diskon bisa dipakai.');
     } else {

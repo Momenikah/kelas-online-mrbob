@@ -76,7 +76,7 @@
               <strong>Waiting for the Verification</strong>
               <p>
                 Admin sedang mengecek nama pemberi rekomendasi kamu. Total di bawah ini <b>belum termasuk diskon</b>.
-                Kalau referral kamu valid, diskon <%= formatCurrency(100000) %> dipotong untuk paket VIP ke atas dan kami
+                Kalau referral kamu valid, diskon <%= formatCurrency(100000) %> dipotong untuk paket seharga Rp900.000 ke atas dan kami
                 kirim email berisi total terbaru ke <%= registration.email %>. Tunggu email itu dulu sebelum transfer
                 supaya kamu membayar jumlah yang benar.
               </p>
@@ -86,7 +86,7 @@
                 <% if (Number(registration.referral_discount) > 0) { %>
                   Diskon <%= formatCurrency(registration.referral_discount) %> sudah dipotong. Total di bawah ini adalah jumlah yang perlu kamu transfer.
                 <% } else { %>
-                  Pemberi rekomendasi kamu sudah dikonfirmasi admin. Diskon referral hanya untuk paket VIP ke atas, jadi total kamu tetap sama.
+                  Pemberi rekomendasi kamu sudah dikonfirmasi admin. Diskon referral hanya untuk paket seharga Rp900.000 ke atas, jadi total kamu tetap sama. Pemberi rekomendasi kamu tetap menerima poin.
                 <% } %>
               </p>
             <% } else { %>

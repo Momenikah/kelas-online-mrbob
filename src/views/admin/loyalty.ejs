@@ -68,7 +68,7 @@
       <p class="field-hint">
         <i class="fas fa-circle-info"></i>
         Verifikasi secepatnya, jangan tunggu pembayaran: begitu disetujui, diskon <%= formatCurrency(100000) %> dipotong dari tagihan member baru
-        (paket VIP ke atas, selama belum dibayar) dan mereka dikirimi email berisi total terbaru. Poin baru masuk ke alumni setelah pembayaran mereka terkonfirmasi.
+        (paket Rp900.000 ke atas, selama belum dibayar) dan mereka dikirimi email berisi total terbaru. Poin baru masuk ke alumni setelah pembayaran mereka terkonfirmasi.
         Poin terisi dari daftar poin paket dan bisa diubah sebelum disetujui. Kalau isian referral belum cocok atau namanya kembar, isi kode, email, atau nama lengkap alumni yang benar.
       </p>
 
@@ -172,7 +172,7 @@
                 <a href="/admin/users/<%= c.member_id %>"><strong><%= c.member_name %></strong></a>
                 <div class="table-subtext"><%= c.member_email %></div>
               </td>
-              <td><strong><%= c.reward_item %></strong><div class="table-subtext"><%= c.points %> poin · <%= formatCurrency(c.reward_value) %></div></td>
+              <td><strong><%= c.reward_item %></strong><div class="table-subtext"><%= c.points %> poin</div></td>
               <td>
                 <%= c.recipient_name %> · <%= c.phone %>
                 <div class="table-subtext"><%= c.address %></div>

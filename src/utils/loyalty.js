@@ -5,10 +5,11 @@
 // Keputusan detail tercatat di docs/specs/0001-alumni-loyalty-program.md.
 // =============================================
 
-// Member baru dapat diskon ini kalau referral valid dan harga paket per orang
-// setara atau di atas paket VIP.
+// Member baru dapat diskon ini kalau referral sudah diverifikasi admin dan
+// harga paket per orang minimal Rp900.000. Di bawah itu alumni tetap dapat
+// poin, tetapi member barunya tidak dapat potongan harga (revisi klien).
 const REFERRAL_DISCOUNT = 100000;
-const DISCOUNT_MIN_PRICE = 980000;
+const DISCOUNT_MIN_PRICE = 900000;
 
 // Rincian poin per paket (tab DRAFT KATALOG), lengkap seperti dokumen klien.
 // Di formulir, TOEFL dijual dengan nama paket VIP dan IELTS Luxury dengan nama

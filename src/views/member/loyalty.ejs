@@ -6,7 +6,7 @@
   const claimBadge = { pending: 'badge-suspended', processing: 'badge-upcoming', shipped: 'badge-upcoming', completed: 'badge-completed', rejected: 'badge-cancelled' };
   const progress = nextTier ? Math.min(1, summary.balance / nextTier.points) : 1;
   const affordable = rewardTiers.filter(t => t.points <= summary.balance);
-  const shareText = `Yuk belajar bahasa Inggris di Kelas Online Mr.BOB! Daftar lewat link ini dan pakai kode referral ${code} untuk diskon ${formatCurrency(referralDiscount)} (paket VIP ke atas): ${shareLink}`;
+  const shareText = `Yuk belajar bahasa Inggris di Kelas Online Mr.BOB! Daftar lewat link ini dan pakai kode referral ${code} untuk diskon ${formatCurrency(referralDiscount)} (paket Rp900.000 ke atas): ${shareLink}`;
 %>
 
 <div class="page-wrapper">
@@ -35,7 +35,7 @@
           </div>
           <small>
             <% if (nextTier) { %>
-              <%= nextTier.points - summary.balance %> poin lagi untuk hadiah <%= formatCurrency(nextTier.value) %>
+              <%= nextTier.points - summary.balance %> poin lagi menuju hadiah <%= nextTier.points %> poin
             <% } else { %>
               Semua hadiah di katalog bisa kamu tukar.
             <% } %>
@@ -87,7 +87,7 @@
           <article class="loyalty-tier <%= canClaim ? 'is-open' : '' %>">
             <header>
               <strong><%= tier.points %> <small>poin</small></strong>
-              <span>Senilai <%= formatCurrency(tier.value) %></span>
+              <span>Pilih salah satu</span>
             </header>
             <ul>
               <% tier.items.forEach(item => { %><li><%= item %></li><% }) %>
@@ -177,7 +177,7 @@
           <label class="form-label" for="claimReward">Hadiah</label>
           <select name="reward" id="claimReward" class="form-input" required>
             <% affordable.forEach(tier => { %>
-              <optgroup label="<%= tier.points %> poin (senilai <%= formatCurrency(tier.value) %>)">
+              <optgroup label="Hadiah <%= tier.points %> poin">
                 <% tier.items.forEach(item => { %>
                   <option value="<%= tier.points %>|<%= item %>" data-tier="<%= tier.points %>" data-points="<%= tier.points %>"><%= item %> — <%= tier.points %> poin</option>
                 <% }) %>

@@ -30,7 +30,7 @@
         <div class="lp-card-track"><i></i></div>
         <ul class="lp-card-list">
           <li><span>2 teman daftar paket VIP</span><b>+20</b></li>
-          <li><span>Tukar: e-money senilai</span><b><%= formatCurrency(200000) %></b></li>
+          <li><span>Tukar dengan e-money</span><b>20 poin</b></li>
         </ul>
       </div>
     </div>
@@ -69,7 +69,7 @@
         <i class="fas fa-tags"></i>
         <div>
           <strong>Teman kamu juga untung</strong>
-          <p>Member baru yang mendaftar dengan referral alumni mendapat diskon <b><%= formatCurrency(referralDiscount) %></b> untuk paket VIP dan paket lain seharga <%= formatCurrency(discountMinPrice) %> ke atas. Diskon dipotong setelah admin memverifikasi referralnya, dan totalnya dikirim lewat email.</p>
+          <p>Member baru yang mendaftar dengan referral alumni mendapat diskon <b><%= formatCurrency(referralDiscount) %></b> untuk paket seharga <%= formatCurrency(discountMinPrice) %> ke atas. Diskon dipotong setelah admin memverifikasi referralnya, dan totalnya dikirim lewat email.</p>
         </div>
       </div>
     </div>
@@ -89,7 +89,7 @@
               <strong><%= tier.points %></strong>
               <span>poin</span>
             </div>
-            <p class="lp-tier-value">Senilai <%= formatCurrency(tier.value) %></p>
+            <p class="lp-tier-value">Pilih salah satu</p>
             <ul>
               <% tier.items.forEach(item => { %><li><i class="fas fa-check"></i> <%= item %></li><% }) %>
             </ul>
@@ -147,7 +147,7 @@
           <li>Member baru adalah orang yang direkomendasikan oleh pemberi rekomendasi untuk kursus di Kelas Online Mr.BOB.</li>
           <li>Rekomendasi dilakukan dengan cara member baru mendaftar di aplikasi Kelas Online (<a href="/register">app.kelasonlinemrbob.com</a>) dan mengisi kode referral atau nama lengkap pemberi rekomendasi pada kolom referral.</li>
           <li>Admin melakukan verifikasi internal. Jika data valid, pemberi rekomendasi mendapat poin sesuai nominal transaksi setelah member baru menyelesaikan pembayaran.</li>
-          <li>Member baru mendapat diskon kursus <%= formatCurrency(referralDiscount) %> bila mendaftar dengan referral yang valid, khusus paket VIP dan paket lain yang harganya setara atau lebih besar dari paket VIP. Diskon dipotong setelah verifikasi admin, bukan saat mengisi formulir.</li>
+          <li>Member baru mendapat diskon kursus <%= formatCurrency(referralDiscount) %> bila mendaftar dengan referral yang valid, khusus paket seharga <%= formatCurrency(discountMinPrice) %> ke atas. Untuk paket di bawah itu, pemberi rekomendasi tetap menerima poin tetapi member baru tidak mendapat potongan harga. Diskon dipotong setelah verifikasi admin, bukan saat mengisi formulir.</li>
         </ol>
       </details>
 
