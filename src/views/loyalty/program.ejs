@@ -84,7 +84,13 @@
       </header>
       <div class="lp-tiers">
         <% rewardTiers.forEach(tier => { %>
-          <article class="lp-tier">
+          <article class="lp-tier" data-tier="<%= tier.points %>">
+            <div class="lp-tier-visual">
+              <picture>
+                <source srcset="/img/loyalty/tier-<%= tier.points %>.webp" type="image/webp">
+                <img src="/img/loyalty/tier-<%= tier.points %>.png" alt="Hadiah <%= tier.points %> Poin" class="lp-tier-img" loading="lazy">
+              </picture>
+            </div>
             <div class="lp-tier-head">
               <strong><%= tier.points %></strong>
               <span>poin</span>
